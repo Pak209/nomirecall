@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct MemoryDetailView: View {
     @EnvironmentObject private var memoryStore: MemoryStore
@@ -9,6 +10,12 @@ struct MemoryDetailView: View {
     @State private var isSaving = false
     @State private var isDeleting = false
     @State private var isConfirmingDelete = false
+    @State private var exportedFileURL: URL?
+    @State private var isShowingShareSheet = false
+    @State private var isShowingMarkdownPreview = false
+    @State private var markdownPreview = ""
+    @State private var exportMessage: String?
+    @State private var exportErrorMessage: String?
 
     init(memory: NomiMemory) {
         _draft = State(initialValue: memory)
@@ -41,6 +48,7 @@ struct MemoryDetailView: View {
                         .textInputAutocapitalization(.never)
                         .nomiTextField()
 
+                    exportSection
                     actions
                 }
                 .padding(20)
@@ -58,6 +66,38 @@ struct MemoryDetailView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text(memoryStore.errorMessage ?? "Something went wrong.")
+        }
+        .alert("Export failed", isPresented: exportErrorBinding) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(exportErrorMessage ?? "Nomi could not create the Markdown file.")
+        }
+        .sheet(isPresented: $isShowingShareSheet) {
+            if let exportedFileURL {
+                ShareSheet(activityItems: [exportedFileURL])
+            }
+        }
+        .sheet(isPresented: $isShowingMarkdownPreview) {
+            NavigationStack {
+                ScrollView {
+                    Text(markdownPreview)
+                        .font(.system(.body, design: .monospaced))
+                        .foregroundStyle(Color.nomiInk)
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding()
+                }
+                .background(NomiBackground())
+                .navigationTitle("Markdown Preview")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Done") {
+                            isShowingMarkdownPreview = false
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -123,10 +163,61 @@ struct MemoryDetailView: View {
         }
     }
 
+    private var exportSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Obsidian")
+                .font(.headline)
+                .foregroundStyle(Color.nomiInk)
+
+            Button {
+                exportAsObsidianNote()
+            } label: {
+                Label("Export as Obsidian Note", systemImage: "square.and.arrow.up")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(NomiSecondaryButtonStyle())
+            .disabled(isSaving || isDeleting)
+
+            HStack(spacing: 12) {
+                Button {
+                    copyMarkdown()
+                } label: {
+                    Label("Copy Markdown", systemImage: "doc.on.doc")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(NomiSecondaryButtonStyle())
+
+                Button {
+                    previewMarkdown()
+                } label: {
+                    Label("Preview", systemImage: "doc.text.magnifyingglass")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(NomiSecondaryButtonStyle())
+            }
+
+            if let exportMessage {
+                Text(exportMessage)
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.green)
+            }
+        }
+        .padding(16)
+        .background(.white.opacity(0.82))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
     private var errorBinding: Binding<Bool> {
         Binding(
             get: { memoryStore.errorMessage != nil },
             set: { if !$0 { memoryStore.errorMessage = nil } }
+        )
+    }
+
+    private var exportErrorBinding: Binding<Bool> {
+        Binding(
+            get: { exportErrorMessage != nil },
+            set: { if !$0 { exportErrorMessage = nil } }
         )
     }
 
@@ -147,5 +238,38 @@ struct MemoryDetailView: View {
         if await memoryStore.delete(draft) {
             dismiss()
         }
+    }
+
+    private func currentExportMemory() -> NomiMemory {
+        var memory = draft
+        memory.tags = tagText.nomiTags
+        return memory
+    }
+
+    private func exportAsObsidianNote() {
+        do {
+            let memory = currentExportMemory()
+            let markdown = MarkdownExporter.makeMarkdown(from: memory)
+            let fileURL = try MarkdownExporter.writeMarkdownFile(
+                markdown: markdown,
+                title: memory.title
+            )
+            exportedFileURL = fileURL
+            exportMessage = "Markdown file ready to share."
+            isShowingShareSheet = true
+        } catch {
+            exportErrorMessage = error.localizedDescription
+        }
+    }
+
+    private func copyMarkdown() {
+        let markdown = MarkdownExporter.makeMarkdown(from: currentExportMemory())
+        UIPasteboard.general.string = markdown
+        exportMessage = "Markdown copied."
+    }
+
+    private func previewMarkdown() {
+        markdownPreview = MarkdownExporter.makeMarkdown(from: currentExportMemory())
+        isShowingMarkdownPreview = true
     }
 }
