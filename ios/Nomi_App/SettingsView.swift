@@ -25,7 +25,7 @@ struct SettingsView: View {
             }
             .navigationTitle("Settings")
             .sheet(isPresented: $isShowingPaywall) {
-                PaywallView(displayCloseButton: true)
+                NomiPaywallView()
             }
             .sheet(isPresented: $isShowingCustomerCenter) {
                 CustomerCenterView()

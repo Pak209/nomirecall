@@ -60,6 +60,19 @@ final class PurchaseStore: ObservableObject {
         }
     }
 
+    func purchase(_ package: Package) async {
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+
+        do {
+            let result = try await Purchases.shared.purchase(package: package)
+            customerInfo = result.customerInfo
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
     private func observeCustomerInfo() {
         Task {
             for await newCustomerInfo in Purchases.shared.customerInfoStream {

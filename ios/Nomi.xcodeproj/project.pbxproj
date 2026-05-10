@@ -45,6 +45,7 @@
 		BCADF9DEB48F73E165C7DA5B /* XBackendService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 780E29385D410EE2A374CA8D /* XBackendService.swift */; };
 		BF0CA75C04DE1BACC9DC792B /* NomiControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEB475CC9A4C2CE315818FF0 /* NomiControls.swift */; };
 		C71588CF0528D5861BFCB354 /* AuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 023CA8064AE4526C1CBFCEFC /* AuthService.swift */; };
+		C72621B6F3F3FD0ACCF6955F /* NomiPaywallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F81FF0E663F233BB1A4DFB0A /* NomiPaywallView.swift */; };
 		C96C659D7C0D84318F6C8DF5 /* NomiBackground.swift in Sources */ = {isa = PBXBuildFile; fileRef = E19204E49FA71C9C3F7B7CB1 /* NomiBackground.swift */; };
 		D333F27B4EF6E727D790A4A6 /* QuickCaptureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDEB249721001A9EFD4599A8 /* QuickCaptureView.swift */; };
 		DB3FA86C1FAF04EF0921A645 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 539BC29121E5CF1D60CBB022 /* Foundation.framework */; };
@@ -101,6 +102,7 @@
 		ED762E379793815EC13BD3F5 /* DiscoverView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DiscoverView.swift; sourceTree = "<group>"; };
 		F5627D30997EBF1C9C550A2A /* MemoryDetailView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MemoryDetailView.swift; sourceTree = "<group>"; };
 		F7D9E1335968406A90DE28A1 /* noop-file.swift */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.swift; name = "noop-file.swift"; path = "Nomi/noop-file.swift"; sourceTree = "<group>"; };
+		F81FF0E663F233BB1A4DFB0A /* NomiPaywallView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NomiPaywallView.swift; sourceTree = "<group>"; };
 		FA7E40E491E286B68943BF17 /* BackendConfig.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BackendConfig.swift; sourceTree = "<group>"; };
 		FAC4AC0C9597D3379C41A16B /* Nomi.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Nomi.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		FAC715A2D49A985799AEE119 /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-Nomi/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
@@ -194,6 +196,7 @@
 				E472180490C8BE07A9C07C6D /* RevenueCatBootstrap.swift */,
 				03B1BA0E5198465E668F1619 /* PurchaseStore.swift */,
 				ED762E379793815EC13BD3F5 /* DiscoverView.swift */,
+				F81FF0E663F233BB1A4DFB0A /* NomiPaywallView.swift */,
 			);
 			path = Nomi_App;
 			sourceTree = "<group>";
@@ -540,6 +543,7 @@
 				88C3A5A31E371E1DC9B5C4E9 /* RevenueCatBootstrap.swift in Sources */,
 				04EA7BE19AFE7CF963793653 /* PurchaseStore.swift in Sources */,
 				62A09443F7F40E99A24E3CFA /* DiscoverView.swift in Sources */,
+				C72621B6F3F3FD0ACCF6955F /* NomiPaywallView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
