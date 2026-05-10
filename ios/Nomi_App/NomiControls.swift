@@ -1,5 +1,15 @@
 import SwiftUI
 
+extension Color {
+    static let nomiInk = Color(red: 0.10, green: 0.10, blue: 0.13)
+    static let nomiMuted = Color(red: 0.58, green: 0.55, blue: 0.62)
+    static let nomiOrange = Color(red: 1.00, green: 0.50, blue: 0.11)
+    static let nomiCoral = Color(red: 1.00, green: 0.35, blue: 0.31)
+    static let nomiPink = Color(red: 1.00, green: 0.15, blue: 0.46)
+    static let nomiPurple = Color(red: 0.50, green: 0.28, blue: 1.00)
+    static let nomiCream = Color(red: 1.00, green: 0.96, blue: 0.92)
+}
+
 struct NomiPrimaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
