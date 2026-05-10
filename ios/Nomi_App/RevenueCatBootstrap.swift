@@ -5,7 +5,7 @@ enum RevenueCatBootstrap {
     #if DEBUG
     static let apiKey = "test_bttPcQWbrAMlgJEOIWVYlokorNq"
     #else
-    static let apiKey = ""
+    static let apiKey = "appl_HUPnABuXmDYjCuQKeiuJGmQbKHg"
     #endif
 
     static let proEntitlementIdentifier = "Nomi Pro"
