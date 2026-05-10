@@ -97,6 +97,17 @@ struct NomiPaywallView: View {
                 Text("Nomi Pro is active")
                     .font(.title3.bold())
                     .foregroundStyle(.green)
+            } else if !RevenueCatBootstrap.isReadyForPurchases {
+                VStack(spacing: 8) {
+                    Text("Nomi Pro is not ready yet")
+                        .font(.headline)
+                    Text("Purchases need a production RevenueCat key before TestFlight users can subscribe.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
             } else if let monthlyPackage {
                 VStack(spacing: 6) {
                     Text("Monthly")

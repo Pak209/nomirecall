@@ -13,14 +13,24 @@ final class PurchaseStore: ObservableObject {
     }
 
     var proStatusLabel: String {
-        hasNomiPro ? "Nomi Pro active" : "Free plan"
+        if !RevenueCatBootstrap.isReadyForPurchases {
+            return "Purchases not configured"
+        }
+        return hasNomiPro ? "Nomi Pro active" : "Free plan"
     }
 
     init() {
-        observeCustomerInfo()
+        if RevenueCatBootstrap.isReadyForPurchases {
+            observeCustomerInfo()
+        }
     }
 
     func refresh() async {
+        guard RevenueCatBootstrap.isReadyForPurchases else {
+            errorMessage = "Purchases are not configured yet."
+            return
+        }
+
         isLoading = true
         defer { isLoading = false }
 
@@ -35,6 +45,10 @@ final class PurchaseStore: ObservableObject {
     }
 
     func syncUser(userId: String?) async {
+        guard RevenueCatBootstrap.isReadyForPurchases else {
+            return
+        }
+
         do {
             if let userId, !userId.isEmpty {
                 let result = try await Purchases.shared.logIn(userId)
@@ -50,6 +64,11 @@ final class PurchaseStore: ObservableObject {
     }
 
     func restorePurchases() async {
+        guard RevenueCatBootstrap.isReadyForPurchases else {
+            errorMessage = "Purchases are not configured yet."
+            return
+        }
+
         isLoading = true
         defer { isLoading = false }
 
@@ -61,6 +80,11 @@ final class PurchaseStore: ObservableObject {
     }
 
     func purchase(_ package: Package) async {
+        guard RevenueCatBootstrap.isReadyForPurchases else {
+            errorMessage = "Purchases are not configured yet."
+            return
+        }
+
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
