@@ -20,13 +20,14 @@ struct AuthStackView: View {
             ZStack {
                 NomiBackground()
 
-                VStack(spacing: 24) {
-                    VStack(spacing: 12) {
-                        Image("AppIcon")
+                VStack(spacing: 20) {
+                    VStack(spacing: 10) {
+                        Image("NomiMascot")
                             .resizable()
                             .scaledToFit()
-                            .frame(width: 96, height: 96)
-                            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                            .frame(width: 112, height: 112)
+                            .padding(10)
+                            .background(.white.opacity(0.52), in: Circle())
 
                         Text("Nomi")
                             .font(.system(size: 44, weight: .bold, design: .rounded))
