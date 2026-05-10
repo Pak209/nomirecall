@@ -1,0 +1,884 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 54;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		04EA7BE19AFE7CF963793653 /* PurchaseStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03B1BA0E5198465E668F1619 /* PurchaseStore.swift */; };
+		09FB3CF85FAE766CD86516D6 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A1FA9C2AB1FF7A7A453A296D /* Assets.xcassets */; };
+		0A0A0BD4D0ECEBF7503A1789 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 3835DFB317F094FD68CFC186 /* FirebaseFirestore */; };
+		13B07FBC1A68108700A75B9A /* AppDelegate.mm in Sources */ = {isa = PBXBuildFile; fileRef = 13B07FB01A68108700A75B9A /* AppDelegate.mm */; };
+		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
+		13B07FC11A68108700A75B9A /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 13B07FB71A68108700A75B9A /* main.m */; };
+		1FCF34BE588E09BBCCAB7C0C /* Nomi_AppApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00F0AEECB97CBE9B468AB80B /* Nomi_AppApp.swift */; };
+		239075CDCC2C5285AD91AF33 /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = 5CA6D7C800C25ADE16AFF8E4 /* FirebaseStorage */; };
+		2611B6276C303EE22479F2A6 /* FirebaseBootstrap.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3832AB5D187347568CA63290 /* FirebaseBootstrap.swift */; };
+		26A9959E38C44989E6CBEA1F /* NomiFormatters.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAADDD4382D5095095C8C7C5 /* NomiFormatters.swift */; };
+		2FD02CAD479AA01BFDCC74FC /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D501EA1B4D8F681751EB04F /* SettingsView.swift */; };
+		31F1DC2906FF60DF14C0C067 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = E76A2C4ED4541E44D1CC4547 /* PrivacyInfo.xcprivacy */; };
+		35C45096F08845FE8E1C849A /* noop-file.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7D9E1335968406A90DE28A1 /* noop-file.swift */; };
+		39DDAB4E51087852A3BAB439 /* EmptyStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B82B60EAD008E692668BEC5 /* EmptyStateView.swift */; };
+		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
+		3E4D598EFC2170139FFAE4D4 /* MemoryCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A9ACFB55BB89EA80BF087C3 /* MemoryCardView.swift */; };
+		62A09443F7F40E99A24E3CFA /* DiscoverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED762E379793815EC13BD3F5 /* DiscoverView.swift */; };
+		75B59C72983D97A0674384A1 /* LoadingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 477BD54A690043D328BB8FE0 /* LoadingView.swift */; };
+		7D923EE396FD483A72020F3A /* RevenueCatUI in Frameworks */ = {isa = PBXBuildFile; productRef = 26838F235C41A3977A3902E8 /* RevenueCatUI */; };
+		8448F09CB02F172CF2F7C28F /* BackendConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA7E40E491E286B68943BF17 /* BackendConfig.swift */; };
+		881B15EA4A4A2FDE85858E3A /* AppSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 025E759FE95060F50E8FAF8D /* AppSession.swift */; };
+		88BE4C2B60009FF2E86D05A6 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8C8A8DB6D9A5001CA7414DC /* HomeView.swift */; };
+		88C3A5A31E371E1DC9B5C4E9 /* RevenueCatBootstrap.swift in Sources */ = {isa = PBXBuildFile; fileRef = E472180490C8BE07A9C07C6D /* RevenueCatBootstrap.swift */; };
+		89BD840DEEC4B9222B768D76 /* RecallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74A7AC3E41E0FFC1306DDD72 /* RecallView.swift */; };
+		8E3A229B2B03F8D040556D10 /* AuthStackView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9964D226D6037015D6FAC2D5 /* AuthStackView.swift */; };
+		91ABA99C9054938B58C49317 /* MemoryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 258E798A15EBCFFDA671A56B /* MemoryService.swift */; };
+		940CB849208C2626A1A7BFE6 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 564C1BF454C02C57B7687386 /* GoogleService-Info.plist */; };
+		96905EF65AED1B983A6B3ABC /* libPods-Nomi.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 58EEBF8E8E6FB1BC6CAF49B5 /* libPods-Nomi.a */; };
+		A4100BF1057A4BE121D63588 /* MemoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8A93D02E68AB774863407EC /* MemoryStore.swift */; };
+		A84DF51953538D99ABF7BB9B /* UserProfileService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B57A1310C5744919811FA515 /* UserProfileService.swift */; };
+		A8BA0437BB6FD0F553613026 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34E40BE9845930A8DD4A3446 /* ContentView.swift */; };
+		AD938C3BA7CC0CF74F2DF915 /* MainTabsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F554E7A931049171E9289AA /* MainTabsView.swift */; };
+		B18059E884C0ABDD17F3DC3D /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAC715A2D49A985799AEE119 /* ExpoModulesProvider.swift */; };
+		B82FA72A1105AA597561575B /* RevenueCat in Frameworks */ = {isa = PBXBuildFile; productRef = 51EF7B14BE8846B19408E7D0 /* RevenueCat */; };
+		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
+		BCADF9DEB48F73E165C7DA5B /* XBackendService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 780E29385D410EE2A374CA8D /* XBackendService.swift */; };
+		BF0CA75C04DE1BACC9DC792B /* NomiControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEB475CC9A4C2CE315818FF0 /* NomiControls.swift */; };
+		C71588CF0528D5861BFCB354 /* AuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 023CA8064AE4526C1CBFCEFC /* AuthService.swift */; };
+		C96C659D7C0D84318F6C8DF5 /* NomiBackground.swift in Sources */ = {isa = PBXBuildFile; fileRef = E19204E49FA71C9C3F7B7CB1 /* NomiBackground.swift */; };
+		D333F27B4EF6E727D790A4A6 /* QuickCaptureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDEB249721001A9EFD4599A8 /* QuickCaptureView.swift */; };
+		DB3FA86C1FAF04EF0921A645 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 539BC29121E5CF1D60CBB022 /* Foundation.framework */; };
+		DBD71B9B18AF2AA34596A99C /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = F6B041995AAA249414F62BA4 /* FirebaseCore */; };
+		E621D5A4A45CF55047E39316 /* MemoryDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5627D30997EBF1C9C550A2A /* MemoryDetailView.swift */; };
+		F4CBC918F65950FA86D112D3 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 41A6F43A2493105F942AA71A /* FirebaseAuth */; };
+		F4F52B5ED25CB9B555F9E40A /* SplashView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC0408D7AC75EE860D8CEF4B /* SplashView.swift */; };
+		FE79B36067D12257D5D6FB08 /* MeetNomiView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46C2070B326AEB9DA6291044 /* MeetNomiView.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		00F0AEECB97CBE9B468AB80B /* Nomi_AppApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Nomi_AppApp.swift; sourceTree = "<group>"; };
+		023CA8064AE4526C1CBFCEFC /* AuthService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AuthService.swift; sourceTree = "<group>"; };
+		025E759FE95060F50E8FAF8D /* AppSession.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppSession.swift; sourceTree = "<group>"; };
+		03B1BA0E5198465E668F1619 /* PurchaseStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PurchaseStore.swift; sourceTree = "<group>"; };
+		0D501EA1B4D8F681751EB04F /* SettingsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		13B07F961A680F5B00A75B9A /* Nomi.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Nomi.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		13B07FAF1A68108700A75B9A /* AppDelegate.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = AppDelegate.h; path = Nomi/AppDelegate.h; sourceTree = "<group>"; };
+		13B07FB01A68108700A75B9A /* AppDelegate.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; name = AppDelegate.mm; path = Nomi/AppDelegate.mm; sourceTree = "<group>"; };
+		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = Nomi/Images.xcassets; sourceTree = "<group>"; };
+		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = Nomi/Info.plist; sourceTree = "<group>"; };
+		13B07FB71A68108700A75B9A /* main.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = main.m; path = Nomi/main.m; sourceTree = "<group>"; };
+		1D9DC5529F87445D59F2D674 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		258E798A15EBCFFDA671A56B /* MemoryService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MemoryService.swift; sourceTree = "<group>"; };
+		34E40BE9845930A8DD4A3446 /* ContentView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		3832AB5D187347568CA63290 /* FirebaseBootstrap.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FirebaseBootstrap.swift; sourceTree = "<group>"; };
+		46C2070B326AEB9DA6291044 /* MeetNomiView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MeetNomiView.swift; sourceTree = "<group>"; };
+		477BD54A690043D328BB8FE0 /* LoadingView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LoadingView.swift; sourceTree = "<group>"; };
+		4A9ACFB55BB89EA80BF087C3 /* MemoryCardView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MemoryCardView.swift; sourceTree = "<group>"; };
+		539BC29121E5CF1D60CBB022 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
+		564C1BF454C02C57B7687386 /* GoogleService-Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
+		58EEBF8E8E6FB1BC6CAF49B5 /* libPods-Nomi.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-Nomi.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		5B82B60EAD008E692668BEC5 /* EmptyStateView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = EmptyStateView.swift; sourceTree = "<group>"; };
+		5F554E7A931049171E9289AA /* MainTabsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MainTabsView.swift; sourceTree = "<group>"; };
+		68E97A4004094EB7B68808A5 /* Nomi-Bridging-Header.h */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.c.h; name = "Nomi-Bridging-Header.h"; path = "Nomi/Nomi-Bridging-Header.h"; sourceTree = "<group>"; };
+		6C2E3173556A471DD304B334 /* Pods-Nomi.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Nomi.debug.xcconfig"; path = "Target Support Files/Pods-Nomi/Pods-Nomi.debug.xcconfig"; sourceTree = "<group>"; };
+		74A7AC3E41E0FFC1306DDD72 /* RecallView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RecallView.swift; sourceTree = "<group>"; };
+		780E29385D410EE2A374CA8D /* XBackendService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = XBackendService.swift; sourceTree = "<group>"; };
+		7A4D352CD337FB3A3BF06240 /* Pods-Nomi.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Nomi.release.xcconfig"; path = "Target Support Files/Pods-Nomi/Pods-Nomi.release.xcconfig"; sourceTree = "<group>"; };
+		9964D226D6037015D6FAC2D5 /* AuthStackView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AuthStackView.swift; sourceTree = "<group>"; };
+		A1FA9C2AB1FF7A7A453A296D /* Assets.xcassets */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = Nomi/SplashScreen.storyboard; sourceTree = "<group>"; };
+		AC0408D7AC75EE860D8CEF4B /* SplashView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SplashView.swift; sourceTree = "<group>"; };
+		B57A1310C5744919811FA515 /* UserProfileService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = UserProfileService.swift; sourceTree = "<group>"; };
+		BB2F792C24A3F905000567C9 /* Expo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Expo.plist; sourceTree = "<group>"; };
+		C8A93D02E68AB774863407EC /* MemoryStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MemoryStore.swift; sourceTree = "<group>"; };
+		CDEB249721001A9EFD4599A8 /* QuickCaptureView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = QuickCaptureView.swift; sourceTree = "<group>"; };
+		E19204E49FA71C9C3F7B7CB1 /* NomiBackground.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NomiBackground.swift; sourceTree = "<group>"; };
+		E472180490C8BE07A9C07C6D /* RevenueCatBootstrap.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RevenueCatBootstrap.swift; sourceTree = "<group>"; };
+		E76A2C4ED4541E44D1CC4547 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xml; name = PrivacyInfo.xcprivacy; path = Nomi/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		E8C8A8DB6D9A5001CA7414DC /* HomeView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
+		EAADDD4382D5095095C8C7C5 /* NomiFormatters.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NomiFormatters.swift; sourceTree = "<group>"; };
+		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
+		ED762E379793815EC13BD3F5 /* DiscoverView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DiscoverView.swift; sourceTree = "<group>"; };
+		F5627D30997EBF1C9C550A2A /* MemoryDetailView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MemoryDetailView.swift; sourceTree = "<group>"; };
+		F7D9E1335968406A90DE28A1 /* noop-file.swift */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.swift; name = "noop-file.swift"; path = "Nomi/noop-file.swift"; sourceTree = "<group>"; };
+		FA7E40E491E286B68943BF17 /* BackendConfig.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BackendConfig.swift; sourceTree = "<group>"; };
+		FAC4AC0C9597D3379C41A16B /* Nomi.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Nomi.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		FAC715A2D49A985799AEE119 /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-Nomi/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
+		FEB475CC9A4C2CE315818FF0 /* NomiControls.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NomiControls.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		13B07F8C1A680F5B00A75B9A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				96905EF65AED1B983A6B3ABC /* libPods-Nomi.a in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		1F790861B8A02686C8721916 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				DB3FA86C1FAF04EF0921A645 /* Foundation.framework in Frameworks */,
+				DBD71B9B18AF2AA34596A99C /* FirebaseCore in Frameworks */,
+				F4CBC918F65950FA86D112D3 /* FirebaseAuth in Frameworks */,
+				0A0A0BD4D0ECEBF7503A1789 /* FirebaseFirestore in Frameworks */,
+				239075CDCC2C5285AD91AF33 /* FirebaseStorage in Frameworks */,
+				B82FA72A1105AA597561575B /* RevenueCat in Frameworks */,
+				7D923EE396FD483A72020F3A /* RevenueCatUI in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		13B07FAE1A68108700A75B9A /* Nomi */ = {
+			isa = PBXGroup;
+			children = (
+				BB2F792B24A3F905000567C9 /* Supporting */,
+				13B07FAF1A68108700A75B9A /* AppDelegate.h */,
+				13B07FB01A68108700A75B9A /* AppDelegate.mm */,
+				13B07FB51A68108700A75B9A /* Images.xcassets */,
+				13B07FB61A68108700A75B9A /* Info.plist */,
+				13B07FB71A68108700A75B9A /* main.m */,
+				AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */,
+				F7D9E1335968406A90DE28A1 /* noop-file.swift */,
+				68E97A4004094EB7B68808A5 /* Nomi-Bridging-Header.h */,
+				E76A2C4ED4541E44D1CC4547 /* PrivacyInfo.xcprivacy */,
+			);
+			name = Nomi;
+			sourceTree = "<group>";
+		};
+		2D16E6871FA4F8E400B85C8A /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
+				58EEBF8E8E6FB1BC6CAF49B5 /* libPods-Nomi.a */,
+				542DD5A686413E0CCA55CC00 /* iOS */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		2D90132EDC5AF7A3847C0B83 /* Nomi_App */ = {
+			isa = PBXGroup;
+			children = (
+				00F0AEECB97CBE9B468AB80B /* Nomi_AppApp.swift */,
+				34E40BE9845930A8DD4A3446 /* ContentView.swift */,
+				A1FA9C2AB1FF7A7A453A296D /* Assets.xcassets */,
+				1D9DC5529F87445D59F2D674 /* Info.plist */,
+				3832AB5D187347568CA63290 /* FirebaseBootstrap.swift */,
+				025E759FE95060F50E8FAF8D /* AppSession.swift */,
+				023CA8064AE4526C1CBFCEFC /* AuthService.swift */,
+				258E798A15EBCFFDA671A56B /* MemoryService.swift */,
+				B57A1310C5744919811FA515 /* UserProfileService.swift */,
+				477BD54A690043D328BB8FE0 /* LoadingView.swift */,
+				E19204E49FA71C9C3F7B7CB1 /* NomiBackground.swift */,
+				9964D226D6037015D6FAC2D5 /* AuthStackView.swift */,
+				46C2070B326AEB9DA6291044 /* MeetNomiView.swift */,
+				5F554E7A931049171E9289AA /* MainTabsView.swift */,
+				FEB475CC9A4C2CE315818FF0 /* NomiControls.swift */,
+				564C1BF454C02C57B7687386 /* GoogleService-Info.plist */,
+				AC0408D7AC75EE860D8CEF4B /* SplashView.swift */,
+				C8A93D02E68AB774863407EC /* MemoryStore.swift */,
+				EAADDD4382D5095095C8C7C5 /* NomiFormatters.swift */,
+				4A9ACFB55BB89EA80BF087C3 /* MemoryCardView.swift */,
+				5B82B60EAD008E692668BEC5 /* EmptyStateView.swift */,
+				E8C8A8DB6D9A5001CA7414DC /* HomeView.swift */,
+				CDEB249721001A9EFD4599A8 /* QuickCaptureView.swift */,
+				74A7AC3E41E0FFC1306DDD72 /* RecallView.swift */,
+				F5627D30997EBF1C9C550A2A /* MemoryDetailView.swift */,
+				0D501EA1B4D8F681751EB04F /* SettingsView.swift */,
+				FA7E40E491E286B68943BF17 /* BackendConfig.swift */,
+				780E29385D410EE2A374CA8D /* XBackendService.swift */,
+				E472180490C8BE07A9C07C6D /* RevenueCatBootstrap.swift */,
+				03B1BA0E5198465E668F1619 /* PurchaseStore.swift */,
+				ED762E379793815EC13BD3F5 /* DiscoverView.swift */,
+			);
+			path = Nomi_App;
+			sourceTree = "<group>";
+		};
+		542DD5A686413E0CCA55CC00 /* iOS */ = {
+			isa = PBXGroup;
+			children = (
+				539BC29121E5CF1D60CBB022 /* Foundation.framework */,
+			);
+			name = iOS;
+			sourceTree = "<group>";
+		};
+		832341AE1AAA6A7D00B99B32 /* Libraries */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Libraries;
+			sourceTree = "<group>";
+		};
+		83CBB9F61A601CBA00E9B192 = {
+			isa = PBXGroup;
+			children = (
+				13B07FAE1A68108700A75B9A /* Nomi */,
+				832341AE1AAA6A7D00B99B32 /* Libraries */,
+				83CBBA001A601CBA00E9B192 /* Products */,
+				2D16E6871FA4F8E400B85C8A /* Frameworks */,
+				D65327D7A22EEC0BE12398D9 /* Pods */,
+				D7E4C46ADA2E9064B798F356 /* ExpoModulesProviders */,
+				2D90132EDC5AF7A3847C0B83 /* Nomi_App */,
+			);
+			indentWidth = 2;
+			sourceTree = "<group>";
+			tabWidth = 2;
+			usesTabs = 0;
+		};
+		83CBBA001A601CBA00E9B192 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				13B07F961A680F5B00A75B9A /* Nomi.app */,
+				FAC4AC0C9597D3379C41A16B /* Nomi.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		92DBD88DE9BF7D494EA9DA96 /* Nomi */ = {
+			isa = PBXGroup;
+			children = (
+				FAC715A2D49A985799AEE119 /* ExpoModulesProvider.swift */,
+			);
+			name = Nomi;
+			sourceTree = "<group>";
+		};
+		BB2F792B24A3F905000567C9 /* Supporting */ = {
+			isa = PBXGroup;
+			children = (
+				BB2F792C24A3F905000567C9 /* Expo.plist */,
+			);
+			name = Supporting;
+			path = Nomi/Supporting;
+			sourceTree = "<group>";
+		};
+		D65327D7A22EEC0BE12398D9 /* Pods */ = {
+			isa = PBXGroup;
+			children = (
+				6C2E3173556A471DD304B334 /* Pods-Nomi.debug.xcconfig */,
+				7A4D352CD337FB3A3BF06240 /* Pods-Nomi.release.xcconfig */,
+			);
+			path = Pods;
+			sourceTree = "<group>";
+		};
+		D7E4C46ADA2E9064B798F356 /* ExpoModulesProviders */ = {
+			isa = PBXGroup;
+			children = (
+				92DBD88DE9BF7D494EA9DA96 /* Nomi */,
+			);
+			name = ExpoModulesProviders;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		13B07F861A680F5B00A75B9A /* Nomi */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "Nomi" */;
+			buildPhases = (
+				08A4A3CD28434E44B6B9DE2E /* [CP] Check Pods Manifest.lock */,
+				2E08AB70BDA94A789D135D54 /* [Expo] Configure project */,
+				13B07F871A680F5B00A75B9A /* Sources */,
+				13B07F8C1A680F5B00A75B9A /* Frameworks */,
+				13B07F8E1A680F5B00A75B9A /* Resources */,
+				00DD1BFF1BD5951E006B06BC /* Bundle React Native code and images */,
+				800E24972A6A228C8D4807E9 /* [CP] Copy Pods Resources */,
+				17D8EAE18A5BDDA6099DCEA0 /* [CP] Embed Pods Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Nomi;
+			productName = Nomi;
+			productReference = 13B07F961A680F5B00A75B9A /* Nomi.app */;
+			productType = "com.apple.product-type.application";
+		};
+		A1A7CEB759677E2354CB21EC /* Nomi_App */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B4CECCA5AE3BB0B812EF51AE /* Build configuration list for PBXNativeTarget "Nomi_App" */;
+			buildPhases = (
+				C565C7FFAE344E80782BD312 /* Sources */,
+				1F790861B8A02686C8721916 /* Frameworks */,
+				90EA1E5580A0F605FDC2D3AA /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Nomi_App;
+			packageProductDependencies = (
+				F6B041995AAA249414F62BA4 /* FirebaseCore */,
+				41A6F43A2493105F942AA71A /* FirebaseAuth */,
+				3835DFB317F094FD68CFC186 /* FirebaseFirestore */,
+				5CA6D7C800C25ADE16AFF8E4 /* FirebaseStorage */,
+				51EF7B14BE8846B19408E7D0 /* RevenueCat */,
+				26838F235C41A3977A3902E8 /* RevenueCatUI */,
+			);
+			productName = Nomi_App;
+			productReference = FAC4AC0C9597D3379C41A16B /* Nomi.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		83CBB9F71A601CBA00E9B192 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				LastUpgradeCheck = 1130;
+				TargetAttributes = {
+					13B07F861A680F5B00A75B9A = {
+						LastSwiftMigration = 1250;
+					};
+				};
+			};
+			buildConfigurationList = 83CBB9FA1A601CBA00E9B192 /* Build configuration list for PBXProject "Nomi" */;
+			compatibilityVersion = "Xcode 3.2";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 83CBB9F61A601CBA00E9B192;
+			packageReferences = (
+				653FAD6187560F2BED9CFDB6 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+				CCCEDFF3385885FA7054BC96 /* XCRemoteSwiftPackageReference "purchases-ios-spm" */,
+			);
+			productRefGroup = 83CBBA001A601CBA00E9B192 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				13B07F861A680F5B00A75B9A /* Nomi */,
+				A1A7CEB759677E2354CB21EC /* Nomi_App */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		13B07F8E1A680F5B00A75B9A /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BB2F792D24A3F905000567C9 /* Expo.plist in Resources */,
+				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
+				3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */,
+				31F1DC2906FF60DF14C0C067 /* PrivacyInfo.xcprivacy in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		90EA1E5580A0F605FDC2D3AA /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				09FB3CF85FAE766CD86516D6 /* Assets.xcassets in Resources */,
+				940CB849208C2626A1A7BFE6 /* GoogleService-Info.plist in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		00DD1BFF1BD5951E006B06BC /* Bundle React Native code and images */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Bundle React Native code and images";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "if [[ -f \"$PODS_ROOT/../.xcode.env\" ]]; then\n  source \"$PODS_ROOT/../.xcode.env\"\nfi\nif [[ -f \"$PODS_ROOT/../.xcode.env.local\" ]]; then\n  source \"$PODS_ROOT/../.xcode.env.local\"\nfi\n\n# The project root by default is one level up from the ios directory\nexport PROJECT_ROOT=\"$PROJECT_DIR\"/..\n\nif [[ \"$CONFIGURATION\" = *Debug* ]]; then\n  export SKIP_BUNDLING=1\nfi\nif [[ -z \"$ENTRY_FILE\" ]]; then\n  # Set the entry JS file using the bundler's entry resolution.\n  export ENTRY_FILE=\"$(\"$NODE_BINARY\" -e \"require('expo/scripts/resolveAppEntry')\" \"$PROJECT_ROOT\" ios absolute | tail -n 1)\"\nfi\n\nif [[ -z \"$CLI_PATH\" ]]; then\n  # Use Expo CLI\n  export CLI_PATH=\"$(\"$NODE_BINARY\" --print \"require.resolve('@expo/cli', { paths: [require.resolve('expo/package.json')] })\")\"\nfi\nif [[ -z \"$BUNDLE_COMMAND\" ]]; then\n  # Default Expo CLI command for bundling\n  export BUNDLE_COMMAND=\"export:embed\"\nfi\n\n# Source .xcode.env.updates if it exists to allow\n# SKIP_BUNDLING to be unset if needed\nif [[ -f \"$PODS_ROOT/../.xcode.env.updates\" ]]; then\n  source \"$PODS_ROOT/../.xcode.env.updates\"\nfi\n# Source local changes to allow overrides\n# if needed\nif [[ -f \"$PODS_ROOT/../.xcode.env.local\" ]]; then\n  source \"$PODS_ROOT/../.xcode.env.local\"\nfi\n\n`\"$NODE_BINARY\" --print \"require('path').dirname(require.resolve('react-native/package.json')) + '/scripts/react-native-xcode.sh'\"`\n\n";
+		};
+		08A4A3CD28434E44B6B9DE2E /* [CP] Check Pods Manifest.lock */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"${PODS_PODFILE_DIR_PATH}/Podfile.lock",
+				"${PODS_ROOT}/Manifest.lock",
+			);
+			name = "[CP] Check Pods Manifest.lock";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(DERIVED_FILE_DIR)/Pods-Nomi-checkManifestLockResult.txt",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
+			showEnvVarsInLog = 0;
+		};
+		17D8EAE18A5BDDA6099DCEA0 /* [CP] Embed Pods Frameworks */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-Nomi/Pods-Nomi-frameworks.sh",
+				"${PODS_XCFRAMEWORKS_BUILD_DIR}/hermes-engine/Pre-built/hermes.framework/hermes",
+			);
+			name = "[CP] Embed Pods Frameworks";
+			outputPaths = (
+				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/hermes.framework",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-Nomi/Pods-Nomi-frameworks.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
+		2E08AB70BDA94A789D135D54 /* [Expo] Configure project */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "[Expo] Configure project";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# This script configures Expo modules and generates the modules provider file.\nbash -l -c \"./Pods/Target\\ Support\\ Files/Pods-Nomi/expo-configure-project.sh\"\n";
+		};
+		800E24972A6A228C8D4807E9 /* [CP] Copy Pods Resources */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-Nomi/Pods-Nomi-resources.sh",
+				"${PODS_CONFIGURATION_BUILD_DIR}/EXApplication/ExpoApplication_privacy.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/EXConstants/EXConstants.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/EXConstants/ExpoConstants_privacy.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/EXNotifications/ExpoNotifications_privacy.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/ExpoFileSystem/ExpoFileSystem_privacy.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/PurchasesHybridCommon/PurchasesHybridCommon.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/RNCAsyncStorage/RNCAsyncStorage_resources.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/React-Core/RCTI18nStrings.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/RevenueCat/RevenueCat.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/expo-dev-launcher/EXDevLauncher.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/expo-dev-menu/EXDevMenu.bundle",
+			);
+			name = "[CP] Copy Pods Resources";
+			outputPaths = (
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/ExpoApplication_privacy.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/EXConstants.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/ExpoConstants_privacy.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/ExpoNotifications_privacy.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/ExpoFileSystem_privacy.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/PurchasesHybridCommon.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/RNCAsyncStorage_resources.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/RCTI18nStrings.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/RevenueCat.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/EXDevLauncher.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/EXDevMenu.bundle",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-Nomi/Pods-Nomi-resources.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		13B07F871A680F5B00A75B9A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				13B07FBC1A68108700A75B9A /* AppDelegate.mm in Sources */,
+				13B07FC11A68108700A75B9A /* main.m in Sources */,
+				B18059E884C0ABDD17F3DC3D /* ExpoModulesProvider.swift in Sources */,
+				35C45096F08845FE8E1C849A /* noop-file.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C565C7FFAE344E80782BD312 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1FCF34BE588E09BBCCAB7C0C /* Nomi_AppApp.swift in Sources */,
+				A8BA0437BB6FD0F553613026 /* ContentView.swift in Sources */,
+				2611B6276C303EE22479F2A6 /* FirebaseBootstrap.swift in Sources */,
+				881B15EA4A4A2FDE85858E3A /* AppSession.swift in Sources */,
+				C71588CF0528D5861BFCB354 /* AuthService.swift in Sources */,
+				91ABA99C9054938B58C49317 /* MemoryService.swift in Sources */,
+				A84DF51953538D99ABF7BB9B /* UserProfileService.swift in Sources */,
+				75B59C72983D97A0674384A1 /* LoadingView.swift in Sources */,
+				C96C659D7C0D84318F6C8DF5 /* NomiBackground.swift in Sources */,
+				8E3A229B2B03F8D040556D10 /* AuthStackView.swift in Sources */,
+				FE79B36067D12257D5D6FB08 /* MeetNomiView.swift in Sources */,
+				AD938C3BA7CC0CF74F2DF915 /* MainTabsView.swift in Sources */,
+				BF0CA75C04DE1BACC9DC792B /* NomiControls.swift in Sources */,
+				F4F52B5ED25CB9B555F9E40A /* SplashView.swift in Sources */,
+				A4100BF1057A4BE121D63588 /* MemoryStore.swift in Sources */,
+				26A9959E38C44989E6CBEA1F /* NomiFormatters.swift in Sources */,
+				3E4D598EFC2170139FFAE4D4 /* MemoryCardView.swift in Sources */,
+				39DDAB4E51087852A3BAB439 /* EmptyStateView.swift in Sources */,
+				88BE4C2B60009FF2E86D05A6 /* HomeView.swift in Sources */,
+				D333F27B4EF6E727D790A4A6 /* QuickCaptureView.swift in Sources */,
+				89BD840DEEC4B9222B768D76 /* RecallView.swift in Sources */,
+				E621D5A4A45CF55047E39316 /* MemoryDetailView.swift in Sources */,
+				2FD02CAD479AA01BFDCC74FC /* SettingsView.swift in Sources */,
+				8448F09CB02F172CF2F7C28F /* BackendConfig.swift in Sources */,
+				BCADF9DEB48F73E165C7DA5B /* XBackendService.swift in Sources */,
+				88C3A5A31E371E1DC9B5C4E9 /* RevenueCatBootstrap.swift in Sources */,
+				04EA7BE19AFE7CF963793653 /* PurchaseStore.swift in Sources */,
+				62A09443F7F40E99A24E3CFA /* DiscoverView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		13B07F941A680F5B00A75B9A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 6C2E3173556A471DD304B334 /* Pods-Nomi.debug.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = Nomi/Nomi.entitlements;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 5YJJCSFSQM;
+				ENABLE_BITCODE = NO;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"FB_SONARKIT_ENABLED=1",
+				);
+				INFOPLIST_FILE = Nomi/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 13.4;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-ObjC",
+					"-lc++",
+				);
+				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_DEBUG";
+				PRODUCT_BUNDLE_IDENTIFIER = com.dkimoto.nomi;
+				PRODUCT_NAME = Nomi;
+				SWIFT_OBJC_BRIDGING_HEADER = "Nomi/Nomi-Bridging-Header.h";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				VERSIONING_SYSTEM = "apple-generic";
+			};
+			name = Debug;
+		};
+		13B07F951A680F5B00A75B9A /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 7A4D352CD337FB3A3BF06240 /* Pods-Nomi.release.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = Nomi/Nomi.entitlements;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 5YJJCSFSQM;
+				INFOPLIST_FILE = Nomi/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 13.4;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-ObjC",
+					"-lc++",
+				);
+				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_RELEASE";
+				PRODUCT_BUNDLE_IDENTIFIER = com.dkimoto.nomi;
+				PRODUCT_NAME = Nomi;
+				SWIFT_OBJC_BRIDGING_HEADER = "Nomi/Nomi-Bridging-Header.h";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				VERSIONING_SYSTEM = "apple-generic";
+			};
+			name = Release;
+		};
+		14F5FC86D09BB1D4466CDCB1 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 5YJJCSFSQM;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Nomi_App/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				NOMI_BACKEND_API_BASE_URL = "http://127.0.0.1:3000/api";
+				PRODUCT_BUNDLE_IDENTIFIER = com.dkimoto.nomi.recall;
+				PRODUCT_NAME = Nomi;
+				SDKROOT = iphoneos;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		83CBBA201A601CBA00E9B192 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CC = "";
+				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "c++20";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
+				COPY_PHASE_STRIP = NO;
+				CXX = "";
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 13.4;
+				LD = "";
+				LDPLUSPLUS = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					/usr/lib/swift,
+					"$(inherited)",
+				);
+				LIBRARY_SEARCH_PATHS = "$(SDKROOT)/usr/lib/swift\"$(inherited)\"";
+				MTL_ENABLE_DEBUG_INFO = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				OTHER_LDFLAGS = "$(inherited)  ";
+				REACT_NATIVE_PATH = "${PODS_ROOT}/../../node_modules/react-native";
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				USE_HERMES = true;
+			};
+			name = Debug;
+		};
+		83CBBA211A601CBA00E9B192 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CC = "";
+				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "c++20";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
+				COPY_PHASE_STRIP = YES;
+				CXX = "";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 13.4;
+				LD = "";
+				LDPLUSPLUS = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					/usr/lib/swift,
+					"$(inherited)",
+				);
+				LIBRARY_SEARCH_PATHS = "$(SDKROOT)/usr/lib/swift\"$(inherited)\"";
+				MTL_ENABLE_DEBUG_INFO = NO;
+				OTHER_LDFLAGS = "$(inherited)  ";
+				REACT_NATIVE_PATH = "${PODS_ROOT}/../../node_modules/react-native";
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				USE_HERMES = true;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		EC0E9A36F88189C246224546 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 5YJJCSFSQM;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Nomi_App/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				NOMI_BACKEND_API_BASE_URL = "https://REPLACE-WITH-NOMI-PRODUCTION-BACKEND/api";
+				PRODUCT_BUNDLE_IDENTIFIER = com.dkimoto.nomi.recall;
+				PRODUCT_NAME = Nomi;
+				SDKROOT = iphoneos;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "Nomi" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				13B07F941A680F5B00A75B9A /* Debug */,
+				13B07F951A680F5B00A75B9A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		83CBB9FA1A601CBA00E9B192 /* Build configuration list for PBXProject "Nomi" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				83CBBA201A601CBA00E9B192 /* Debug */,
+				83CBBA211A601CBA00E9B192 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		B4CECCA5AE3BB0B812EF51AE /* Build configuration list for PBXNativeTarget "Nomi_App" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				EC0E9A36F88189C246224546 /* Release */,
+				14F5FC86D09BB1D4466CDCB1 /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		653FAD6187560F2BED9CFDB6 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 12.0.0;
+			};
+		};
+		CCCEDFF3385885FA7054BC96 /* XCRemoteSwiftPackageReference "purchases-ios-spm" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/RevenueCat/purchases-ios-spm.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 5.72.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		26838F235C41A3977A3902E8 /* RevenueCatUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = CCCEDFF3385885FA7054BC96 /* XCRemoteSwiftPackageReference "purchases-ios-spm" */;
+			productName = RevenueCatUI;
+		};
+		3835DFB317F094FD68CFC186 /* FirebaseFirestore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 653FAD6187560F2BED9CFDB6 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseFirestore;
+		};
+		41A6F43A2493105F942AA71A /* FirebaseAuth */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 653FAD6187560F2BED9CFDB6 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAuth;
+		};
+		51EF7B14BE8846B19408E7D0 /* RevenueCat */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = CCCEDFF3385885FA7054BC96 /* XCRemoteSwiftPackageReference "purchases-ios-spm" */;
+			productName = RevenueCat;
+		};
+		5CA6D7C800C25ADE16AFF8E4 /* FirebaseStorage */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 653FAD6187560F2BED9CFDB6 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseStorage;
+		};
+		F6B041995AAA249414F62BA4 /* FirebaseCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 653FAD6187560F2BED9CFDB6 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseCore;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 83CBB9F71A601CBA00E9B192 /* Project object */;
+}

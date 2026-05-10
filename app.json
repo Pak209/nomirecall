@@ -1,0 +1,48 @@
+{
+  "expo": {
+    "name": "Nomi",
+    "slug": "second-brain",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "cover",
+      "backgroundColor": "#FF2D8E"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.dkimoto.nomi",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Nomi uses the camera so you can capture images into your memory.",
+        "NSMicrophoneUsageDescription": "Nomi uses the microphone so you can capture voice notes.",
+        "NSPhotoLibraryUsageDescription": "Nomi uses your photo library so you can save images into your memory.",
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "usesAppleSignIn": true,
+      "entitlements": {
+        "aps-environment": "production"
+      }
+    },
+    "plugins": [
+      "expo-apple-authentication",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#1D9E75",
+          "sounds": []
+        }
+      ],
+      [
+        "expo-document-picker",
+        {
+          "iCloudContainerEnvironment": "Production"
+        }
+      ]
+    ],
+    "scheme": "secondbrain"
+  }
+}
