@@ -30,7 +30,9 @@ struct QuickCaptureView: View {
                         typePicker
                         captureFields
                         categoryPicker
-                        saveButton
+                        if selectedType != .link {
+                            saveButton
+                        }
                     }
                     .padding(.horizontal, 20)
                     .padding(.top, 12)
@@ -111,6 +113,8 @@ struct QuickCaptureView: View {
                     .buttonStyle(NomiSecondaryButtonStyle())
                     .disabled(isImportingXPost || link.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
+
+                saveButton
             }
 
             TextEditor(text: $content)
