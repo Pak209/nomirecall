@@ -13,10 +13,10 @@ extension Color {
 struct NomiPrimaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.headline)
+            .font(.subheadline.weight(.bold))
             .foregroundStyle(.white)
-            .padding(.vertical, 16)
-            .padding(.horizontal, 18)
+            .padding(.vertical, 13)
+            .padding(.horizontal, 16)
             .background(
                 LinearGradient(
                     colors: [.orange, .pink],
@@ -24,7 +24,7 @@ struct NomiPrimaryButtonStyle: ButtonStyle {
                     endPoint: .trailing
                 )
             )
-            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             .opacity(configuration.isPressed ? 0.82 : 1.0)
     }
 }
@@ -32,14 +32,14 @@ struct NomiPrimaryButtonStyle: ButtonStyle {
 struct NomiSecondaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.headline)
+            .font(.subheadline.weight(.bold))
             .foregroundStyle(.pink)
-            .padding(.vertical, 14)
-            .padding(.horizontal, 18)
+            .padding(.vertical, 11)
+            .padding(.horizontal, 16)
             .background(.white.opacity(0.86))
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .stroke(.pink.opacity(0.2), lineWidth: 1)
             )
             .opacity(configuration.isPressed ? 0.78 : 1.0)
@@ -49,8 +49,8 @@ struct NomiSecondaryButtonStyle: ButtonStyle {
 extension View {
     func nomiTextField() -> some View {
         self
-            .padding(.vertical, 15)
-            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .padding(.horizontal, 14)
             .background(.white.opacity(0.9))
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             .overlay(

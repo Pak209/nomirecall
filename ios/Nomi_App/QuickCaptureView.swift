@@ -25,7 +25,7 @@ struct QuickCaptureView: View {
                 NomiBackground()
 
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 20) {
+                    VStack(alignment: .leading, spacing: 14) {
                         header
                         typePicker
                         captureFields
@@ -34,12 +34,13 @@ struct QuickCaptureView: View {
                             saveButton
                         }
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.top, 12)
-                    .padding(.bottom, 36)
+                    .padding(.horizontal, 18)
+                    .padding(.top, 10)
+                    .padding(.bottom, 104)
                 }
             }
             .navigationTitle("Quick Capture")
+            .navigationBarTitleDisplayMode(.inline)
             .alert(alertTitle, isPresented: errorBinding) {
                 Button("OK", role: .cancel) {}
             } message: {
@@ -51,7 +52,7 @@ struct QuickCaptureView: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Save anything")
-                .font(.largeTitle.bold())
+                .font(.system(size: 30, weight: .black, design: .rounded))
 
             Text("Capture notes, links, images, and voice thoughts to your Nomi memory.")
                 .font(.subheadline)
@@ -67,12 +68,12 @@ struct QuickCaptureView: View {
                 } label: {
                     VStack(spacing: 8) {
                         Image(systemName: type.systemImage)
-                            .font(.title2)
+                            .font(.system(size: 20, weight: .semibold))
                         Text(type.title)
                             .font(.caption.weight(.semibold))
                     }
                     .frame(maxWidth: .infinity)
-                    .frame(height: 82)
+                    .frame(height: 72)
                     .foregroundStyle(selectedType == type ? .pink : .primary)
                     .background(.white.opacity(selectedType == type ? 0.95 : 0.78))
                     .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
@@ -118,7 +119,7 @@ struct QuickCaptureView: View {
             }
 
             TextEditor(text: $content)
-                .frame(minHeight: 170)
+                .frame(minHeight: 142)
                 .padding(12)
                 .background(.white.opacity(0.9))
                 .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
@@ -144,7 +145,7 @@ struct QuickCaptureView: View {
     private var categoryPicker: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Category")
-                .font(.headline)
+                .font(.subheadline.weight(.bold))
 
             Picker("Category", selection: $category) {
                 ForEach(categories, id: \.self) { category in

@@ -26,7 +26,7 @@ struct MainTabsView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             NomiTabBar(selectedTab: $selectedTab)
-                .padding(.horizontal, 18)
+                .padding(.horizontal, 16)
                 .padding(.bottom, 8)
         }
         .ignoresSafeArea(.keyboard, edges: .bottom)
@@ -72,27 +72,27 @@ private struct NomiTabBar: View {
             tabButton(.recall)
             tabButton(.profile)
         }
-        .padding(.horizontal, 12)
-        .padding(.top, 14)
-        .padding(.bottom, 12)
-        .background(.white.opacity(0.94), in: RoundedRectangle(cornerRadius: 30, style: .continuous))
+        .padding(.horizontal, 10)
+        .padding(.top, 11)
+        .padding(.bottom, 10)
+        .background(.white.opacity(0.94), in: RoundedRectangle(cornerRadius: 26, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 30, style: .continuous)
+            RoundedRectangle(cornerRadius: 26, style: .continuous)
                 .stroke(Color.black.opacity(0.06), lineWidth: 1)
         )
-        .shadow(color: Color(red: 1, green: 0.22, blue: 0.42).opacity(0.14), radius: 22, y: 8)
+        .shadow(color: Color(red: 1, green: 0.22, blue: 0.42).opacity(0.13), radius: 18, y: 7)
     }
 
     private func tabButton(_ tab: NomiTab) -> some View {
         Button {
             selectedTab = tab
         } label: {
-            VStack(spacing: 5) {
+            VStack(spacing: 4) {
                 Image(systemName: tab.systemImage)
-                    .font(.system(size: 20, weight: .semibold))
+                    .font(.system(size: 17, weight: .semibold))
 
                 Text(tab.title)
-                    .font(.caption.weight(.bold))
+                    .font(.caption2.weight(.bold))
             }
             .foregroundStyle(selectedTab == tab ? Color.nomiCoral : Color.nomiMuted)
             .frame(maxWidth: .infinity)
@@ -105,9 +105,9 @@ private struct NomiTabBar: View {
             selectedTab = .capture
         } label: {
             Image(systemName: "plus")
-                .font(.system(size: 34, weight: .regular))
+                .font(.system(size: 29, weight: .regular))
                 .foregroundStyle(.white)
-                .frame(width: 76, height: 76)
+                .frame(width: 62, height: 62)
                 .background(
                     LinearGradient(
                         colors: [Color.nomiOrange, Color.nomiPink],
@@ -116,8 +116,8 @@ private struct NomiTabBar: View {
                     ),
                     in: Circle()
                 )
-                .shadow(color: Color.nomiPink.opacity(0.28), radius: 18, y: 10)
-                .offset(y: -22)
+                .shadow(color: Color.nomiPink.opacity(0.25), radius: 14, y: 8)
+                .offset(y: -18)
                 .frame(maxWidth: .infinity)
         }
         .buttonStyle(.plain)

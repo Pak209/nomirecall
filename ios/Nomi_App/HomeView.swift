@@ -34,15 +34,15 @@ struct HomeView: View {
                 NomiBackground()
 
                 ScrollView(showsIndicators: false) {
-                    VStack(alignment: .leading, spacing: 18) {
+                    VStack(alignment: .leading, spacing: 13) {
                         header
                         quickCapturePanel
                         todaySection
                         recentSection
                     }
-                    .padding(.horizontal, 22)
-                    .padding(.top, 20)
-                    .padding(.bottom, 122)
+                    .padding(.horizontal, 18)
+                    .padding(.top, 16)
+                    .padding(.bottom, 104)
                 }
                 .refreshable {
                     await loadMemories()
@@ -62,13 +62,13 @@ struct HomeView: View {
         HStack(alignment: .center, spacing: 12) {
             HStack(spacing: 8) {
                 Text("\(greeting), \(displayName)")
-                    .font(.system(size: 30, weight: .black, design: .rounded))
+                    .font(.system(size: 23, weight: .black, design: .rounded))
                     .foregroundStyle(Color.nomiInk)
                     .lineLimit(1)
                     .minimumScaleFactor(0.62)
 
                 Image(systemName: "sun.max.fill")
-                    .font(.system(size: 22, weight: .bold))
+                    .font(.system(size: 17, weight: .bold))
                     .foregroundStyle(Color.nomiOrange)
                     .accessibilityHidden(true)
             }
@@ -79,23 +79,23 @@ struct HomeView: View {
                 Image("NomiMascot")
                     .resizable()
                     .scaledToFit()
-                    .frame(width: 44, height: 44)
-                    .padding(7)
+                    .frame(width: 34, height: 34)
+                    .padding(6)
                     .background(Color(red: 1.0, green: 0.80, blue: 0.76), in: Circle())
 
                 Circle()
                     .fill(Color(red: 0.16, green: 0.84, blue: 0.45))
-                    .frame(width: 13, height: 13)
-                    .overlay(Circle().stroke(.white, lineWidth: 3))
+                    .frame(width: 11, height: 11)
+                    .overlay(Circle().stroke(.white, lineWidth: 2.5))
             }
         }
     }
 
     private var quickCapturePanel: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text("Quick capture anything...")
-                    .font(.system(size: 22, weight: .black, design: .rounded))
+                    .font(.system(size: 18, weight: .black, design: .rounded))
                     .foregroundStyle(.white)
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
@@ -103,9 +103,9 @@ struct HomeView: View {
                 Spacer()
 
                 Image(systemName: "sparkle")
-                    .font(.headline.weight(.bold))
+                    .font(.subheadline.weight(.bold))
                     .foregroundStyle(.white.opacity(0.88))
-                    .frame(width: 40, height: 40)
+                    .frame(width: 34, height: 34)
                     .background(.white.opacity(0.18), in: Circle())
             }
 
@@ -116,7 +116,7 @@ struct HomeView: View {
                 captureButton("Voice", "mic")
             }
         }
-        .padding(18)
+        .padding(14)
         .background(
             LinearGradient(
                 colors: [Color.nomiOrange, Color.nomiCoral, Color.nomiPink],
@@ -124,30 +124,30 @@ struct HomeView: View {
                 endPoint: .bottomTrailing
             )
         )
-        .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
-        .shadow(color: Color.nomiPink.opacity(0.18), radius: 18, y: 9)
+        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .shadow(color: Color.nomiPink.opacity(0.16), radius: 14, y: 7)
     }
 
     private func captureButton(_ title: String, _ icon: String) -> some View {
         Button {
             onQuickCapture()
         } label: {
-            VStack(spacing: 8) {
+            VStack(spacing: 7) {
                 Image(systemName: icon)
-                    .font(.system(size: 20, weight: .bold))
+                    .font(.system(size: 17, weight: .bold))
                     .foregroundStyle(.white)
-                    .frame(width: 40, height: 40)
-                    .background(.white.opacity(0.18), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .frame(width: 34, height: 34)
+                    .background(.white.opacity(0.18), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
 
                 Text(title)
-                    .font(.subheadline.weight(.black))
+                    .font(.caption.weight(.black))
                     .foregroundStyle(.white)
                 }
             .frame(maxWidth: .infinity)
-            .frame(height: 84)
-            .background(.white.opacity(0.13), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .frame(height: 68)
+            .background(.white.opacity(0.13), in: RoundedRectangle(cornerRadius: 17, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                RoundedRectangle(cornerRadius: 17, style: .continuous)
                     .stroke(.white.opacity(0.24), lineWidth: 1.2)
             )
         }
@@ -155,32 +155,32 @@ struct HomeView: View {
     }
 
     private var aiSummaryCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .top, spacing: 14) {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 11) {
                 Image(systemName: "sparkle")
-                    .font(.system(size: 21, weight: .bold))
+                    .font(.system(size: 17, weight: .bold))
                     .foregroundStyle(Color.nomiPurple)
-                    .frame(width: 48, height: 48)
-                    .background(.white, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
-                    .shadow(color: Color.nomiPurple.opacity(0.10), radius: 8, y: 5)
+                    .frame(width: 38, height: 38)
+                    .background(.white, in: RoundedRectangle(cornerRadius: 13, style: .continuous))
+                    .shadow(color: Color.nomiPurple.opacity(0.10), radius: 6, y: 4)
 
                 VStack(alignment: .leading, spacing: 5) {
                     HStack(spacing: 8) {
                         Text("AI summary")
-                            .font(.title3.weight(.black))
+                            .font(.system(size: 17, weight: .black, design: .rounded))
                             .foregroundStyle(Color.nomiInk)
 
                         Text("NEW")
-                            .font(.caption.weight(.black))
+                            .font(.caption2.weight(.black))
                             .foregroundStyle(Color.nomiPurple)
-                            .padding(.vertical, 4)
-                            .padding(.horizontal, 9)
+                            .padding(.vertical, 3)
+                            .padding(.horizontal, 8)
                             .background(.white.opacity(0.85), in: Capsule())
                             .overlay(Capsule().stroke(Color.nomiPurple.opacity(0.24), lineWidth: 1))
                     }
 
                     Text(memoryStore.memories.isEmpty ? "Generated once you start capturing" : "Generated just now")
-                        .font(.subheadline.weight(.semibold))
+                        .font(.caption.weight(.semibold))
                         .foregroundStyle(Color.nomiMuted)
                 }
 
@@ -189,14 +189,14 @@ struct HomeView: View {
                 Image("NomiMascot")
                     .resizable()
                     .scaledToFit()
-                    .frame(width: 42, height: 42)
+                    .frame(width: 30, height: 30)
                     .opacity(0.92)
             }
 
             Text(summaryText)
-                .font(.system(size: 17, weight: .regular, design: .rounded))
                 .foregroundStyle(Color.nomiInk)
-                .lineSpacing(3)
+                .font(.system(size: 14, weight: .regular, design: .rounded))
+                .lineSpacing(2)
 
             Button {
             } label: {
@@ -204,32 +204,32 @@ struct HomeView: View {
                     Text("View summary")
                     Image(systemName: "chevron.right")
                 }
-                .font(.subheadline.weight(.black))
+                .font(.caption.weight(.black))
                 .foregroundStyle(Color.nomiInk)
-                .padding(.vertical, 10)
-                .padding(.horizontal, 18)
+                .padding(.vertical, 8)
+                .padding(.horizontal, 14)
                 .background(.white.opacity(0.88), in: Capsule())
                 .overlay(Capsule().stroke(Color.nomiPurple.opacity(0.18), lineWidth: 1))
             }
             .buttonStyle(.plain)
         }
-        .padding(20)
+        .padding(14)
         .background(
             LinearGradient(
                 colors: [Color(red: 0.96, green: 0.89, blue: 1.0), Color(red: 1.0, green: 0.91, blue: 0.96)],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             ),
-            in: RoundedRectangle(cornerRadius: 28, style: .continuous)
+            in: RoundedRectangle(cornerRadius: 22, style: .continuous)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 28, style: .continuous)
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .stroke(Color.nomiPurple.opacity(0.17), lineWidth: 1.2)
         )
     }
 
     private var todaySection: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 10) {
             sectionHeader("Today", trailing: todayMemories.isEmpty ? nil : "See all")
 
             if memoryStore.isLoading && memoryStore.memories.isEmpty {
@@ -250,54 +250,54 @@ struct HomeView: View {
     }
 
     private func resurfacedCard(_ memory: NomiMemory) -> some View {
-        HStack(alignment: .top, spacing: 14) {
-            VStack(alignment: .leading, spacing: 12) {
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 8) {
                 HStack(alignment: .firstTextBaseline) {
                     Text("Resurfaced memory ✦")
-                        .font(.title3.weight(.black))
+                        .font(.system(size: 16, weight: .black, design: .rounded))
                         .foregroundStyle(Color.nomiInk)
 
                     Spacer()
 
                     Text(memory.displayDate)
-                        .font(.subheadline.weight(.bold))
+                        .font(.caption.weight(.bold))
                         .foregroundStyle(Color.nomiMuted)
                 }
 
                 Text(memory.previewText.isEmpty ? memory.title : "\"\(memory.previewText)\"")
-                    .font(.system(size: 20, weight: .medium, design: .rounded))
+                    .font(.system(size: 14, weight: .medium, design: .rounded))
                     .italic()
                     .foregroundStyle(Color.nomiInk)
                     .lineLimit(3)
 
                 Text(memory.sourceUsername ?? memory.category)
-                    .font(.headline.weight(.semibold))
+                    .font(.caption.weight(.semibold))
                     .foregroundStyle(Color.nomiMuted)
 
                 Text("Open note  ›")
-                    .font(.headline.weight(.black))
+                    .font(.caption.weight(.black))
                     .foregroundStyle(.white)
-                    .padding(.vertical, 12)
-                    .padding(.horizontal, 20)
+                    .padding(.vertical, 8)
+                    .padding(.horizontal, 14)
                     .background(Color.nomiInk, in: Capsule())
             }
 
             Image("NomiMascot")
                 .resizable()
                 .scaledToFit()
-                .frame(width: 64, height: 64)
+                .frame(width: 46, height: 46)
                 .opacity(0.84)
         }
-        .padding(24)
-        .background(Color(red: 1.0, green: 0.94, blue: 0.93).opacity(0.90), in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .padding(16)
+        .background(Color(red: 1.0, green: 0.94, blue: 0.93).opacity(0.90), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 28, style: .continuous)
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .stroke(Color.nomiCoral.opacity(0.18), lineWidth: 1.2)
         )
     }
 
     private var recentSection: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 10) {
             sectionHeader("Recent captures", trailing: recentMemories.isEmpty ? nil : "See all")
 
             if recentMemories.isEmpty {
@@ -305,7 +305,7 @@ struct HomeView: View {
                     title: "No memories yet",
                     message: "Your real captures will show here as soon as you save them."
                 )
-                .background(.white.opacity(0.76), in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+                .background(.white.opacity(0.76), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
             } else {
                 VStack(spacing: 0) {
                     ForEach(recentMemories) { memory in
@@ -320,10 +320,10 @@ struct HomeView: View {
                         }
                     }
                 }
-                .padding(.vertical, 10)
-                .background(.white.opacity(0.94), in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+                .padding(.vertical, 6)
+                .background(.white.opacity(0.94), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 28, style: .continuous)
+                    RoundedRectangle(cornerRadius: 22, style: .continuous)
                         .stroke(Color.black.opacity(0.05), lineWidth: 1)
                 )
             }
@@ -333,14 +333,14 @@ struct HomeView: View {
     private func sectionHeader(_ title: String, trailing: String?) -> some View {
         HStack {
             Text(title)
-                .font(.system(size: 25, weight: .black, design: .rounded))
+                .font(.system(size: 19, weight: .black, design: .rounded))
                 .foregroundStyle(Color.nomiInk)
 
             Spacer()
 
             if let trailing {
                 Text(trailing)
-                    .font(.headline.weight(.black))
+                    .font(.subheadline.weight(.black))
                     .foregroundStyle(Color.nomiCoral)
             }
         }
@@ -373,36 +373,36 @@ private struct RecentCaptureRow: View {
     let memory: NomiMemory
 
     var body: some View {
-        HStack(spacing: 16) {
+        HStack(spacing: 12) {
             Image(systemName: icon)
-                .font(.system(size: 21, weight: .bold))
+                .font(.system(size: 16, weight: .bold))
                 .foregroundStyle(Color.nomiCoral)
-                .frame(width: 52, height: 52)
-                .background(Color(red: 1.0, green: 0.91, blue: 0.86), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .frame(width: 40, height: 40)
+                .background(Color(red: 1.0, green: 0.91, blue: 0.86), in: RoundedRectangle(cornerRadius: 13, style: .continuous))
 
-            VStack(alignment: .leading, spacing: 5) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(memory.title)
-                    .font(.headline.weight(.black))
+                    .font(.subheadline.weight(.black))
                     .foregroundStyle(Color.nomiInk)
                     .lineLimit(1)
 
                 Text("\(memory.displayType) · \(memory.displayDate)")
-                    .font(.subheadline.weight(.semibold))
+                    .font(.caption.weight(.semibold))
                     .foregroundStyle(Color.nomiMuted)
             }
 
             Spacer(minLength: 10)
 
             Text("#\(memory.category.lowercased().replacingOccurrences(of: " ", with: ""))")
-                .font(.subheadline.weight(.black))
+                .font(.caption.weight(.black))
                 .foregroundStyle(Color.nomiCoral)
-                .padding(.vertical, 8)
-                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .padding(.horizontal, 10)
                 .background(Color(red: 1.0, green: 0.91, blue: 0.87), in: Capsule())
                 .lineLimit(1)
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 12)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 9)
     }
 
     private var icon: String {
