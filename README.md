@@ -149,6 +149,8 @@ The app currently uses a simple email/password endpoint on your backend. To add 
 
 1. Create a Firebase project at console.firebase.google.com
 2. Add an iOS app — download `GoogleService-Info.plist`
+   - Keep the real plist at `ios/Nomi_App/GoogleService-Info.plist` locally.
+   - Do not commit it. Use `ios/Nomi_App/GoogleService-Info.example.plist` as the tracked template.
 3. Install:
    ```bash
    npx expo install @react-native-firebase/app @react-native-firebase/auth

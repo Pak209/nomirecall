@@ -14,5 +14,4 @@ web-build/
 .env
 .env.local
 GoogleService-Info.plist
-!ios/Nomi_App/GoogleService-Info.plist
 google-services.json
