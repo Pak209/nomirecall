@@ -74,12 +74,24 @@ enum AuthErrorFormatter {
         case AuthErrorCode.invalidAPIKey.rawValue:
             return DisplayableAuthError("Firebase rejected the API key. Re-download GoogleService-Info.plist or loosen the key restrictions for this iOS app.")
         case AuthErrorCode.internalError.rawValue:
-            return DisplayableAuthError("Firebase returned an internal auth error. Check that Email/Password is enabled and the API key is allowed for bundle ID com.dkimoto.nomi.recall. Code \(nsError.code).")
+            let details = debugDetails(from: nsError)
+            return DisplayableAuthError("Firebase Auth is being blocked. Check Email/Password sign-in and API key restrictions for bundle ID com.dkimoto.nomi.recall. Code \(nsError.code).\n\(details)")
         default:
-            let details = [nsError.localizedDescription, nsError.userInfo.description]
-                .joined(separator: "\n")
+            let details = debugDetails(from: nsError)
             return DisplayableAuthError("Firebase auth failed (\(rawCode)).\n\(details)")
         }
+    }
+
+    private static func debugDetails(from error: NSError) -> String {
+        let response = error.userInfo["FIRAuthErrorUserInfoDeserializedResponseKey"]
+            ?? error.userInfo["NSUnderlyingError"]
+            ?? error.userInfo["NSLocalizedFailureReason"]
+
+        if let response {
+            return "\(response)"
+        }
+
+        return error.localizedDescription
     }
 }
 
