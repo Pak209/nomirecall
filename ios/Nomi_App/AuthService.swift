@@ -17,7 +17,10 @@ final class AuthService {
         guard FirebaseAppReady.isConfigured else { throw AuthServiceError.firebaseNotConfigured }
 
         do {
-            let result = try await Auth.auth().signIn(withEmail: email, password: password)
+            let result = try await Auth.auth().signIn(
+                withEmail: email.trimmingCharacters(in: .whitespacesAndNewlines),
+                password: password
+            )
             return result.user
         } catch {
             throw AuthErrorFormatter.userFacingError(from: error)
@@ -28,7 +31,10 @@ final class AuthService {
         guard FirebaseAppReady.isConfigured else { throw AuthServiceError.firebaseNotConfigured }
 
         do {
-            let result = try await Auth.auth().createUser(withEmail: email, password: password)
+            let result = try await Auth.auth().createUser(
+                withEmail: email.trimmingCharacters(in: .whitespacesAndNewlines),
+                password: password
+            )
             return result.user
         } catch {
             throw AuthErrorFormatter.userFacingError(from: error)
@@ -45,31 +51,34 @@ final class AuthService {
 enum AuthErrorFormatter {
     static func userFacingError(from error: Error) -> Error {
         let nsError = error as NSError
-        let authCode = AuthErrorCode(_bridgedNSError: nsError)?.code
+        let authCode = AuthErrorCode(_bridgedNSError: nsError)
+        let rawCode = authCode?.code.rawValue ?? nsError.code
 
-        switch authCode {
-        case .invalidEmail:
+        switch rawCode {
+        case AuthErrorCode.invalidEmail.rawValue:
             return DisplayableAuthError("Enter a valid email address.")
-        case .wrongPassword, .invalidCredential:
+        case AuthErrorCode.wrongPassword.rawValue, AuthErrorCode.invalidCredential.rawValue:
             return DisplayableAuthError("That email or password does not look right.")
-        case .userNotFound:
+        case AuthErrorCode.userNotFound.rawValue:
             return DisplayableAuthError("No Nomi account exists for that email yet. Try signing up first.")
-        case .emailAlreadyInUse:
+        case AuthErrorCode.emailAlreadyInUse.rawValue:
             return DisplayableAuthError("That email already has an account. Try signing in instead.")
-        case .weakPassword:
+        case AuthErrorCode.weakPassword.rawValue:
             return DisplayableAuthError("Use a password with at least 6 characters.")
-        case .networkError:
+        case AuthErrorCode.networkError.rawValue:
             return DisplayableAuthError("Nomi could not reach Firebase. Check your connection and try again.")
-        case .operationNotAllowed:
+        case AuthErrorCode.operationNotAllowed.rawValue:
             return DisplayableAuthError("Email/password sign-in is not enabled in Firebase Authentication.")
+        case AuthErrorCode.appNotAuthorized.rawValue:
+            return DisplayableAuthError("This app is not authorized for Firebase Auth. Check the iOS bundle ID and API key restrictions in Google Cloud.")
+        case AuthErrorCode.invalidAPIKey.rawValue:
+            return DisplayableAuthError("Firebase rejected the API key. Re-download GoogleService-Info.plist or loosen the key restrictions for this iOS app.")
+        case AuthErrorCode.internalError.rawValue:
+            return DisplayableAuthError("Firebase returned an internal auth error. Check that Email/Password is enabled and the API key is allowed for bundle ID com.dkimoto.nomi.recall. Code \(nsError.code).")
         default:
-            #if DEBUG
             let details = [nsError.localizedDescription, nsError.userInfo.description]
                 .joined(separator: "\n")
-            return DisplayableAuthError("Firebase auth failed (\(authCode?.rawValue ?? nsError.code)).\n\(details)")
-            #else
-            return DisplayableAuthError("Could not sign in right now. Please try again.")
-            #endif
+            return DisplayableAuthError("Firebase auth failed (\(rawCode)).\n\(details)")
         }
     }
 }
