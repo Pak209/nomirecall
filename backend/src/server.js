@@ -164,6 +164,50 @@ function generateMemoryMetadata(text = '') {
   return { category, tags };
 }
 
+function cleanObject(value) {
+  return Object.fromEntries(
+    Object.entries(value).filter(([, entryValue]) => entryValue !== undefined),
+  );
+}
+
+function timestampFromValue(value, fallback = Date.now()) {
+  if (typeof value?.toDate === 'function') return admin.firestore.Timestamp.fromDate(value.toDate());
+  if (typeof value?._seconds === 'number') return admin.firestore.Timestamp.fromMillis(value._seconds * 1000);
+  if (typeof value === 'string') {
+    const ms = new Date(value).getTime();
+    if (Number.isFinite(ms)) return admin.firestore.Timestamp.fromMillis(ms);
+  }
+  if (value instanceof Date && Number.isFinite(value.getTime())) {
+    return admin.firestore.Timestamp.fromDate(value);
+  }
+  return admin.firestore.Timestamp.fromMillis(fallback);
+}
+
+function nativeMemoryFromSource(source, firebaseUserId) {
+  const content = String(source.body || source.content || source.summary || '');
+  const createdAtMs = sourceTimestampMs(source) || Date.now();
+  const sourceDate = source.postDate || source.sourceDate;
+
+  return cleanObject({
+    id: String(source.id),
+    userId: firebaseUserId,
+    title: String(source.title || fallbackTitle(content) || 'Untitled memory'),
+    content,
+    category: String(source.category || 'General'),
+    tags: Array.isArray(source.tags) ? source.tags.map(String).slice(0, 12) : [],
+    createdAt: timestampFromValue(source.createdAt, createdAtMs),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    type: String(source.source_type || source.type || 'note'),
+    sourceURL: source.source_url || source.sourceURL,
+    sourceUsername: source.authorUsername || source.sourceUsername,
+    sourceDate: sourceDate ? timestampFromValue(sourceDate, createdAtMs) : undefined,
+    links: Array.isArray(source.links) ? source.links : [],
+    media: Array.isArray(source.media) ? source.media : [],
+    importedFromLegacyBackend: true,
+    legacyUserId: source.userId,
+  });
+}
+
 function parseXPostUrl(url = '') {
   const normalized = String(url || '').trim();
   const match = normalized.match(/(?:https?:\/\/)?(?:www\.)?(?:x|twitter)\.com\/([^/?#]+)\/status\/([0-9]+)/i);
@@ -862,6 +906,64 @@ app.get('/api/memories', auth, async (req, res) => {
       media: Array.isArray(source.media) ? source.media : [],
     }));
   return res.json({ memories });
+});
+
+app.post('/api/memories/import-legacy', auth, async (req, res) => {
+  if (!admin.apps.length) {
+    return res.status(503).json({ error: 'Firebase Admin is not configured for migration.' });
+  }
+
+  const email = String(req.firebaseUser?.email || '').toLowerCase();
+  if (!email) {
+    return res.status(400).json({ error: 'A Firebase email is required to import legacy memories.' });
+  }
+
+  const legacyUser = await store.getUserByEmail(email);
+  if (!legacyUser?.id) {
+    return res.json({ imported: 0, skipped: 0, message: 'No legacy account found for this email.' });
+  }
+
+  const sources = await store.listSources(legacyUser.id);
+  if (!sources.length) {
+    return res.json({ imported: 0, skipped: 0, message: 'No legacy memories found for this email.' });
+  }
+
+  const db = admin.firestore();
+  const memoriesCollection = db.collection('users').doc(req.userId).collection('memories');
+  let imported = 0;
+  let skipped = 0;
+  let batch = db.batch();
+  let operationCount = 0;
+
+  for (const source of sources) {
+    const documentId = String(source.id);
+    const reference = memoriesCollection.doc(documentId);
+    const existing = await reference.get();
+    if (existing.exists) {
+      skipped += 1;
+      continue;
+    }
+
+    batch.set(reference, nativeMemoryFromSource(source, req.userId), { merge: true });
+    imported += 1;
+    operationCount += 1;
+
+    if (operationCount >= 450) {
+      await batch.commit();
+      batch = db.batch();
+      operationCount = 0;
+    }
+  }
+
+  if (operationCount > 0) {
+    await batch.commit();
+  }
+
+  return res.json({
+    imported,
+    skipped,
+    legacyUserId: legacyUser.id,
+  });
 });
 
 app.get('/api/memories/:id', auth, async (req, res) => {

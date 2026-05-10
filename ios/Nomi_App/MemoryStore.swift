@@ -8,6 +8,8 @@ final class MemoryStore: ObservableObject {
     @Published var successMessage: String?
 
     private let memoryService = MemoryService()
+    private let backendService = XBackendService()
+    private var attemptedLegacyImports = Set<String>()
 
     var categories: [String] {
         Array(Set(memories.map(\.category))).sorted()
@@ -21,9 +23,21 @@ final class MemoryStore: ObservableObject {
 
         do {
             memories = try await memoryService.memories(userId: userId)
+            if memories.isEmpty && !attemptedLegacyImports.contains(userId) {
+                attemptedLegacyImports.insert(userId)
+                try await importLegacyMemoriesIfAvailable(userId: userId)
+            }
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    private func importLegacyMemoriesIfAvailable(userId: String) async throws {
+        let response = try await backendService.importLegacyMemories()
+        guard response.imported > 0 else { return }
+
+        memories = try await memoryService.memories(userId: userId)
+        successMessage = "Imported \(response.imported) previous memories."
     }
 
     func create(

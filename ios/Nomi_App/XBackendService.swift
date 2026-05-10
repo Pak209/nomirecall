@@ -51,6 +51,12 @@ struct XDiscoverResponse: Decodable {
     }
 }
 
+struct LegacyMemoryImportResponse: Decodable {
+    let imported: Int
+    let skipped: Int?
+    let message: String?
+}
+
 struct XDiscoverItem: Identifiable, Decodable {
     let id: String
     let title: String
@@ -142,6 +148,12 @@ final class XBackendService {
 
         var request = try await authorizedRequest(url: url)
         request.httpMethod = "GET"
+        return try await send(request)
+    }
+
+    func importLegacyMemories() async throws -> LegacyMemoryImportResponse {
+        var request = try await authorizedRequest(path: "memories/import-legacy")
+        request.httpMethod = "POST"
         return try await send(request)
     }
 
