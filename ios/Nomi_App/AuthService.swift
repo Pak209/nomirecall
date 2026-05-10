@@ -1,13 +1,25 @@
 import Foundation
 import FirebaseAuth
+import FirebaseCore
+import GoogleSignIn
+import UIKit
 
 enum AuthServiceError: LocalizedError {
     case firebaseNotConfigured
+    case googleClientIDMissing
+    case googlePresentationContextMissing
+    case googleIDTokenMissing
 
     var errorDescription: String? {
         switch self {
         case .firebaseNotConfigured:
             return "Firebase is not configured yet. Add GoogleService-Info.plist to the Nomi_App target."
+        case .googleClientIDMissing:
+            return "Google Sign-In is missing CLIENT_ID in GoogleService-Info.plist. Download a fresh plist from Firebase after enabling Google sign-in."
+        case .googlePresentationContextMissing:
+            return "Nomi could not open the Google sign-in window. Please try again."
+        case .googleIDTokenMissing:
+            return "Google did not return a valid sign-in token. Please try again."
         }
     }
 }
@@ -41,10 +53,73 @@ final class AuthService {
         }
     }
 
+    @MainActor
+    func signInWithGoogle() async throws -> User {
+        guard FirebaseAppReady.isConfigured else { throw AuthServiceError.firebaseNotConfigured }
+        guard let clientID = FirebaseApp.app()?.options.clientID else {
+            throw AuthServiceError.googleClientIDMissing
+        }
+        guard let presenter = UIApplication.shared.nomiRootViewController else {
+            throw AuthServiceError.googlePresentationContextMissing
+        }
+
+        GIDSignIn.sharedInstance.configuration = GIDConfiguration(clientID: clientID)
+
+        do {
+            let result = try await GIDSignIn.sharedInstance.signIn(withPresenting: presenter)
+
+            guard let idToken = result.user.idToken?.tokenString else {
+                throw AuthServiceError.googleIDTokenMissing
+            }
+
+            let credential = GoogleAuthProvider.credential(
+                withIDToken: idToken,
+                accessToken: result.user.accessToken.tokenString
+            )
+            let authResult = try await Auth.auth().signIn(with: credential)
+            return authResult.user
+        } catch let error as AuthServiceError {
+            throw error
+        } catch {
+            throw AuthErrorFormatter.userFacingError(from: error)
+        }
+    }
+
     func signOut() throws {
         guard FirebaseAppReady.isConfigured else { throw AuthServiceError.firebaseNotConfigured }
 
         try Auth.auth().signOut()
+    }
+}
+
+private extension UIApplication {
+    var nomiRootViewController: UIViewController? {
+        connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap(\.windows)
+            .first { $0.isKeyWindow }?
+            .rootViewController?
+            .topMostPresentedViewController
+    }
+}
+
+private extension UIViewController {
+    var topMostPresentedViewController: UIViewController {
+        if let presentedViewController {
+            return presentedViewController.topMostPresentedViewController
+        }
+
+        if let navigationController = self as? UINavigationController,
+           let visibleViewController = navigationController.visibleViewController {
+            return visibleViewController.topMostPresentedViewController
+        }
+
+        if let tabBarController = self as? UITabBarController,
+           let selectedViewController = tabBarController.selectedViewController {
+            return selectedViewController.topMostPresentedViewController
+        }
+
+        return self
     }
 }
 

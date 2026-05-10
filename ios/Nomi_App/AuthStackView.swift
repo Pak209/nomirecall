@@ -10,6 +10,7 @@ struct AuthStackView: View {
     @State private var email = ""
     @State private var password = ""
     @State private var isWorking = false
+    @State private var isGoogleWorking = false
     @State private var errorMessage: String?
 
     private let authService = AuthService()
@@ -71,7 +72,47 @@ struct AuthStackView: View {
                         .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(NomiPrimaryButtonStyle())
-                    .disabled(isWorking || email.isEmpty || password.count < 6)
+                    .disabled(isWorking || isGoogleWorking || email.isEmpty || password.count < 6)
+
+                    HStack(spacing: 12) {
+                        Rectangle()
+                            .fill(.secondary.opacity(0.24))
+                            .frame(height: 1)
+
+                        Text("or")
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(.secondary)
+
+                        Rectangle()
+                            .fill(.secondary.opacity(0.24))
+                            .frame(height: 1)
+                    }
+
+                    Button {
+                        continueWithGoogle()
+                    } label: {
+                        HStack(spacing: 12) {
+                            if isGoogleWorking {
+                                ProgressView()
+                            } else {
+                                Text("G")
+                                    .font(.system(size: 18, weight: .bold))
+                                    .foregroundStyle(.blue)
+                                    .frame(width: 28, height: 28)
+                                    .background(.white, in: Circle())
+                                    .overlay(
+                                        Circle()
+                                            .stroke(.black.opacity(0.08), lineWidth: 1)
+                                    )
+                            }
+
+                            Text("Continue with Google")
+                                .fontWeight(.bold)
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(NomiSecondaryButtonStyle())
+                    .disabled(isWorking || isGoogleWorking)
 
                     if let errorMessage {
                         Text(errorMessage)
@@ -103,6 +144,21 @@ struct AuthStackView: View {
             }
 
             isWorking = false
+        }
+    }
+
+    private func continueWithGoogle() {
+        isGoogleWorking = true
+        errorMessage = nil
+
+        Task {
+            do {
+                _ = try await authService.signInWithGoogle()
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+
+            isGoogleWorking = false
         }
     }
 }

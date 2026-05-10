@@ -1,5 +1,6 @@
 import SwiftUI
 import FirebaseCore
+import GoogleSignIn
 
 @main
 struct Nomi_AppApp: App {
@@ -20,6 +21,9 @@ struct Nomi_AppApp: App {
                 .environmentObject(purchaseStore)
                 .task(id: appSession.user?.uid) {
                     await purchaseStore.syncUser(userId: appSession.user?.uid)
+                }
+                .onOpenURL { url in
+                    GIDSignIn.sharedInstance.handle(url)
                 }
         }
     }
