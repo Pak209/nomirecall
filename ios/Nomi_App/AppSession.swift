@@ -63,7 +63,7 @@ final class AppSession: ObservableObject {
             let updatedProfile = try await userProfileService.markOnboardingComplete(userId: user.uid)
             profile = updatedProfile
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = FirebaseErrorFormatter.userFacingMessage(from: error, action: "Completing Meet Nomi")
         }
     }
 
@@ -94,7 +94,7 @@ final class AppSession: ObservableObject {
         do {
             profile = try await userProfileService.profile(for: user)
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = FirebaseErrorFormatter.userFacingMessage(from: error, action: "Loading your Nomi profile")
         }
     }
 }

@@ -23,6 +23,7 @@
 		39DDAB4E51087852A3BAB439 /* EmptyStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B82B60EAD008E692668BEC5 /* EmptyStateView.swift */; };
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
 		3E4D598EFC2170139FFAE4D4 /* MemoryCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A9ACFB55BB89EA80BF087C3 /* MemoryCardView.swift */; };
+		425DBC42B7CA6847889B9E8A /* FirebaseErrorFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = C81634FA67723ADCAE4BBB54 /* FirebaseErrorFormatter.swift */; };
 		512BB64F28A7197146C2F702 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = 3113F081B3903E4252A323AD /* GoogleSignIn */; };
 		62A09443F7F40E99A24E3CFA /* DiscoverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED762E379793815EC13BD3F5 /* DiscoverView.swift */; };
 		75B59C72983D97A0674384A1 /* LoadingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 477BD54A690043D328BB8FE0 /* LoadingView.swift */; };
@@ -92,6 +93,7 @@
 		AC0408D7AC75EE860D8CEF4B /* SplashView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SplashView.swift; sourceTree = "<group>"; };
 		B57A1310C5744919811FA515 /* UserProfileService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = UserProfileService.swift; sourceTree = "<group>"; };
 		BB2F792C24A3F905000567C9 /* Expo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Expo.plist; sourceTree = "<group>"; };
+		C81634FA67723ADCAE4BBB54 /* FirebaseErrorFormatter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FirebaseErrorFormatter.swift; sourceTree = "<group>"; };
 		C8A93D02E68AB774863407EC /* MemoryStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MemoryStore.swift; sourceTree = "<group>"; };
 		CDEB249721001A9EFD4599A8 /* QuickCaptureView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = QuickCaptureView.swift; sourceTree = "<group>"; };
 		E19204E49FA71C9C3F7B7CB1 /* NomiBackground.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NomiBackground.swift; sourceTree = "<group>"; };
@@ -199,6 +201,7 @@
 				03B1BA0E5198465E668F1619 /* PurchaseStore.swift */,
 				ED762E379793815EC13BD3F5 /* DiscoverView.swift */,
 				F81FF0E663F233BB1A4DFB0A /* NomiPaywallView.swift */,
+				C81634FA67723ADCAE4BBB54 /* FirebaseErrorFormatter.swift */,
 			);
 			path = Nomi_App;
 			sourceTree = "<group>";
@@ -548,6 +551,7 @@
 				04EA7BE19AFE7CF963793653 /* PurchaseStore.swift in Sources */,
 				62A09443F7F40E99A24E3CFA /* DiscoverView.swift in Sources */,
 				C72621B6F3F3FD0ACCF6955F /* NomiPaywallView.swift in Sources */,
+				425DBC42B7CA6847889B9E8A /* FirebaseErrorFormatter.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
