@@ -14,6 +14,7 @@ struct QuickCaptureView: View {
     @State private var isImportingXPost = false
     @State private var xSourceUsername: String?
     @State private var xSourceDate: Date?
+    @State private var alertTitle = "Could not save"
 
     private let categories = ["General", "Work", "Personal", "AI & Tech", "Finance", "Health", "Ideas"]
     private let xBackendService = XBackendService()
@@ -37,7 +38,7 @@ struct QuickCaptureView: View {
                 }
             }
             .navigationTitle("Quick Capture")
-            .alert("Could not save", isPresented: errorBinding) {
+            .alert(alertTitle, isPresented: errorBinding) {
                 Button("OK", role: .cancel) {}
             } message: {
                 Text(memoryStore.errorMessage ?? "Something went wrong.")
@@ -197,6 +198,7 @@ struct QuickCaptureView: View {
         guard let userId = appSession.user?.uid else { return }
 
         isSaving = true
+        alertTitle = "Could not save"
         defer { isSaving = false }
 
         let saved = await memoryStore.create(
@@ -224,6 +226,7 @@ struct QuickCaptureView: View {
 
     private func importXPost() async {
         isImportingXPost = true
+        alertTitle = "Could not import X post"
         defer { isImportingXPost = false }
 
         do {
