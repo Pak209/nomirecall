@@ -23,7 +23,7 @@
 4. Replace the Release backend URL build setting:
    - Target: `Nomi_App`
    - Build Settings: `NOMI_BACKEND_API_BASE_URL`
-   - Release value is currently `https://REPLACE-WITH-NOMI-PRODUCTION-BACKEND/api`
+   - Release value is currently `https://nomirecall.onrender.com/api`
 5. Confirm the production backend has:
    - `X_BEARER_TOKEN`
    - Firebase Admin credentials

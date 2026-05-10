@@ -785,7 +785,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				NOMI_BACKEND_API_BASE_URL = "https://REPLACE-WITH-NOMI-PRODUCTION-BACKEND/api";
+				NOMI_BACKEND_API_BASE_URL = "https://nomirecall.onrender.com/api";
 				PRODUCT_BUNDLE_IDENTIFIER = com.dkimoto.nomi.recall;
 				PRODUCT_NAME = Nomi;
 				SDKROOT = iphoneos;
