@@ -15,7 +15,7 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "A1A7CEB759677E2354CB21EC"
-               BuildableName = "Nomi.app"
+               BuildableName = "Nomi Recall.app"
                BlueprintName = "Nomi_App"
                ReferencedContainer = "container:Nomi.xcodeproj">
             </BuildableReference>
@@ -31,7 +31,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "A1A7CEB759677E2354CB21EC"
-            BuildableName = "Nomi.app"
+            BuildableName = "Nomi Recall.app"
             BlueprintName = "Nomi_App"
             ReferencedContainer = "container:Nomi.xcodeproj">
          </BuildableReference>
@@ -54,7 +54,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "A1A7CEB759677E2354CB21EC"
-            BuildableName = "Nomi.app"
+            BuildableName = "Nomi Recall.app"
             BlueprintName = "Nomi_App"
             ReferencedContainer = "container:Nomi.xcodeproj">
          </BuildableReference>
@@ -71,7 +71,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "A1A7CEB759677E2354CB21EC"
-            BuildableName = "Nomi.app"
+            BuildableName = "Nomi Recall.app"
             BlueprintName = "Nomi_App"
             ReferencedContainer = "container:Nomi.xcodeproj">
          </BuildableReference>
