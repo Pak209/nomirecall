@@ -4,6 +4,8 @@ struct QuickCaptureView: View {
     @EnvironmentObject private var appSession: AppSession
     @EnvironmentObject private var memoryStore: MemoryStore
 
+    @Binding private var pendingSharePayload: NomiSharePayload?
+
     @State private var selectedType = CaptureType.note
     @State private var title = ""
     @State private var content = ""
@@ -18,6 +20,10 @@ struct QuickCaptureView: View {
 
     private let categories = ["General", "Work", "Personal", "AI & Tech", "Finance", "Health", "Ideas"]
     private let xBackendService = XBackendService()
+
+    init(pendingSharePayload: Binding<NomiSharePayload?> = .constant(nil)) {
+        _pendingSharePayload = pendingSharePayload
+    }
 
     var body: some View {
         NavigationStack {
@@ -45,6 +51,10 @@ struct QuickCaptureView: View {
                 Button("OK", role: .cancel) {}
             } message: {
                 Text(memoryStore.errorMessage ?? "Something went wrong.")
+            }
+            .onAppear(perform: applyPendingSharePayload)
+            .onChange(of: pendingSharePayload) { _, _ in
+                applyPendingSharePayload()
             }
         }
     }
@@ -247,6 +257,29 @@ struct QuickCaptureView: View {
         } catch {
             memoryStore.errorMessage = error.localizedDescription
         }
+    }
+
+    private func applyPendingSharePayload() {
+        guard let payload = pendingSharePayload else { return }
+
+        selectedType = .link
+        if let sharedURL = payload.urlString?.trimmingCharacters(in: .whitespacesAndNewlines), !sharedURL.isEmpty {
+            link = sharedURL
+        } else {
+            selectedType = .note
+        }
+
+        if let sharedText = payload.text?.trimmingCharacters(in: .whitespacesAndNewlines), !sharedText.isEmpty {
+            if sharedText != link {
+                content = sharedText
+            }
+        }
+
+        if let sharedTitle = payload.title?.trimmingCharacters(in: .whitespacesAndNewlines), !sharedTitle.isEmpty {
+            title = sharedTitle
+        }
+
+        pendingSharePayload = nil
     }
 }
 

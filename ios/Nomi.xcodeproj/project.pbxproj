@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		02DE75098B0A170AC631B8AF /* NomiSharePayload.swift in Sources */ = {isa = PBXBuildFile; fileRef = F60EF6FFD302C6A5751B09F7 /* NomiSharePayload.swift */; };
 		04EA7BE19AFE7CF963793653 /* PurchaseStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03B1BA0E5198465E668F1619 /* PurchaseStore.swift */; };
 		09FB3CF85FAE766CD86516D6 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A1FA9C2AB1FF7A7A453A296D /* Assets.xcassets */; };
 		0A0A0BD4D0ECEBF7503A1789 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 3835DFB317F094FD68CFC186 /* FirebaseFirestore */; };
@@ -14,19 +15,23 @@
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
 		13B07FC11A68108700A75B9A /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 13B07FB71A68108700A75B9A /* main.m */; };
 		1FCF34BE588E09BBCCAB7C0C /* Nomi_AppApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00F0AEECB97CBE9B468AB80B /* Nomi_AppApp.swift */; };
+		214857FA9E633945A1FFC1EC /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CB09AEAFBB86D72F3C90383 /* ShareViewController.swift */; };
 		239075CDCC2C5285AD91AF33 /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = 5CA6D7C800C25ADE16AFF8E4 /* FirebaseStorage */; };
 		2611B6276C303EE22479F2A6 /* FirebaseBootstrap.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3832AB5D187347568CA63290 /* FirebaseBootstrap.swift */; };
 		26A9959E38C44989E6CBEA1F /* NomiFormatters.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAADDD4382D5095095C8C7C5 /* NomiFormatters.swift */; };
 		2FD02CAD479AA01BFDCC74FC /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D501EA1B4D8F681751EB04F /* SettingsView.swift */; };
 		31F1DC2906FF60DF14C0C067 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = E76A2C4ED4541E44D1CC4547 /* PrivacyInfo.xcprivacy */; };
 		35C45096F08845FE8E1C849A /* noop-file.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7D9E1335968406A90DE28A1 /* noop-file.swift */; };
+		3990FD57A831B2BF5EA5BAB0 /* NomiShareInbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0409D49EAF065C6BE22C7F52 /* NomiShareInbox.swift */; };
 		39DDAB4E51087852A3BAB439 /* EmptyStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B82B60EAD008E692668BEC5 /* EmptyStateView.swift */; };
 		3AB9C8589E7E498BA22AA103 /* MarkdownExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3AB9C8579E7E498BA22AA103 /* MarkdownExporter.swift */; };
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
 		3E4D598EFC2170139FFAE4D4 /* MemoryCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A9ACFB55BB89EA80BF087C3 /* MemoryCardView.swift */; };
 		425DBC42B7CA6847889B9E8A /* FirebaseErrorFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = C81634FA67723ADCAE4BBB54 /* FirebaseErrorFormatter.swift */; };
 		512BB64F28A7197146C2F702 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = 3113F081B3903E4252A323AD /* GoogleSignIn */; };
+		617B2313E9AB7388623E86F4 /* NomiShareInbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0409D49EAF065C6BE22C7F52 /* NomiShareInbox.swift */; };
 		62A09443F7F40E99A24E3CFA /* DiscoverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED762E379793815EC13BD3F5 /* DiscoverView.swift */; };
+		6C749CFCA791688F4D1303B8 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 539BC29121E5CF1D60CBB022 /* Foundation.framework */; };
 		75B59C72983D97A0674384A1 /* LoadingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 477BD54A690043D328BB8FE0 /* LoadingView.swift */; };
 		7D923EE396FD483A72020F3A /* RevenueCatUI in Frameworks */ = {isa = PBXBuildFile; productRef = 26838F235C41A3977A3902E8 /* RevenueCatUI */; };
 		8448F09CB02F172CF2F7C28F /* BackendConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA7E40E491E286B68943BF17 /* BackendConfig.swift */; };
@@ -43,6 +48,7 @@
 		A8BA0437BB6FD0F553613026 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34E40BE9845930A8DD4A3446 /* ContentView.swift */; };
 		AD938C3BA7CC0CF74F2DF915 /* MainTabsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F554E7A931049171E9289AA /* MainTabsView.swift */; };
 		B18059E884C0ABDD17F3DC3D /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAC715A2D49A985799AEE119 /* ExpoModulesProvider.swift */; };
+		B3C434F4572B2BEA69663E35 /* NomiShareExtension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 717F65F582578F8567B7087C /* NomiShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		B82FA72A1105AA597561575B /* RevenueCat in Frameworks */ = {isa = PBXBuildFile; productRef = 51EF7B14BE8846B19408E7D0 /* RevenueCat */; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
 		BCADF9DEB48F73E165C7DA5B /* XBackendService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 780E29385D410EE2A374CA8D /* XBackendService.swift */; };
@@ -54,17 +60,44 @@
 		D333F27B4EF6E727D790A4A6 /* QuickCaptureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDEB249721001A9EFD4599A8 /* QuickCaptureView.swift */; };
 		DB3FA86C1FAF04EF0921A645 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 539BC29121E5CF1D60CBB022 /* Foundation.framework */; };
 		DBD71B9B18AF2AA34596A99C /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = F6B041995AAA249414F62BA4 /* FirebaseCore */; };
+		E4F30D9193E80C5E4A9D6F5E /* NomiSharePayload.swift in Sources */ = {isa = PBXBuildFile; fileRef = F60EF6FFD302C6A5751B09F7 /* NomiSharePayload.swift */; };
 		E621D5A4A45CF55047E39316 /* MemoryDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5627D30997EBF1C9C550A2A /* MemoryDetailView.swift */; };
 		F4CBC918F65950FA86D112D3 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 41A6F43A2493105F942AA71A /* FirebaseAuth */; };
 		F4F52B5ED25CB9B555F9E40A /* SplashView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC0408D7AC75EE860D8CEF4B /* SplashView.swift */; };
 		FE79B36067D12257D5D6FB08 /* MeetNomiView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46C2070B326AEB9DA6291044 /* MeetNomiView.swift */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		DB5C04F0B021066267169860 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 83CBB9F71A601CBA00E9B192 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 48A66BD44810B52C55C2020D;
+			remoteInfo = NomiShareExtension;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		12550B8AD8EBA54C1A14F4FC /* Embed App Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				B3C434F4572B2BEA69663E35 /* NomiShareExtension.appex in Embed App Extensions */,
+			);
+			name = "Embed App Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
 		00F0AEECB97CBE9B468AB80B /* Nomi_AppApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Nomi_AppApp.swift; sourceTree = "<group>"; };
 		023CA8064AE4526C1CBFCEFC /* AuthService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AuthService.swift; sourceTree = "<group>"; };
 		025E759FE95060F50E8FAF8D /* AppSession.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppSession.swift; sourceTree = "<group>"; };
+		039CBC479F6EC025CD4D92CC /* Nomi_App.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = Nomi_App.entitlements; sourceTree = "<group>"; };
 		03B1BA0E5198465E668F1619 /* PurchaseStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PurchaseStore.swift; sourceTree = "<group>"; };
+		0409D49EAF065C6BE22C7F52 /* NomiShareInbox.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NomiShareInbox.swift; sourceTree = "<group>"; };
 		0D501EA1B4D8F681751EB04F /* SettingsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		13B07F961A680F5B00A75B9A /* Nomi.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Nomi.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		13B07FAF1A68108700A75B9A /* AppDelegate.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = AppDelegate.h; path = Nomi/AppDelegate.h; sourceTree = "<group>"; };
@@ -84,12 +117,16 @@
 		564C1BF454C02C57B7687386 /* GoogleService-Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		58EEBF8E8E6FB1BC6CAF49B5 /* libPods-Nomi.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-Nomi.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		5B82B60EAD008E692668BEC5 /* EmptyStateView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = EmptyStateView.swift; sourceTree = "<group>"; };
+		5CB09AEAFBB86D72F3C90383 /* ShareViewController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ShareViewController.swift; sourceTree = "<group>"; };
 		5F554E7A931049171E9289AA /* MainTabsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MainTabsView.swift; sourceTree = "<group>"; };
+		667F4B3B6A029EE361B774D0 /* NomiShareExtension.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = NomiShareExtension.entitlements; sourceTree = "<group>"; };
 		68E97A4004094EB7B68808A5 /* Nomi-Bridging-Header.h */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.c.h; name = "Nomi-Bridging-Header.h"; path = "Nomi/Nomi-Bridging-Header.h"; sourceTree = "<group>"; };
 		6C2E3173556A471DD304B334 /* Pods-Nomi.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Nomi.debug.xcconfig"; path = "Target Support Files/Pods-Nomi/Pods-Nomi.debug.xcconfig"; sourceTree = "<group>"; };
+		717F65F582578F8567B7087C /* NomiShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = NomiShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		74A7AC3E41E0FFC1306DDD72 /* RecallView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RecallView.swift; sourceTree = "<group>"; };
 		780E29385D410EE2A374CA8D /* XBackendService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = XBackendService.swift; sourceTree = "<group>"; };
 		7A4D352CD337FB3A3BF06240 /* Pods-Nomi.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Nomi.release.xcconfig"; path = "Target Support Files/Pods-Nomi/Pods-Nomi.release.xcconfig"; sourceTree = "<group>"; };
+		882BF9FCDA9B7051854A1BA6 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		9964D226D6037015D6FAC2D5 /* AuthStackView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AuthStackView.swift; sourceTree = "<group>"; };
 		A1FA9C2AB1FF7A7A453A296D /* Assets.xcassets */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = Nomi/SplashScreen.storyboard; sourceTree = "<group>"; };
@@ -108,6 +145,7 @@
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		ED762E379793815EC13BD3F5 /* DiscoverView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DiscoverView.swift; sourceTree = "<group>"; };
 		F5627D30997EBF1C9C550A2A /* MemoryDetailView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MemoryDetailView.swift; sourceTree = "<group>"; };
+		F60EF6FFD302C6A5751B09F7 /* NomiSharePayload.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NomiSharePayload.swift; sourceTree = "<group>"; };
 		F7D9E1335968406A90DE28A1 /* noop-file.swift */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.swift; name = "noop-file.swift"; path = "Nomi/noop-file.swift"; sourceTree = "<group>"; };
 		F81FF0E663F233BB1A4DFB0A /* NomiPaywallView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NomiPaywallView.swift; sourceTree = "<group>"; };
 		FA7E40E491E286B68943BF17 /* BackendConfig.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BackendConfig.swift; sourceTree = "<group>"; };
@@ -137,6 +175,14 @@
 				B82FA72A1105AA597561575B /* RevenueCat in Frameworks */,
 				7D923EE396FD483A72020F3A /* RevenueCatUI in Frameworks */,
 				512BB64F28A7197146C2F702 /* GoogleSignIn in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C8A59B9A0E2E198149EAD089 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				6C749CFCA791688F4D1303B8 /* Foundation.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -208,8 +254,22 @@
 				C81634FA67723ADCAE4BBB54 /* FirebaseErrorFormatter.swift */,
 				3AB9C8579E7E498BA22AA103 /* MarkdownExporter.swift */,
 				CF51DC85356E40F8B4236463 /* ShareSheet.swift */,
+				F60EF6FFD302C6A5751B09F7 /* NomiSharePayload.swift */,
+				0409D49EAF065C6BE22C7F52 /* NomiShareInbox.swift */,
+				039CBC479F6EC025CD4D92CC /* Nomi_App.entitlements */,
 			);
 			path = Nomi_App;
+			sourceTree = "<group>";
+		};
+		3C18FC988858CCFE3048B724 /* NomiShareExtension */ = {
+			isa = PBXGroup;
+			children = (
+				5CB09AEAFBB86D72F3C90383 /* ShareViewController.swift */,
+				882BF9FCDA9B7051854A1BA6 /* Info.plist */,
+				667F4B3B6A029EE361B774D0 /* NomiShareExtension.entitlements */,
+			);
+			name = NomiShareExtension;
+			path = NomiShareExtension;
 			sourceTree = "<group>";
 		};
 		542DD5A686413E0CCA55CC00 /* iOS */ = {
@@ -237,6 +297,7 @@
 				D65327D7A22EEC0BE12398D9 /* Pods */,
 				D7E4C46ADA2E9064B798F356 /* ExpoModulesProviders */,
 				2D90132EDC5AF7A3847C0B83 /* Nomi_App */,
+				3C18FC988858CCFE3048B724 /* NomiShareExtension */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -248,6 +309,7 @@
 			children = (
 				13B07F961A680F5B00A75B9A /* Nomi.app */,
 				FAC4AC0C9597D3379C41A16B /* Nomi.app */,
+				717F65F582578F8567B7087C /* NomiShareExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -311,6 +373,23 @@
 			productReference = 13B07F961A680F5B00A75B9A /* Nomi.app */;
 			productType = "com.apple.product-type.application";
 		};
+		48A66BD44810B52C55C2020D /* NomiShareExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 61A82C02AC4A2A5D7743F764 /* Build configuration list for PBXNativeTarget "NomiShareExtension" */;
+			buildPhases = (
+				2EAEF8714450022E868BCC08 /* Sources */,
+				C8A59B9A0E2E198149EAD089 /* Frameworks */,
+				C24C30B6ED3A5CA3FB278177 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = NomiShareExtension;
+			productName = NomiShareExtension;
+			productReference = 717F65F582578F8567B7087C /* NomiShareExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		A1A7CEB759677E2354CB21EC /* Nomi_App */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = B4CECCA5AE3BB0B812EF51AE /* Build configuration list for PBXNativeTarget "Nomi_App" */;
@@ -318,10 +397,12 @@
 				C565C7FFAE344E80782BD312 /* Sources */,
 				1F790861B8A02686C8721916 /* Frameworks */,
 				90EA1E5580A0F605FDC2D3AA /* Resources */,
+				12550B8AD8EBA54C1A14F4FC /* Embed App Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				875AD52F59977A4B325EB4B0 /* PBXTargetDependency */,
 			);
 			name = Nomi_App;
 			packageProductDependencies = (
@@ -370,6 +451,7 @@
 			targets = (
 				13B07F861A680F5B00A75B9A /* Nomi */,
 				A1A7CEB759677E2354CB21EC /* Nomi_App */,
+				48A66BD44810B52C55C2020D /* NomiShareExtension */,
 			);
 		};
 /* End PBXProject section */
@@ -392,6 +474,13 @@
 			files = (
 				09FB3CF85FAE766CD86516D6 /* Assets.xcassets in Resources */,
 				940CB849208C2626A1A7BFE6 /* GoogleService-Info.plist in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C24C30B6ED3A5CA3FB278177 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -524,6 +613,16 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		2EAEF8714450022E868BCC08 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				214857FA9E633945A1FFC1EC /* ShareViewController.swift in Sources */,
+				E4F30D9193E80C5E4A9D6F5E /* NomiSharePayload.swift in Sources */,
+				617B2313E9AB7388623E86F4 /* NomiShareInbox.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		C565C7FFAE344E80782BD312 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -560,10 +659,21 @@
 				425DBC42B7CA6847889B9E8A /* FirebaseErrorFormatter.swift in Sources */,
 				3AB9C8589E7E498BA22AA103 /* MarkdownExporter.swift in Sources */,
 				CF51DC86356E40F8B4236463 /* ShareSheet.swift in Sources */,
+				02DE75098B0A170AC631B8AF /* NomiSharePayload.swift in Sources */,
+				3990FD57A831B2BF5EA5BAB0 /* NomiShareInbox.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		875AD52F59977A4B325EB4B0 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = NomiShareExtension;
+			target = 48A66BD44810B52C55C2020D /* NomiShareExtension */;
+			targetProxy = DB5C04F0B021066267169860 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		13B07F941A680F5B00A75B9A /* Debug */ = {
@@ -640,6 +750,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = Nomi_App/Nomi_App.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 5YJJCSFSQM;
@@ -656,6 +767,26 @@
 				PRODUCT_NAME = "Nomi Recall";
 				SDKROOT = iphoneos;
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		6DC413BB08002BDE7143DE8A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = NomiShareExtension/NomiShareExtension.entitlements;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = NomiShareExtension/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.dkimoto.nomi.recall.share;
+				PRODUCT_NAME = "Save to Nomi";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -794,12 +925,34 @@
 			};
 			name = Release;
 		};
+		E01CA279AA6AA50D8B0A978C /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = NomiShareExtension/NomiShareExtension.entitlements;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = NomiShareExtension/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.dkimoto.nomi.recall.share;
+				PRODUCT_NAME = "Save to Nomi";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
 		EC0E9A36F88189C246224546 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = Nomi_App/Nomi_App.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 5YJJCSFSQM;
@@ -830,6 +983,15 @@
 			buildConfigurations = (
 				13B07F941A680F5B00A75B9A /* Debug */,
 				13B07F951A680F5B00A75B9A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		61A82C02AC4A2A5D7743F764 /* Build configuration list for PBXNativeTarget "NomiShareExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E01CA279AA6AA50D8B0A978C /* Release */,
+				6DC413BB08002BDE7143DE8A /* Debug */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

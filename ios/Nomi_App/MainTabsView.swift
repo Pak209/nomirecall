@@ -3,6 +3,8 @@ import SwiftUI
 struct MainTabsView: View {
     @StateObject private var memoryStore = MemoryStore()
     @State private var selectedTab: NomiTab = .home
+    @State private var pendingSharePayload: NomiSharePayload?
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -15,7 +17,7 @@ struct MainTabsView: View {
                 case .search:
                     RecallView()
                 case .capture:
-                    QuickCaptureView()
+                    QuickCaptureView(pendingSharePayload: $pendingSharePayload)
                 case .recall:
                     RecallView()
                 case .profile:
@@ -30,6 +32,25 @@ struct MainTabsView: View {
                 .padding(.bottom, 8)
         }
         .ignoresSafeArea(.keyboard, edges: .bottom)
+        .onAppear(perform: consumeSharedCaptureIfNeeded)
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active else { return }
+            consumeSharedCaptureIfNeeded()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .nomiSharedCaptureReceived)) { notification in
+            if let payload = notification.object as? NomiSharePayload {
+                pendingSharePayload = payload
+                selectedTab = .capture
+            } else {
+                consumeSharedCaptureIfNeeded()
+            }
+        }
+    }
+
+    private func consumeSharedCaptureIfNeeded() {
+        guard let payload = NomiShareInbox.consumePendingPayload() else { return }
+        pendingSharePayload = payload
+        selectedTab = .capture
     }
 }
 

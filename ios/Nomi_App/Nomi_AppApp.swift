@@ -23,7 +23,11 @@ struct Nomi_AppApp: App {
                     await purchaseStore.syncUser(userId: appSession.user?.uid)
                 }
                 .onOpenURL { url in
-                    GIDSignIn.sharedInstance.handle(url)
+                    if url.scheme == "nomirecall" {
+                        NotificationCenter.default.post(name: .nomiSharedCaptureReceived, object: NomiShareInbox.consumePendingPayload())
+                    } else {
+                        GIDSignIn.sharedInstance.handle(url)
+                    }
                 }
         }
     }
