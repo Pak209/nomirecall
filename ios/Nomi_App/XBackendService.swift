@@ -176,18 +176,62 @@ final class XBackendService {
             throw BackendServiceError.invalidResponse
         }
 
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = JSONDecoder.nomiBackendDecoder
 
         guard (200..<300).contains(httpResponse.statusCode) else {
             let errorResponse = try? decoder.decode(BackendErrorResponse.self, from: data)
             throw BackendServiceError.server(errorResponse?.error ?? "Backend request failed.")
         }
 
-        return try decoder.decode(T.self, from: data)
+        do {
+            return try decoder.decode(T.self, from: data)
+        } catch let decodingError as DecodingError {
+            throw BackendServiceError.server(decodingError.nomiReadableMessage)
+        }
     }
 }
 
 private struct BackendErrorResponse: Decodable {
     let error: String
+}
+
+private extension JSONDecoder {
+    static var nomiBackendDecoder: JSONDecoder {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .custom { decoder in
+            let container = try decoder.singleValueContainer()
+            let value = try container.decode(String.self)
+
+            let fractionalFormatter = ISO8601DateFormatter()
+            fractionalFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+
+            let standardFormatter = ISO8601DateFormatter()
+            standardFormatter.formatOptions = [.withInternetDateTime]
+
+            if let date = fractionalFormatter.date(from: value) ?? standardFormatter.date(from: value) {
+                return date
+            }
+
+            throw DecodingError.dataCorruptedError(
+                in: container,
+                debugDescription: "Invalid date format: \(value)"
+            )
+        }
+        return decoder
+    }
+}
+
+private extension DecodingError {
+    var nomiReadableMessage: String {
+        switch self {
+        case .dataCorrupted(let context):
+            return context.debugDescription
+        case .keyNotFound(let key, _):
+            return "The backend response is missing \(key.stringValue)."
+        case .typeMismatch(_, let context), .valueNotFound(_, let context):
+            return context.debugDescription
+        @unknown default:
+            return "The backend returned data Nomi could not read."
+        }
+    }
 }
