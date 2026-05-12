@@ -34,6 +34,7 @@ struct XPostPreview: Decodable {
     let tags: [String]?
     let links: [XLink]?
     let media: [XMedia]?
+    let referencedPosts: [XReferencedPost]?
     let title: String?
 }
 
@@ -73,6 +74,7 @@ struct XDiscoverItem: Identifiable, Decodable {
     let postDate: Date?
     let links: [XLink]?
     let media: [XMedia]?
+    let referencedPosts: [XReferencedPost]?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -90,6 +92,7 @@ struct XDiscoverItem: Identifiable, Decodable {
         case postDate
         case links
         case media
+        case referencedPosts
     }
 }
 
@@ -113,6 +116,17 @@ struct XMediaVariant: Decodable, Hashable {
     let url: URL
     let contentType: String?
     let bitRate: Int?
+}
+
+struct XReferencedPost: Decodable, Hashable {
+    let id: String
+    let referenceType: String?
+    let username: String?
+    let url: URL?
+    let text: String?
+    let postDate: Date?
+    let links: [XLink]?
+    let media: [XMedia]?
 }
 
 struct XDiscoverError: Decodable, Hashable {

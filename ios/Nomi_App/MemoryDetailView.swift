@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import AVKit
 
 struct MemoryDetailView: View {
     @EnvironmentObject private var memoryStore: MemoryStore
@@ -42,6 +43,7 @@ struct MemoryDetailView: View {
                                 .stroke(Color.black.opacity(0.08), lineWidth: 1)
                         )
 
+                    richPostSection
                     infoSection
 
                     TextField("Tags, separated by commas", text: $tagText)
@@ -128,6 +130,31 @@ struct MemoryDetailView: View {
         .padding(16)
         .background(.white.opacity(0.82))
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    @ViewBuilder
+    private var richPostSection: some View {
+        if !draft.media.isEmpty || !draft.links.isEmpty || !draft.referencedPosts.isEmpty {
+            VStack(alignment: .leading, spacing: 14) {
+                if !draft.media.isEmpty {
+                    MemoryMediaSection(title: "Media", media: draft.media)
+                }
+
+                if !draft.links.isEmpty {
+                    MemoryLinksSection(title: "Links", links: draft.links)
+                }
+
+                if !draft.referencedPosts.isEmpty {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Related posts")
+                            .font(.headline)
+                        ForEach(draft.referencedPosts) { post in
+                            ReferencedPostCard(post: post)
+                        }
+                    }
+                }
+            }
+        }
     }
 
     private var actions: some View {
@@ -271,5 +298,182 @@ struct MemoryDetailView: View {
     private func previewMarkdown() {
         markdownPreview = MarkdownExporter.makeMarkdown(from: currentExportMemory())
         isShowingMarkdownPreview = true
+    }
+}
+
+private struct MemoryMediaSection: View {
+    let title: String
+    let media: [NomiMemoryMedia]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title)
+                .font(.headline)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    ForEach(media) { item in
+                        MemoryMediaCard(item: item)
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct MemoryMediaCard: View {
+    let item: NomiMemoryMedia
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(.white.opacity(0.75))
+
+                if let videoURL = item.bestVideoURL,
+                   item.type == "video" || item.type == "animated_gif" {
+                    VideoPlayer(player: AVPlayer(url: videoURL))
+                        .frame(width: 188, height: 132)
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                } else if let imageURL = item.bestDisplayURL {
+                    AsyncImage(url: imageURL) { phase in
+                        switch phase {
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .scaledToFill()
+                        case .failure:
+                            Image(systemName: "photo")
+                                .font(.title2)
+                                .foregroundStyle(.secondary)
+                        case .empty:
+                            ProgressView()
+                        @unknown default:
+                            EmptyView()
+                        }
+                    }
+                    .frame(width: 188, height: 132)
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                } else {
+                    Image(systemName: "photo")
+                        .font(.title2)
+                        .foregroundStyle(.secondary)
+                }
+
+                if item.bestVideoURL == nil && (item.type == "video" || item.type == "animated_gif") {
+                    Image(systemName: item.type == "animated_gif" ? "livephoto" : "play.circle.fill")
+                        .font(.system(size: 34, weight: .bold))
+                        .foregroundStyle(.white)
+                        .shadow(radius: 8)
+                }
+            }
+            .frame(width: 188, height: 132)
+
+            HStack(spacing: 6) {
+                Text(item.type == "animated_gif" ? "GIF" : item.type.capitalized)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+
+                if let videoURL = item.bestVideoURL {
+                    Link("Open video", destination: videoURL)
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(.pink)
+                } else if let sourceURL = item.url {
+                    Link("Open", destination: sourceURL)
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(.pink)
+                }
+            }
+        }
+        .frame(width: 188, alignment: .leading)
+    }
+}
+
+private struct MemoryLinksSection: View {
+    let title: String
+    let links: [NomiMemoryLink]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title)
+                .font(.headline)
+
+            ForEach(links) { link in
+                if let url = link.url {
+                    Link(destination: url) {
+                        HStack(spacing: 12) {
+                            Image(systemName: "link")
+                                .font(.headline)
+                                .foregroundStyle(.pink)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(link.title?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false ? link.title! : (link.displayUrl ?? url.host ?? url.absoluteString))
+                                    .font(.subheadline.weight(.bold))
+                                    .foregroundStyle(.primary)
+                                    .lineLimit(2)
+                                Text(link.displayUrl ?? url.absoluteString)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                            }
+                            Spacer()
+                        }
+                        .padding(12)
+                        .background(.white.opacity(0.86))
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct ReferencedPostCard: View {
+    let post: NomiReferencedPost
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text(label)
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.pink)
+                Spacer()
+                if let url = post.url {
+                    Link("Open", destination: url)
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(.pink)
+                }
+            }
+
+            if let username = post.username {
+                Text(username)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
+
+            Text(post.text?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false ? post.text! : "No post text returned.")
+                .font(.body)
+                .foregroundStyle(.primary)
+                .lineLimit(8)
+
+            if !post.media.isEmpty {
+                MemoryMediaSection(title: "Post media", media: post.media)
+            }
+
+            if !post.links.isEmpty {
+                MemoryLinksSection(title: "Post links", links: post.links)
+            }
+        }
+        .padding(14)
+        .background(.white.opacity(0.86))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    private var label: String {
+        switch post.referenceType {
+        case "quoted": "Quoted post"
+        case "retweeted": "Repost"
+        case "replied_to": "Reply"
+        default: "Referenced post"
+        }
     }
 }

@@ -33,7 +33,7 @@ extension NomiMemory {
             return "Image"
         case "voice":
             return "Voice"
-        case "x_post":
+        case "x_post", "tweet", "x-post", "xpost":
             return "X post"
         default:
             return "Note"

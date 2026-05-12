@@ -45,6 +45,24 @@ enum MarkdownExporter {
             lines.append("original_url: \(yamlQuoted(sourceURL.absoluteString))")
         }
 
+        if !memory.links.isEmpty {
+            lines.append("links:")
+            for link in memory.links {
+                if let url = link.url?.absoluteString {
+                    lines.append("  - \(yamlQuoted(url))")
+                }
+            }
+        }
+
+        if !memory.media.isEmpty {
+            lines.append("media:")
+            for media in memory.media {
+                if let url = media.bestDisplayURL?.absoluteString ?? media.bestVideoURL?.absoluteString {
+                    lines.append("  - \(yamlQuoted(url))")
+                }
+            }
+        }
+
         lines.append("exported_at: \(yamlQuoted(isoFormatter.string(from: exportedAt)))")
         lines.append("---")
         lines.append("")
@@ -82,14 +100,72 @@ enum MarkdownExporter {
         if let mediaURL = memory.mediaURL {
             sourceLines.append("- Media: \(mediaURL.absoluteString)")
         }
+        for link in memory.links {
+            if let url = link.url {
+                sourceLines.append("- Link: \(url.absoluteString)")
+            }
+        }
+        for media in memory.media {
+            if let url = media.bestDisplayURL ?? media.bestVideoURL {
+                sourceLines.append("- \(media.type.capitalized): \(url.absoluteString)")
+            }
+        }
 
         lines.append(contentsOf: sourceLines)
         lines.append("")
 
-        if let mediaURL = memory.mediaURL {
+        if let mediaURL = memory.mediaURL ?? memory.media.first?.bestDisplayURL ?? memory.media.first?.bestVideoURL {
             lines.append("## Media")
             lines.append("")
             lines.append("- \(mediaURL.absoluteString)")
+            for media in memory.media.dropFirst() {
+                if let url = media.bestDisplayURL ?? media.bestVideoURL {
+                    lines.append("- \(url.absoluteString)")
+                }
+            }
+            lines.append("")
+        }
+
+        if !memory.links.isEmpty {
+            lines.append("## Links")
+            lines.append("")
+            for link in memory.links {
+                if let url = link.url {
+                    let label = link.title ?? link.displayUrl ?? url.absoluteString
+                    lines.append("- [\(markdownEscaped(label))](\(url.absoluteString))")
+                }
+            }
+            lines.append("")
+        }
+
+        if !memory.referencedPosts.isEmpty {
+            lines.append("## Referenced Posts")
+            lines.append("")
+            for post in memory.referencedPosts {
+                lines.append("### \(referencedPostTitle(post))")
+                lines.append("")
+                if let text = post.text, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    lines.append(text)
+                    lines.append("")
+                }
+                if let url = post.url {
+                    lines.append("- URL: \(url.absoluteString)")
+                }
+                if let date = post.postDate {
+                    lines.append("- Post Date: \(dateOnlyFormatter.string(from: date))")
+                }
+                for media in post.media {
+                    if let url = media.bestDisplayURL ?? media.bestVideoURL {
+                        lines.append("- \(media.type.capitalized): \(url.absoluteString)")
+                    }
+                }
+                for link in post.links {
+                    if let url = link.url {
+                        lines.append("- Link: \(url.absoluteString)")
+                    }
+                }
+                lines.append("")
+            }
             lines.append("")
         }
 
@@ -128,6 +204,27 @@ enum MarkdownExporter {
 
     private static func yamlQuoted(_ value: String) -> String {
         "\"\(value.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\""))\""
+    }
+
+    private static func markdownEscaped(_ value: String) -> String {
+        value
+            .replacingOccurrences(of: "[", with: "\\[")
+            .replacingOccurrences(of: "]", with: "\\]")
+    }
+
+    private static func referencedPostTitle(_ post: NomiReferencedPost) -> String {
+        let label: String
+        switch post.referenceType {
+        case "quoted": label = "Quoted post"
+        case "retweeted": label = "Repost"
+        case "replied_to": label = "Reply"
+        default: label = "Referenced post"
+        }
+
+        if let username = post.username, !username.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return "\(label) from \(username)"
+        }
+        return label
     }
 
     private static func normalizedTags(_ tags: [String]) -> [String] {

@@ -49,7 +49,10 @@ final class MemoryStore: ObservableObject {
         sourceURL: URL?,
         sourceUsername: String? = nil,
         sourceDate: Date? = nil,
-        type: String
+        type: String,
+        links: [NomiMemoryLink] = [],
+        media: [NomiMemoryMedia] = [],
+        referencedPosts: [NomiReferencedPost] = []
     ) async -> Bool {
         do {
             _ = try await memoryService.createMemory(
@@ -61,7 +64,10 @@ final class MemoryStore: ObservableObject {
                 sourceURL: sourceURL,
                 sourceUsername: sourceUsername,
                 sourceDate: sourceDate,
-                type: type
+                type: type,
+                links: links,
+                media: media,
+                referencedPosts: referencedPosts
             )
             successMessage = "Memory saved."
             await load(userId: userId)

@@ -67,6 +67,16 @@ const INGEST_SCHEMA = z.object({
       bitRate: z.number().optional(),
     })).max(8).optional(),
   })).max(12).optional(),
+  referencedPosts: z.array(z.object({
+    id: z.string().min(1),
+    referenceType: z.string().optional(),
+    username: z.string().optional(),
+    url: z.string().optional(),
+    text: z.string().optional(),
+    postDate: z.string().optional(),
+    links: z.array(z.any()).optional(),
+    media: z.array(z.any()).optional(),
+  })).max(8).optional(),
 });
 
 const BRAIN_QUERY_SCHEMA = z.object({
@@ -203,6 +213,7 @@ function nativeMemoryFromSource(source, firebaseUserId) {
     sourceDate: sourceDate ? timestampFromValue(sourceDate, createdAtMs) : undefined,
     links: Array.isArray(source.links) ? source.links : [],
     media: Array.isArray(source.media) ? source.media : [],
+    referencedPosts: Array.isArray(source.referencedPosts) ? source.referencedPosts : [],
     importedFromLegacyBackend: true,
     legacyUserId: source.userId,
   });
@@ -250,6 +261,40 @@ function normalizeXMedia(media = []) {
       variants,
     };
   });
+}
+
+function xMediaForTweet(tweet, mediaByKey) {
+  return normalizeXMedia(
+    (tweet?.attachments?.media_keys || [])
+      .map((key) => mediaByKey.get(key))
+      .filter(Boolean),
+  );
+}
+
+function normalizeXReferencedPosts(payload = {}, primaryTweet = {}) {
+  const users = new Map((payload.includes?.users || []).map((user) => [user.id, user]));
+  const tweets = new Map((payload.includes?.tweets || []).map((tweet) => [tweet.id, tweet]));
+  const mediaByKey = new Map((payload.includes?.media || []).map((item) => [item.media_key, item]));
+
+  return (primaryTweet.referenced_tweets || [])
+    .map((reference) => {
+      const tweet = tweets.get(reference.id);
+      if (!tweet) return null;
+      const user = users.get(tweet.author_id);
+      const username = user?.username || '';
+      const text = tweet.note_tweet?.text || tweet.text || '';
+      return {
+        id: tweet.id,
+        referenceType: reference.type,
+        username,
+        url: xTweetUrl(username, tweet.id),
+        text,
+        postDate: tweet.created_at,
+        links: normalizeXLinks(tweet.entities?.urls),
+        media: xMediaForTweet(tweet, mediaByKey),
+      };
+    })
+    .filter(Boolean);
 }
 
 const INTEREST_SEARCH_CONFIG = {
@@ -713,6 +758,7 @@ app.post('/api/feed/:id/ingest', auth, async (req, res) => {
     postDate: item.postDate || item.published_at,
     links: Array.isArray(item.links) ? item.links : [],
     media: Array.isArray(item.media) ? item.media : [],
+    referencedPosts: Array.isArray(item.referencedPosts) ? item.referencedPosts : [],
     category: item.category || 'General',
     tags: Array.isArray(item.tags) && item.tags.length ? item.tags : ['feed'],
   };
@@ -790,9 +836,9 @@ app.post('/api/x-post/preview', auth, async (req, res) => {
   }
 
   const lookupUrl = new URL(`https://api.x.com/2/tweets/${parsed.postId}`);
-  lookupUrl.searchParams.set('tweet.fields', 'attachments,created_at,entities,text,note_tweet');
-  lookupUrl.searchParams.set('expansions', 'author_id,attachments.media_keys');
-  lookupUrl.searchParams.set('user.fields', 'username,name');
+  lookupUrl.searchParams.set('tweet.fields', 'attachments,created_at,entities,text,note_tweet,referenced_tweets');
+  lookupUrl.searchParams.set('expansions', 'author_id,attachments.media_keys,referenced_tweets.id,referenced_tweets.id.author_id,referenced_tweets.id.attachments.media_keys');
+  lookupUrl.searchParams.set('user.fields', 'username,name,profile_image_url');
   lookupUrl.searchParams.set('media.fields', 'alt_text,duration_ms,height,media_key,preview_image_url,type,url,variants,width');
 
   const xRes = await fetch(lookupUrl, {
@@ -808,7 +854,9 @@ app.post('/api/x-post/preview', auth, async (req, res) => {
   const user = payload.includes?.users?.find((item) => item.id === payload.data.author_id);
   const text = payload.data.note_tweet?.text || payload.data.text || '';
   const links = normalizeXLinks(payload.data.entities?.urls);
-  const media = normalizeXMedia(payload.includes?.media);
+  const mediaByKey = new Map((payload.includes?.media || []).map((item) => [item.media_key, item]));
+  const media = xMediaForTweet(payload.data, mediaByKey);
+  const referencedPosts = normalizeXReferencedPosts(payload, payload.data);
   const generated = generateMemoryMetadata(text);
   const username = user?.username || parsed.username;
   return res.json({
@@ -823,6 +871,7 @@ app.post('/api/x-post/preview', auth, async (req, res) => {
       tags: ['xpost', ...generated.tags],
       links,
       media,
+      referencedPosts,
       title: `@${username} on X`,
     },
   });
@@ -850,6 +899,7 @@ app.post('/api/ingest', auth, async (req, res) => {
     postDate: data.postDate,
     links: data.links,
     media: data.media,
+    referencedPosts: data.referencedPosts,
     category,
     tags,
   };
@@ -904,6 +954,7 @@ app.get('/api/memories', auth, async (req, res) => {
       postDate: source.postDate,
       links: Array.isArray(source.links) ? source.links : [],
       media: Array.isArray(source.media) ? source.media : [],
+      referencedPosts: Array.isArray(source.referencedPosts) ? source.referencedPosts : [],
     }));
   return res.json({ memories });
 });
@@ -984,6 +1035,7 @@ app.get('/api/memories/:id', auth, async (req, res) => {
       postDate: memory.postDate,
       links: Array.isArray(memory.links) ? memory.links : [],
       media: Array.isArray(memory.media) ? memory.media : [],
+      referencedPosts: Array.isArray(memory.referencedPosts) ? memory.referencedPosts : [],
     },
   });
 });
@@ -1008,6 +1060,7 @@ app.patch('/api/memories/:id', auth, async (req, res) => {
       postDate: updated.postDate,
       links: Array.isArray(updated.links) ? updated.links : [],
       media: Array.isArray(updated.media) ? updated.media : [],
+      referencedPosts: Array.isArray(updated.referencedPosts) ? updated.referencedPosts : [],
     },
   });
 });
@@ -1071,6 +1124,7 @@ app.get('/api/dashboard/recent', auth, async (req, res) => {
       body: String(source.body || ''),
       source_type: String(source.source_type || 'note'),
       media: Array.isArray(source.media) ? source.media : [],
+      referencedPosts: Array.isArray(source.referencedPosts) ? source.referencedPosts : [],
     }));
 
   return res.json({ items });

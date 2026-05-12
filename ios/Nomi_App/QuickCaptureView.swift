@@ -16,6 +16,9 @@ struct QuickCaptureView: View {
     @State private var isImportingXPost = false
     @State private var xSourceUsername: String?
     @State private var xSourceDate: Date?
+    @State private var xLinks: [NomiMemoryLink] = []
+    @State private var xMedia: [NomiMemoryMedia] = []
+    @State private var xReferencedPosts: [NomiReferencedPost] = []
     @State private var alertTitle = "Could not save"
 
     private let categories = ["General", "Work", "Personal", "AI & Tech", "Finance", "Health", "Ideas"]
@@ -123,6 +126,10 @@ struct QuickCaptureView: View {
                     }
                     .buttonStyle(NomiSecondaryButtonStyle())
                     .disabled(isImportingXPost || link.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+                    if hasImportedXRichContent {
+                        importedXPreview
+                    }
                 }
 
                 saveButton
@@ -209,6 +216,36 @@ struct QuickCaptureView: View {
         )
     }
 
+    private var hasImportedXRichContent: Bool {
+        !xMedia.isEmpty || !xLinks.isEmpty || !xReferencedPosts.isEmpty
+    }
+
+    private var importedXPreview: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Imported extras")
+                .font(.caption.weight(.bold))
+                .foregroundStyle(.secondary)
+
+            HStack(spacing: 8) {
+                if !xMedia.isEmpty {
+                    Label("\(xMedia.count) media", systemImage: "photo.on.rectangle")
+                }
+                if !xLinks.isEmpty {
+                    Label("\(xLinks.count) links", systemImage: "link")
+                }
+                if !xReferencedPosts.isEmpty {
+                    Label("\(xReferencedPosts.count) related posts", systemImage: "arrow.triangle.branch")
+                }
+            }
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(.pink)
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.white.opacity(0.75))
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
     private func save() async {
         guard let userId = appSession.user?.uid else { return }
 
@@ -225,7 +262,10 @@ struct QuickCaptureView: View {
             sourceURL: selectedType == .link ? sourceURL : nil,
             sourceUsername: xSourceUsername,
             sourceDate: xSourceDate,
-            type: selectedType.memoryType
+            type: isXPostLink ? "x_post" : selectedType.memoryType,
+            links: xLinks,
+            media: xMedia,
+            referencedPosts: xReferencedPosts
         )
 
         if saved {
@@ -235,6 +275,9 @@ struct QuickCaptureView: View {
             tagText = ""
             xSourceUsername = nil
             xSourceDate = nil
+            xLinks = []
+            xMedia = []
+            xReferencedPosts = []
             selectedType = .note
         }
     }
@@ -254,6 +297,9 @@ struct QuickCaptureView: View {
             tagText = (post.tags ?? tagText.nomiTags).joined(separator: ", ")
             xSourceUsername = post.username.map { "@\($0)" }
             xSourceDate = post.postDate
+            xLinks = (post.links ?? []).map(NomiMemoryLink.init)
+            xMedia = (post.media ?? []).map(NomiMemoryMedia.init)
+            xReferencedPosts = (post.referencedPosts ?? []).map(NomiReferencedPost.init)
         } catch {
             memoryStore.errorMessage = error.localizedDescription
         }
@@ -280,6 +326,47 @@ struct QuickCaptureView: View {
         }
 
         pendingSharePayload = nil
+    }
+}
+
+private extension NomiMemoryLink {
+    init(_ link: XLink) {
+        self.init(url: link.url, displayUrl: link.displayUrl, title: link.title)
+    }
+}
+
+private extension NomiMemoryMedia {
+    init(_ media: XMedia) {
+        self.init(
+            type: media.type,
+            url: media.url,
+            previewImageUrl: media.previewImageUrl,
+            altText: media.altText,
+            width: media.width,
+            height: media.height,
+            variants: (media.variants ?? []).map(NomiMemoryMediaVariant.init)
+        )
+    }
+}
+
+private extension NomiMemoryMediaVariant {
+    init(_ variant: XMediaVariant) {
+        self.init(url: variant.url, contentType: variant.contentType, bitRate: variant.bitRate)
+    }
+}
+
+private extension NomiReferencedPost {
+    init(_ post: XReferencedPost) {
+        self.init(
+            id: post.id,
+            referenceType: post.referenceType,
+            username: post.username.map { "@\($0)" },
+            url: post.url,
+            text: post.text,
+            postDate: post.postDate,
+            links: (post.links ?? []).map(NomiMemoryLink.init),
+            media: (post.media ?? []).map(NomiMemoryMedia.init)
+        )
     }
 }
 

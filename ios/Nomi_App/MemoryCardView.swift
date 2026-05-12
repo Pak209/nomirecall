@@ -33,6 +33,22 @@ struct MemoryCardView: View {
                     .lineLimit(4)
             }
 
+            if !memory.media.isEmpty || !memory.links.isEmpty || !memory.referencedPosts.isEmpty {
+                HStack(spacing: 12) {
+                    if !memory.media.isEmpty {
+                        Label("\(memory.media.count)", systemImage: "photo.on.rectangle")
+                    }
+                    if !memory.links.isEmpty {
+                        Label("\(memory.links.count)", systemImage: "link")
+                    }
+                    if !memory.referencedPosts.isEmpty {
+                        Label("\(memory.referencedPosts.count)", systemImage: "arrow.triangle.branch")
+                    }
+                }
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+            }
+
             if !memory.tags.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {

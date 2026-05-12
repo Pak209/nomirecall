@@ -141,7 +141,49 @@ struct DiscoverView: View {
             sourceURL: item.url,
             sourceUsername: item.authorUsername.map { "@\($0)" },
             sourceDate: item.postDate ?? item.publishedAt,
-            type: "x_post"
+            type: "x_post",
+            links: (item.links ?? []).map {
+                NomiMemoryLink(url: $0.url, displayUrl: $0.displayUrl, title: $0.title)
+            },
+            media: (item.media ?? []).map {
+                NomiMemoryMedia(
+                    type: $0.type,
+                    url: $0.url,
+                    previewImageUrl: $0.previewImageUrl,
+                    altText: $0.altText,
+                    width: $0.width,
+                    height: $0.height,
+                    variants: ($0.variants ?? []).map {
+                        NomiMemoryMediaVariant(url: $0.url, contentType: $0.contentType, bitRate: $0.bitRate)
+                    }
+                )
+            },
+            referencedPosts: (item.referencedPosts ?? []).map {
+                NomiReferencedPost(
+                    id: $0.id,
+                    referenceType: $0.referenceType,
+                    username: $0.username.map { "@\($0)" },
+                    url: $0.url,
+                    text: $0.text,
+                    postDate: $0.postDate,
+                    links: ($0.links ?? []).map {
+                        NomiMemoryLink(url: $0.url, displayUrl: $0.displayUrl, title: $0.title)
+                    },
+                    media: ($0.media ?? []).map {
+                        NomiMemoryMedia(
+                            type: $0.type,
+                            url: $0.url,
+                            previewImageUrl: $0.previewImageUrl,
+                            altText: $0.altText,
+                            width: $0.width,
+                            height: $0.height,
+                            variants: ($0.variants ?? []).map {
+                                NomiMemoryMediaVariant(url: $0.url, contentType: $0.contentType, bitRate: $0.bitRate)
+                            }
+                        )
+                    }
+                )
+            }
         )
     }
 }
