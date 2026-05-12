@@ -16,17 +16,28 @@ struct SplashView: View {
             )
             .ignoresSafeArea()
 
-            VStack(spacing: 28) {
-                Image("AppIcon")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 148, height: 148)
-                    .clipShape(RoundedRectangle(cornerRadius: 36, style: .continuous))
-                    .shadow(color: .black.opacity(0.18), radius: 28, y: 16)
+            VStack(spacing: 24) {
+                ZStack {
+                    Circle()
+                        .fill(.white.opacity(0.22))
+                        .frame(width: 184, height: 184)
+                        .blur(radius: 1)
 
-                Text("Nomi")
-                    .font(.system(size: 56, weight: .bold, design: .rounded))
+                    Image("NomiMascot")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 148, height: 148)
+                        .shadow(color: .white.opacity(0.32), radius: 18, y: 8)
+                        .shadow(color: .black.opacity(0.14), radius: 24, y: 14)
+                }
+
+                Text("Nomi Recall")
+                    .font(.system(size: 44, weight: .bold, design: .rounded))
                     .foregroundStyle(.white)
+
+                Text("Capture what matters.")
+                    .font(.system(size: 18, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.82))
             }
             .scaleEffect(isVisible ? 1 : 0.96)
             .opacity(isVisible ? 1 : 0)
