@@ -7,8 +7,14 @@ struct NomiPaywallView: View {
 
     private var monthlyPackage: Package? {
         purchaseStore.offerings?.current?.availablePackages.first { package in
-            package.packageType == .monthly
-                || package.storeProduct.productIdentifier.lowercased() == "monthly"
+            let productIdentifier = package.storeProduct.productIdentifier.lowercased()
+            let packageIdentifier = package.identifier.lowercased()
+            return package.packageType == .monthly
+                || productIdentifier == "monthly"
+                || productIdentifier.hasSuffix(".monthly")
+                || productIdentifier.contains("monthly")
+                || packageIdentifier == "$rc_monthly"
+                || packageIdentifier.contains("monthly")
         } ?? purchaseStore.offerings?.current?.availablePackages.first
     }
 
@@ -134,9 +140,20 @@ struct NomiPaywallView: View {
                 .disabled(purchaseStore.isLoading)
             } else {
                 VStack(spacing: 8) {
-                    ProgressView()
-                    Text("Loading subscription...")
-                        .foregroundStyle(.secondary)
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.title2)
+                        .foregroundStyle(Color.nomiOrange)
+
+                    Text(purchaseStore.offerings == nil ? "Loading subscription..." : "No subscription package found")
+                        .font(.headline)
+
+                    Text(purchaseStore.offerings == nil
+                        ? "If this stays here, check your network and RevenueCat setup."
+                        : "In RevenueCat, add your App Store product to the current offering. The App Store product ID must match exactly, including capitalization."
+                    )
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 12)

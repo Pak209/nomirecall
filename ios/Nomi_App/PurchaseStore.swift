@@ -38,9 +38,18 @@ final class PurchaseStore: ObservableObject {
             async let customerInfo = Purchases.shared.customerInfo()
             async let offerings = Purchases.shared.offerings()
             self.customerInfo = try await customerInfo
-            self.offerings = try await offerings
+            let loadedOfferings = try await offerings
+            self.offerings = loadedOfferings
+
+            if loadedOfferings.current == nil {
+                errorMessage = "RevenueCat has no current offering. Mark an offering as Current and attach the App Store product."
+            } else if loadedOfferings.current?.availablePackages.isEmpty == true {
+                errorMessage = "RevenueCat current offering has no packages. Add the Monthly App Store product to the offering."
+            } else {
+                errorMessage = nil
+            }
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = Self.readableErrorMessage(from: error)
         }
     }
 
@@ -57,7 +66,7 @@ final class PurchaseStore: ObservableObject {
                 customerInfo = try await Purchases.shared.logOut()
             }
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = Self.readableErrorMessage(from: error)
         }
 
         await refresh()
@@ -75,7 +84,7 @@ final class PurchaseStore: ObservableObject {
         do {
             customerInfo = try await Purchases.shared.restorePurchases()
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = Self.readableErrorMessage(from: error)
         }
     }
 
@@ -93,7 +102,7 @@ final class PurchaseStore: ObservableObject {
             let result = try await Purchases.shared.purchase(package: package)
             customerInfo = result.customerInfo
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = Self.readableErrorMessage(from: error)
         }
     }
 
@@ -103,5 +112,24 @@ final class PurchaseStore: ObservableObject {
                 customerInfo = newCustomerInfo
             }
         }
+    }
+
+    private static func readableErrorMessage(from error: Error) -> String {
+        let message = error.localizedDescription
+        let lowercased = message.lowercased()
+
+        if lowercased.contains("configuration") || lowercased.contains("products") || lowercased.contains("offerings") {
+            return "RevenueCat could not load Nomi Pro. Confirm the current offering contains the App Store product ID exactly as it appears in App Store Connect, then try again."
+        }
+
+        if lowercased.contains("cancel") {
+            return "Purchase canceled."
+        }
+
+        if lowercased.contains("network") || lowercased.contains("internet") {
+            return "Could not reach RevenueCat. Check your connection and try again."
+        }
+
+        return message
     }
 }

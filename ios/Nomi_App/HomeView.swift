@@ -3,6 +3,7 @@ import SwiftUI
 struct HomeView: View {
     @EnvironmentObject private var appSession: AppSession
     @EnvironmentObject private var memoryStore: MemoryStore
+    @State private var isShowingSummary = false
 
     var onQuickCapture: () -> Void = {}
 
@@ -54,6 +55,14 @@ struct HomeView: View {
             }
             .navigationDestination(for: NomiMemory.self) { memory in
                 MemoryDetailView(memory: memory)
+            }
+            .sheet(isPresented: $isShowingSummary) {
+                DailySummaryView(
+                    memories: memoryStore.memories,
+                    todayMemories: todayMemories,
+                    summaryText: summaryText,
+                    topCategories: topCategories
+                )
             }
         }
     }
@@ -199,6 +208,7 @@ struct HomeView: View {
                 .lineSpacing(2)
 
             Button {
+                isShowingSummary = true
             } label: {
                 HStack(spacing: 10) {
                     Text("View summary")
@@ -366,6 +376,196 @@ struct HomeView: View {
     private func loadMemories() async {
         guard let userId = appSession.user?.uid else { return }
         await memoryStore.load(userId: userId)
+    }
+}
+
+private struct DailySummaryView: View {
+    @Environment(\.dismiss) private var dismiss
+
+    let memories: [NomiMemory]
+    let todayMemories: [NomiMemory]
+    let summaryText: String
+    let topCategories: String
+
+    private var linkCount: Int {
+        memories.filter { ["link", "tweet", "url", "x_post", "x-post", "xpost"].contains($0.type.lowercased()) }.count
+    }
+
+    private var noteCount: Int {
+        max(memories.count - linkCount, 0)
+    }
+
+    private var recentTags: [String] {
+        Array(
+            Set(memories.flatMap(\.tags).map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() })
+        )
+        .filter { !$0.isEmpty }
+        .sorted()
+        .prefix(8)
+        .map { $0 }
+    }
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                NomiBackground()
+
+                ScrollView(showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 16) {
+                        heroCard
+                        statsGrid
+                        recentTodayList
+                    }
+                    .padding(20)
+                    .padding(.bottom, 24)
+                }
+            }
+            .navigationTitle("Today Summary")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                    .fontWeight(.semibold)
+                }
+            }
+        }
+    }
+
+    private var heroCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 12) {
+                Image("NomiMascot")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 52, height: 52)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(memories.isEmpty ? "Start your first summary" : "Nomi noticed")
+                        .font(.system(size: 22, weight: .black, design: .rounded))
+                        .foregroundStyle(Color.nomiInk)
+
+                    Text(memories.isEmpty ? "Capture something and this will become your daily rollup." : "Top themes: \(topCategories).")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Color.nomiMuted)
+                }
+            }
+
+            Text(summaryText)
+                .font(.system(size: 16, weight: .regular, design: .rounded))
+                .foregroundStyle(Color.nomiInk)
+                .lineSpacing(3)
+
+            if !recentTags.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(recentTags, id: \.self) { tag in
+                            Text("#\(tag)")
+                                .font(.caption.weight(.black))
+                                .foregroundStyle(Color.nomiPurple)
+                                .padding(.vertical, 6)
+                                .padding(.horizontal, 10)
+                                .background(.white.opacity(0.82), in: Capsule())
+                        }
+                    }
+                }
+            }
+        }
+        .padding(18)
+        .background(
+            LinearGradient(
+                colors: [Color(red: 0.96, green: 0.89, blue: 1.0), Color(red: 1.0, green: 0.92, blue: 0.96)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            in: RoundedRectangle(cornerRadius: 24, style: .continuous)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .stroke(Color.nomiPurple.opacity(0.16), lineWidth: 1.2)
+        )
+    }
+
+    private var statsGrid: some View {
+        HStack(spacing: 10) {
+            SummaryStatCard(title: "Today", value: "\(todayMemories.count)", icon: "calendar")
+            SummaryStatCard(title: "Notes", value: "\(noteCount)", icon: "note.text")
+            SummaryStatCard(title: "Links", value: "\(linkCount)", icon: "link")
+        }
+    }
+
+    private var recentTodayList: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Captured today")
+                .font(.system(size: 18, weight: .black, design: .rounded))
+                .foregroundStyle(Color.nomiInk)
+
+            if todayMemories.isEmpty {
+                EmptyStateView(
+                    title: "Nothing captured today",
+                    message: "Save an X post, link, note, image, or voice thought and it will appear here."
+                )
+                .background(.white.opacity(0.82), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(todayMemories.prefix(8)) { memory in
+                        HStack(spacing: 12) {
+                            Image(systemName: memory.displayType == "X post" ? "text.bubble" : "doc.text")
+                                .font(.subheadline.weight(.bold))
+                                .foregroundStyle(Color.nomiCoral)
+                                .frame(width: 34, height: 34)
+                                .background(Color.nomiCoral.opacity(0.10), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(memory.title)
+                                    .font(.subheadline.weight(.bold))
+                                    .foregroundStyle(Color.nomiInk)
+                                    .lineLimit(1)
+
+                                Text("\(memory.displayType) · \(memory.category)")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(Color.nomiMuted)
+                            }
+
+                            Spacer()
+                        }
+                        .padding(.vertical, 10)
+
+                        if memory.id != todayMemories.prefix(8).last?.id {
+                            Divider()
+                        }
+                    }
+                }
+                .padding(.horizontal, 14)
+                .background(.white.opacity(0.90), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            }
+        }
+    }
+}
+
+private struct SummaryStatCard: View {
+    let title: String
+    let value: String
+    let icon: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Image(systemName: icon)
+                .font(.subheadline.weight(.bold))
+                .foregroundStyle(Color.nomiPurple)
+
+            Text(value)
+                .font(.system(size: 22, weight: .black, design: .rounded))
+                .foregroundStyle(Color.nomiInk)
+
+            Text(title)
+                .font(.caption.weight(.bold))
+                .foregroundStyle(Color.nomiMuted)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(14)
+        .background(.white.opacity(0.88), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 }
 
