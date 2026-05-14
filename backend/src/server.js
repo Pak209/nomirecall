@@ -7,6 +7,7 @@ const dotenv = require('dotenv');
 const admin = require('firebase-admin');
 const { z } = require('zod');
 const { createStore, newSource } = require('./store');
+const { privacyPolicyPage, termsPage } = require('./legal');
 
 dotenv.config();
 
@@ -17,6 +18,14 @@ const store = createStore();
 
 app.use(cors());
 app.use(express.json());
+
+app.get('/privacy', (_req, res) => {
+  res.type('html').send(privacyPolicyPage());
+});
+
+app.get('/terms', (_req, res) => {
+  res.type('html').send(termsPage());
+});
 
 const EMAIL_AUTH_SCHEMA = z.object({
   email: z.string().email().transform((v) => v.toLowerCase()),

@@ -40,6 +40,8 @@ Then restart Expo.
 ## Implemented routes
 
 - `GET /api/health`
+- `GET /privacy`
+- `GET /terms`
 - `POST /api/auth/email`
 - `POST /api/auth/email/signup`
 - `POST /api/auth/signin`

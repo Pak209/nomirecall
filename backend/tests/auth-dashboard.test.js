@@ -9,6 +9,22 @@ process.env.NODE_ENV = 'test';
 
 const { app } = require('../src/server');
 
+test('legal pages are public html routes', async () => {
+  const privacy = await request(app).get('/privacy');
+  assert.equal(privacy.status, 200);
+  assert.match(privacy.headers['content-type'], /html/);
+  assert.match(privacy.text, /Privacy Policy/);
+  assert.match(privacy.text, /Firebase/);
+  assert.match(privacy.text, /RevenueCat/);
+  assert.match(privacy.text, /X post/);
+
+  const terms = await request(app).get('/terms');
+  assert.equal(terms.status, 200);
+  assert.match(terms.headers['content-type'], /html/);
+  assert.match(terms.text, /Terms of Use/);
+  assert.match(terms.text, /Subscriptions and Purchases/);
+});
+
 test('email signup + signin + password reset flow', async () => {
   const email = `auth.test.${Date.now()}@example.com`;
   const password = 'password123';
