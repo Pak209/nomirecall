@@ -26,6 +26,40 @@ FIREBASE_SERVICE_ACCOUNT_PATH=/absolute/path/to/firebase-service-account.json
 
 If Firebase env vars are not set, backend falls back to in-memory mode.
 
+In production (`NODE_ENV=production`), Firebase Admin config is required and the backend will fail closed instead of falling back to memory mode.
+
+## Render environment
+
+Set production secrets only in the Render dashboard. Do not commit real `.env` files or Firebase service account JSON.
+
+Required production variables:
+
+```env
+NODE_ENV=production
+JWT_SECRET=
+FIREBASE_PROJECT_ID=
+FIREBASE_SERVICE_ACCOUNT_JSON=
+```
+
+Use `FIREBASE_SERVICE_ACCOUNT_PATH` only when the secret file is provided by Render or another secure runtime mechanism. Add `X_BEARER_TOKEN` or `TWITTER_BEARER_TOKEN` on Render when X import/discovery should be live.
+
+For X bookmark imports, configure an OAuth 2.0 app in the X developer portal with this callback URL:
+
+```env
+X_REDIRECT_URI=https://your-backend.example.com/api/x/oauth/callback
+```
+
+Then set:
+
+```env
+X_CLIENT_ID=
+X_CLIENT_SECRET= # optional for public PKCE apps
+X_REDIRECT_URI=
+X_TOKEN_ENCRYPTION_KEY= # 32+ random chars
+```
+
+The bookmark MVP requests `tweet.read users.read bookmark.read offline.access`, stores the refresh token encrypted, and exposes manual sync through `/api/x/bookmarks/sync`.
+
 ## App config
 
 In app `.env`:
@@ -49,6 +83,11 @@ Then restart Expo.
 - `PATCH /api/auth/interests`
 - `PATCH /api/auth/tier`
 - `GET /api/x/discover`
+- `GET /api/x/bookmarks/connect`
+- `GET /api/x/oauth/callback`
+- `GET /api/x/bookmarks/status`
+- `POST /api/x/bookmarks/sync`
+- `DELETE /api/x/bookmarks/connection`
 - `GET /api/feed`
 - `POST /api/feed/:id/ingest`
 - `GET /api/stats`

@@ -10,6 +10,8 @@ class MemoryStore {
     this.usersByEmail = new Map();
     this.sourcesByUser = new Map();
     this.passwordResetTokens = new Map();
+    this.xOAuthStates = new Map();
+    this.xBookmarkConnections = new Map();
     this.feedItems = [...DEFAULT_FEED_ITEMS];
   }
 
@@ -27,6 +29,16 @@ class MemoryStore {
   async upsertUser(user) {
     this.usersByEmail.set(user.email, user);
     return user;
+  }
+
+  async deleteUserData(userId) {
+    for (const [email, user] of this.usersByEmail.entries()) {
+      if (user.id === userId) {
+        this.usersByEmail.delete(email);
+      }
+    }
+    this.sourcesByUser.delete(userId);
+    this.xBookmarkConnections.delete(userId);
   }
 
   async addSource(userId, source) {
@@ -99,6 +111,31 @@ class MemoryStore {
     if (!current) return;
     this.passwordResetTokens.set(tokenHash, { ...current, usedAt: new Date().toISOString() });
   }
+
+  async saveXOAuthState(state, record) {
+    this.xOAuthStates.set(state, record);
+  }
+
+  async consumeXOAuthState(state) {
+    const record = this.xOAuthStates.get(state) || null;
+    if (record) this.xOAuthStates.delete(state);
+    return record;
+  }
+
+  async getXBookmarkConnection(userId) {
+    return this.xBookmarkConnections.get(userId) || null;
+  }
+
+  async upsertXBookmarkConnection(userId, connection) {
+    const current = this.xBookmarkConnections.get(userId) || {};
+    const next = { ...current, ...connection, userId, updatedAt: new Date().toISOString() };
+    this.xBookmarkConnections.set(userId, next);
+    return next;
+  }
+
+  async deleteXBookmarkConnection(userId) {
+    return this.xBookmarkConnections.delete(userId);
+  }
 }
 
 class FirestoreStore {
@@ -118,6 +155,14 @@ class FirestoreStore {
 
   passwordResetCollection() {
     return this.db.collection('password_reset_tokens');
+  }
+
+  xOAuthStateCollection() {
+    return this.db.collection('x_oauth_states');
+  }
+
+  xBookmarkConnectionCollection() {
+    return this.db.collection('x_bookmark_connections');
   }
 
   withoutUndefined(value) {
@@ -146,6 +191,21 @@ class FirestoreStore {
       { merge: true },
     );
     return user;
+  }
+
+  async deleteUserData(userId) {
+    const users = await this.userCollection().where('id', '==', userId).get();
+    const sources = await this.sourceCollection().where('userId', '==', userId).get();
+    const xConnection = await this.xBookmarkConnectionCollection().doc(userId).get();
+    const batch = this.db.batch();
+
+    users.docs.forEach((doc) => batch.delete(doc.ref));
+    sources.docs.forEach((doc) => batch.delete(doc.ref));
+    if (xConnection.exists) batch.delete(xConnection.ref);
+
+    if (!users.empty || !sources.empty || xConnection.exists) {
+      await batch.commit();
+    }
   }
 
   async addSource(userId, source) {
@@ -235,6 +295,42 @@ class FirestoreStore {
       { merge: true },
     );
   }
+
+  async saveXOAuthState(state, record) {
+    await this.xOAuthStateCollection().doc(state).set({
+      ...record,
+      updatedAt: new Date().toISOString(),
+    });
+  }
+
+  async consumeXOAuthState(state) {
+    const ref = this.xOAuthStateCollection().doc(state);
+    const doc = await ref.get();
+    if (!doc.exists) return null;
+    await ref.delete();
+    return doc.data();
+  }
+
+  async getXBookmarkConnection(userId) {
+    const doc = await this.xBookmarkConnectionCollection().doc(userId).get();
+    return doc.exists ? doc.data() : null;
+  }
+
+  async upsertXBookmarkConnection(userId, connection) {
+    const ref = this.xBookmarkConnectionCollection().doc(userId);
+    await ref.set(this.withoutUndefined({
+      ...connection,
+      userId,
+      updatedAt: new Date().toISOString(),
+    }), { merge: true });
+    const doc = await ref.get();
+    return doc.data();
+  }
+
+  async deleteXBookmarkConnection(userId) {
+    await this.xBookmarkConnectionCollection().doc(userId).delete();
+    return true;
+  }
 }
 
 function initializeFirebaseAdmin() {
@@ -270,10 +366,18 @@ function initializeFirebaseAdmin() {
 function createStore() {
   try {
     const app = initializeFirebaseAdmin();
-    if (!app) return new MemoryStore();
+    if (!app) {
+      if (process.env.NODE_ENV === 'production') {
+        throw new Error('Firebase Admin environment variables are required in production.');
+      }
+      return new MemoryStore();
+    }
     const db = admin.firestore();
     return new FirestoreStore(db);
   } catch (error) {
+    if (process.env.NODE_ENV === 'production') {
+      throw error;
+    }
     console.warn(`[store] Firebase init failed, falling back to memory: ${error.message}`);
     return new MemoryStore();
   }

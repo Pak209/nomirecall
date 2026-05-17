@@ -13,7 +13,8 @@ dotenv.config();
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-me';
+const isProduction = process.env.NODE_ENV === 'production';
+const JWT_SECRET = jwtSecret();
 const store = createStore();
 
 app.use(cors());
@@ -99,6 +100,10 @@ const X_POST_PREVIEW_SCHEMA = z.object({
 const X_DISCOVER_QUERY_SCHEMA = z.object({
   topics: z.string().optional(),
   limit: z.coerce.number().int().min(1).max(50).default(20),
+});
+
+const X_BOOKMARK_SYNC_SCHEMA = z.object({
+  limit: z.coerce.number().int().min(1).max(100).default(25),
 });
 
 const PASSWORD_FORGOT_SCHEMA = z.object({
@@ -223,19 +228,47 @@ function nativeMemoryFromSource(source, firebaseUserId) {
     links: Array.isArray(source.links) ? source.links : [],
     media: Array.isArray(source.media) ? source.media : [],
     referencedPosts: Array.isArray(source.referencedPosts) ? source.referencedPosts : [],
+    externalId: source.externalId,
+    importSource: source.importSource,
     importedFromLegacyBackend: true,
     legacyUserId: source.userId,
   });
 }
 
 function parseXPostUrl(url = '') {
-  const normalized = String(url || '').trim();
-  const match = normalized.match(/(?:https?:\/\/)?(?:www\.)?(?:x|twitter)\.com\/([^/?#]+)\/status\/([0-9]+)/i);
-  if (!match) return null;
+  const raw = String(url || '').trim();
+  if (!raw) return null;
+
+  let parsed;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    try {
+      parsed = new URL(`https://${raw}`);
+    } catch {
+      return null;
+    }
+  }
+
+  const host = parsed.hostname.toLowerCase();
+  const isSupportedHost = host === 'x.com'
+    || host.endsWith('.x.com')
+    || host === 'twitter.com'
+    || host.endsWith('.twitter.com');
+  if (!isSupportedHost) return null;
+
+  const pathParts = parsed.pathname.split('/').filter(Boolean);
+  const statusIndex = pathParts.findIndex((part) => part.toLowerCase() === 'status');
+  if (statusIndex < 1 || !pathParts[statusIndex + 1] || !/^[0-9]+$/.test(pathParts[statusIndex + 1])) {
+    return null;
+  }
+
+  const username = pathParts[statusIndex - 1];
+  const postId = pathParts[statusIndex + 1];
   return {
-    username: match[1],
-    postId: match[2],
-    url: `https://x.com/${match[1]}/status/${match[2]}`,
+    username,
+    postId,
+    url: `https://x.com/${username}/status/${postId}`,
   };
 }
 
@@ -404,6 +437,194 @@ function mapXSearchPayloadToFeedItems(payload, topic) {
   });
 }
 
+function xOAuthConfig() {
+  const clientId = process.env.X_CLIENT_ID || process.env.TWITTER_CLIENT_ID;
+  const clientSecret = process.env.X_CLIENT_SECRET || process.env.TWITTER_CLIENT_SECRET;
+  const redirectUri = process.env.X_REDIRECT_URI || process.env.TWITTER_REDIRECT_URI;
+  return {
+    clientId,
+    clientSecret,
+    redirectUri,
+    scopes: 'tweet.read users.read bookmark.read offline.access',
+    configured: !!clientId && !!redirectUri,
+  };
+}
+
+function base64Url(buffer) {
+  return Buffer.from(buffer)
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/g, '');
+}
+
+function encryptedTokenKey() {
+  const secret = process.env.X_TOKEN_ENCRYPTION_KEY || process.env.TOKEN_ENCRYPTION_KEY || JWT_SECRET;
+  return crypto.createHash('sha256').update(String(secret)).digest();
+}
+
+function encryptToken(value) {
+  if (!value) return undefined;
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', encryptedTokenKey(), iv);
+  const encrypted = Buffer.concat([cipher.update(String(value), 'utf8'), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return `${base64Url(iv)}.${base64Url(tag)}.${base64Url(encrypted)}`;
+}
+
+function decryptToken(value) {
+  if (!value) return null;
+  const [ivText, tagText, encryptedText] = String(value).split('.');
+  if (!ivText || !tagText || !encryptedText) return null;
+  const decipher = crypto.createDecipheriv(
+    'aes-256-gcm',
+    encryptedTokenKey(),
+    Buffer.from(ivText, 'base64url'),
+  );
+  decipher.setAuthTag(Buffer.from(tagText, 'base64url'));
+  return Buffer.concat([
+    decipher.update(Buffer.from(encryptedText, 'base64url')),
+    decipher.final(),
+  ]).toString('utf8');
+}
+
+function xTokenRequestHeaders(config) {
+  const headers = { 'Content-Type': 'application/x-www-form-urlencoded' };
+  if (config.clientSecret) {
+    headers.Authorization = `Basic ${Buffer.from(`${config.clientId}:${config.clientSecret}`).toString('base64')}`;
+  }
+  return headers;
+}
+
+function xTokenRequestBody(params, config) {
+  const body = new URLSearchParams(params);
+  if (!config.clientSecret) body.set('client_id', config.clientId);
+  return body;
+}
+
+async function exchangeXAuthorizationCode(code, verifier) {
+  const config = xOAuthConfig();
+  const tokenRes = await fetch('https://api.x.com/2/oauth2/token', {
+    method: 'POST',
+    headers: xTokenRequestHeaders(config),
+    body: xTokenRequestBody({
+      grant_type: 'authorization_code',
+      code,
+      redirect_uri: config.redirectUri,
+      code_verifier: verifier,
+    }, config),
+  });
+  const payload = await tokenRes.json().catch(() => null);
+  if (!tokenRes.ok) {
+    throw new Error(payload?.error_description || payload?.detail || payload?.error || 'X token exchange failed.');
+  }
+  return payload;
+}
+
+async function refreshXAccessToken(connection) {
+  const config = xOAuthConfig();
+  const refreshToken = decryptToken(connection.encryptedRefreshToken);
+  if (!refreshToken) throw new Error('X refresh token is missing. Reconnect X bookmarks.');
+
+  const tokenRes = await fetch('https://api.x.com/2/oauth2/token', {
+    method: 'POST',
+    headers: xTokenRequestHeaders(config),
+    body: xTokenRequestBody({
+      grant_type: 'refresh_token',
+      refresh_token: refreshToken,
+    }, config),
+  });
+  const payload = await tokenRes.json().catch(() => null);
+  if (!tokenRes.ok) {
+    throw new Error(payload?.error_description || payload?.detail || payload?.error || 'X token refresh failed.');
+  }
+  return payload;
+}
+
+async function fetchXMe(accessToken) {
+  const meRes = await fetch('https://api.x.com/2/users/me?user.fields=username,name,profile_image_url', {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  const payload = await meRes.json().catch(() => null);
+  if (!meRes.ok || !payload?.data?.id) {
+    throw new Error(payload?.detail || payload?.title || 'X profile lookup failed.');
+  }
+  return payload.data;
+}
+
+async function fetchXBookmarks(xUserId, accessToken, limit) {
+  const url = new URL(`https://api.x.com/2/users/${xUserId}/bookmarks`);
+  url.searchParams.set('max_results', String(Math.max(1, Math.min(100, limit))));
+  url.searchParams.set('tweet.fields', 'attachments,created_at,entities,note_tweet,public_metrics,text,referenced_tweets');
+  url.searchParams.set('expansions', 'author_id,attachments.media_keys,referenced_tweets.id,referenced_tweets.id.author_id,referenced_tweets.id.attachments.media_keys');
+  url.searchParams.set('user.fields', 'username,name,profile_image_url');
+  url.searchParams.set('media.fields', 'alt_text,duration_ms,height,media_key,preview_image_url,type,url,variants,width');
+
+  const bookmarksRes = await fetch(url, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  const payload = await bookmarksRes.json().catch(() => null);
+  if (!bookmarksRes.ok) {
+    throw new Error(payload?.detail || payload?.title || 'X bookmarks sync failed.');
+  }
+  return payload || {};
+}
+
+function mapXBookmarkPayloadToSources(payload = {}) {
+  const users = new Map((payload.includes?.users || []).map((user) => [user.id, user]));
+  const mediaByKey = new Map((payload.includes?.media || []).map((item) => [item.media_key, item]));
+
+  return (payload.data || []).map((tweet) => {
+    const user = users.get(tweet.author_id);
+    const username = user?.username || '';
+    const text = tweet.note_tweet?.text || tweet.text || '';
+    let generated = { category: 'General', tags: [] };
+    try {
+      generated = generateMemoryMetadata(text);
+    } catch {
+      // Imported bookmarks should still be saved if metadata generation fails.
+    }
+
+    return {
+      ...newSource(username ? `@${username} on X` : 'X bookmark', 'tweet'),
+      id: `x_bookmark_${tweet.id}`,
+      body: text,
+      summary: text.slice(0, 240),
+      source_url: xTweetUrl(username, tweet.id),
+      authorUsername: username,
+      postDate: tweet.created_at,
+      links: normalizeXLinks(tweet.entities?.urls),
+      media: xMediaForTweet(tweet, mediaByKey),
+      referencedPosts: normalizeXReferencedPosts(payload, tweet),
+      category: generated.category,
+      tags: ['xpost', 'bookmark', ...generated.tags],
+      externalId: tweet.id,
+      importSource: 'x_bookmark',
+    };
+  });
+}
+
+async function nativeMemoryExists(userId, externalId) {
+  if (!admin.apps.length) return false;
+  const doc = await admin.firestore()
+    .collection('users')
+    .doc(userId)
+    .collection('memories')
+    .doc(`x_bookmark_${externalId}`)
+    .get();
+  return doc.exists;
+}
+
+async function writeNativeMemoryFromSource(userId, source) {
+  if (!admin.apps.length) return false;
+  const db = admin.firestore();
+  const reference = db.collection('users').doc(userId).collection('memories').doc(source.id);
+  const existing = await reference.get();
+  if (existing.exists) return false;
+  await reference.set(nativeMemoryFromSource({ ...source, userId }, userId), { merge: true });
+  return true;
+}
+
 async function fetchXDiscoveryForTopic(topic, limit) {
   const bearerToken = process.env.X_BEARER_TOKEN || process.env.TWITTER_BEARER_TOKEN;
   if (!bearerToken) {
@@ -411,7 +632,7 @@ async function fetchXDiscoveryForTopic(topic, limit) {
       ok: false,
       needsApiKey: true,
       items: [],
-      error: 'Add X_BEARER_TOKEN to backend/.env to fetch discovery posts automatically.',
+      error: 'X discovery is not configured on the backend yet.',
     };
   }
 
@@ -484,6 +705,14 @@ function issueToken(user) {
   return jwt.sign({ sub: user.id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
 }
 
+function jwtSecret() {
+  const value = process.env.JWT_SECRET;
+  if (isProduction && (!value || value === 'dev-secret-change-me')) {
+    throw new Error('JWT_SECRET must be set to a strong Render environment variable in production.');
+  }
+  return value || 'dev-secret-change-me';
+}
+
 function parseBody(schema, req, res) {
   const parsed = schema.safeParse(req.body || {});
   if (!parsed.success) {
@@ -553,6 +782,35 @@ async function handleEmailAuth(req, res, forcedIntent) {
     return res.status(401).json({ error: 'Invalid credentials' });
   }
   return res.json({ token: issueToken(existing), user: publicUser(existing) });
+}
+
+async function userFromFirebaseIdToken(idToken) {
+  if (!admin.apps.length) return null;
+  try {
+    return await admin.auth().verifyIdToken(idToken);
+  } catch {
+    return null;
+  }
+}
+
+async function upsertFirebaseUser(decoded, interests = []) {
+  const email = String(decoded.email || `${decoded.uid}@firebase.local`).toLowerCase();
+  const existing = await store.getUserByEmail(email);
+  const user = {
+    ...(existing || {}),
+    id: existing?.id || decoded.uid,
+    email,
+    displayName: existing?.displayName || decoded.name || decoded.email?.split('@')[0] || 'Nomi User',
+    passwordHash: existing?.passwordHash || '',
+    tier: existing?.tier || 'free',
+    interests: existing?.interests?.length ? existing.interests : interests,
+    onboardingCompleted: !!existing?.onboardingCompleted,
+    firebaseUid: decoded.uid,
+    authProvider: decoded.firebase?.sign_in_provider || 'firebase',
+    createdAt: existing?.createdAt || new Date().toISOString(),
+  };
+  await store.upsertUser(user);
+  return user;
 }
 
 app.get('/api/health', (_req, res) => {
@@ -632,6 +890,12 @@ app.post('/api/auth/signin', async (req, res) => {
   const data = parseBody(ID_TOKEN_SCHEMA, req, res);
   if (!data) return;
 
+  const firebaseUser = await userFromFirebaseIdToken(data.idToken);
+  if (firebaseUser) {
+    const user = await upsertFirebaseUser(firebaseUser);
+    return res.json({ token: issueToken(user), user: publicUser(user) });
+  }
+
   const pseudoEmail = `apple_${data.idToken.slice(0, 8)}@example.local`;
   let user = await store.getUserByEmail(pseudoEmail);
   if (!user) {
@@ -655,6 +919,12 @@ app.post('/api/auth/signup', async (req, res) => {
   if (!tokenData) return;
   const interestsData = parseBody(INTERESTS_SCHEMA, req, res);
   if (!interestsData) return;
+
+  const firebaseUser = await userFromFirebaseIdToken(tokenData.idToken);
+  if (firebaseUser) {
+    const user = await upsertFirebaseUser(firebaseUser, interestsData.interests);
+    return res.status(201).json({ token: issueToken(user), user: publicUser(user) });
+  }
 
   const pseudoEmail = `apple_${tokenData.idToken.slice(0, 8)}@example.local`;
   let user = await store.getUserByEmail(pseudoEmail);
@@ -708,6 +978,14 @@ app.patch('/api/auth/tier', auth, async (req, res) => {
   return res.json({ ok: true });
 });
 
+app.delete('/api/auth/account', auth, async (req, res) => {
+  if (!store.deleteUserData) {
+    return res.status(501).json({ error: 'Account deletion is not available for this store.' });
+  }
+  await store.deleteUserData(req.userId);
+  return res.json({ ok: true });
+});
+
 app.get('/api/x/discover', auth, async (req, res) => {
   const parsed = X_DISCOVER_QUERY_SCHEMA.safeParse(req.query || {});
   if (!parsed.success) {
@@ -746,6 +1024,184 @@ app.get('/api/x/discover', auth, async (req, res) => {
     needsApiKey,
     errors,
   });
+});
+
+app.get('/api/x/bookmarks/connect', auth, async (req, res) => {
+  const config = xOAuthConfig();
+  if (!config.configured) {
+    return res.status(503).json({
+      configured: false,
+      error: 'X OAuth is not configured. Set X_CLIENT_ID and X_REDIRECT_URI on the backend.',
+    });
+  }
+
+  const state = base64Url(crypto.randomBytes(24));
+  const verifier = base64Url(crypto.randomBytes(48));
+  const challenge = base64Url(crypto.createHash('sha256').update(verifier).digest());
+  await store.saveXOAuthState(state, {
+    userId: req.userId,
+    verifier,
+    expiresAt: new Date(Date.now() + 1000 * 60 * 10).toISOString(),
+    createdAt: new Date().toISOString(),
+  });
+
+  const authorizationUrl = new URL('https://x.com/i/oauth2/authorize');
+  authorizationUrl.searchParams.set('response_type', 'code');
+  authorizationUrl.searchParams.set('client_id', config.clientId);
+  authorizationUrl.searchParams.set('redirect_uri', config.redirectUri);
+  authorizationUrl.searchParams.set('scope', config.scopes);
+  authorizationUrl.searchParams.set('state', state);
+  authorizationUrl.searchParams.set('code_challenge', challenge);
+  authorizationUrl.searchParams.set('code_challenge_method', 'S256');
+
+  return res.json({
+    configured: true,
+    authorizationUrl: authorizationUrl.toString(),
+    scopes: config.scopes.split(/\s+/),
+  });
+});
+
+app.get('/api/x/oauth/callback', async (req, res) => {
+  const code = String(req.query.code || '');
+  const state = String(req.query.state || '');
+  if (!code || !state) {
+    return res.status(400).type('html').send('<h1>Nomi X connection failed</h1><p>Missing authorization code or state.</p>');
+  }
+
+  try {
+    const stateRecord = await store.consumeXOAuthState(state);
+    if (!stateRecord) {
+      return res.status(400).type('html').send('<h1>Nomi X connection failed</h1><p>This connection link expired. Please try again in Nomi.</p>');
+    }
+
+    if (new Date(stateRecord.expiresAt).getTime() < Date.now()) {
+      return res.status(400).type('html').send('<h1>Nomi X connection failed</h1><p>This connection link expired. Please try again in Nomi.</p>');
+    }
+
+    const tokenPayload = await exchangeXAuthorizationCode(code, stateRecord.verifier);
+    const xUser = await fetchXMe(tokenPayload.access_token);
+    await store.upsertXBookmarkConnection(stateRecord.userId, {
+      xUserId: xUser.id,
+      username: xUser.username,
+      name: xUser.name,
+      profileImageUrl: xUser.profile_image_url,
+      encryptedRefreshToken: encryptToken(tokenPayload.refresh_token),
+      encryptedAccessToken: encryptToken(tokenPayload.access_token),
+      tokenExpiresAt: tokenPayload.expires_in
+        ? new Date(Date.now() + Number(tokenPayload.expires_in) * 1000).toISOString()
+        : null,
+      scopes: String(tokenPayload.scope || '').split(/\s+/).filter(Boolean),
+      connectedAt: new Date().toISOString(),
+      lastSyncError: null,
+    });
+
+    return res.type('html').send(`
+      <html>
+        <head><title>Nomi X connected</title><meta name="viewport" content="width=device-width,initial-scale=1" /></head>
+        <body style="font-family:-apple-system,BlinkMacSystemFont,sans-serif;padding:32px;background:#fff7fb;color:#17161d;">
+          <h1>X bookmarks connected</h1>
+          <p>Nomi can now import new bookmarks from @${xUser.username}. You can close this page and return to Nomi.</p>
+        </body>
+      </html>
+    `);
+  } catch (error) {
+    return res.status(502).type('html').send(`<h1>Nomi X connection failed</h1><p>${String(error.message || error)}</p>`);
+  }
+});
+
+app.get('/api/x/bookmarks/status', auth, async (req, res) => {
+  const connection = await store.getXBookmarkConnection(req.userId);
+  return res.json({
+    connected: !!connection,
+    username: connection?.username || null,
+    xUserId: connection?.xUserId || null,
+    connectedAt: connection?.connectedAt || null,
+    lastSyncedAt: connection?.lastSyncedAt || null,
+    lastImportedCount: connection?.lastImportedCount || 0,
+    lastSyncError: connection?.lastSyncError || null,
+  });
+});
+
+app.delete('/api/x/bookmarks/connection', auth, async (req, res) => {
+  await store.deleteXBookmarkConnection(req.userId);
+  return res.json({ ok: true });
+});
+
+app.post('/api/x/bookmarks/sync', auth, async (req, res) => {
+  const parsed = X_BOOKMARK_SYNC_SCHEMA.safeParse(req.body || {});
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.issues[0]?.message || 'Invalid sync request' });
+  }
+
+  const connection = await store.getXBookmarkConnection(req.userId);
+  if (!connection) {
+    return res.status(409).json({ error: 'Connect X bookmarks before syncing.' });
+  }
+
+  try {
+    const tokenPayload = await refreshXAccessToken(connection);
+    const nextConnectionPatch = {
+      encryptedAccessToken: encryptToken(tokenPayload.access_token),
+      tokenExpiresAt: tokenPayload.expires_in
+        ? new Date(Date.now() + Number(tokenPayload.expires_in) * 1000).toISOString()
+        : null,
+      lastSyncError: null,
+    };
+    if (tokenPayload.refresh_token) {
+      nextConnectionPatch.encryptedRefreshToken = encryptToken(tokenPayload.refresh_token);
+    }
+
+    const payload = await fetchXBookmarks(connection.xUserId, tokenPayload.access_token, parsed.data.limit);
+    const existingSources = await store.listSources(req.userId);
+    const existingBookmarkIds = new Set(
+      existingSources
+        .filter((source) => source.importSource === 'x_bookmark' || source.id?.startsWith?.('x_bookmark_'))
+        .map((source) => String(source.externalId || String(source.id || '').replace(/^x_bookmark_/, ''))),
+    );
+
+    const sources = mapXBookmarkPayloadToSources(payload);
+    const imported = [];
+    const skipped = [];
+
+    for (const source of sources) {
+      if (existingBookmarkIds.has(String(source.externalId)) || await nativeMemoryExists(req.userId, source.externalId)) {
+        skipped.push(source.externalId);
+        continue;
+      }
+
+      await store.addSource(req.userId, source);
+      await writeNativeMemoryFromSource(req.userId, source);
+      existingBookmarkIds.add(String(source.externalId));
+      imported.push(source);
+    }
+
+    await store.upsertXBookmarkConnection(req.userId, {
+      ...nextConnectionPatch,
+      lastSyncedAt: new Date().toISOString(),
+      lastImportedCount: imported.length,
+      lastSeenBookmarkId: sources[0]?.externalId || connection.lastSeenBookmarkId || null,
+    });
+
+    return res.json({
+      ok: true,
+      imported: imported.length,
+      skipped: skipped.length,
+      checked: sources.length,
+      memories: imported.map((source) => ({
+        id: source.id,
+        title: source.title,
+        sourceURL: source.source_url,
+        authorUsername: source.authorUsername,
+        externalId: source.externalId,
+      })),
+    });
+  } catch (error) {
+    await store.upsertXBookmarkConnection(req.userId, {
+      lastSyncError: error.message || 'X bookmark sync failed.',
+      lastSyncedAt: new Date().toISOString(),
+    });
+    return res.status(502).json({ error: error.message || 'X bookmark sync failed.' });
+  }
 });
 
 app.get('/api/feed', auth, async (_req, res) => {
@@ -840,7 +1296,7 @@ app.post('/api/x-post/preview', auth, async (req, res) => {
         url: parsed.url,
         title: `@${parsed.username} on X`,
       },
-      message: 'Add X_BEARER_TOKEN to backend/.env to fetch post content automatically.',
+      message: 'X import is not configured on the backend yet.',
     });
   }
 
