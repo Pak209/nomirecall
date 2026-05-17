@@ -166,9 +166,7 @@ class FirestoreStore {
   }
 
   withoutUndefined(value) {
-    return Object.fromEntries(
-      Object.entries(value).filter(([, entryValue]) => entryValue !== undefined),
-    );
+    return sanitizeFirestoreValue(value);
   }
 
   async getUserByEmail(email) {
@@ -331,6 +329,29 @@ class FirestoreStore {
     await this.xBookmarkConnectionCollection().doc(userId).delete();
     return true;
   }
+}
+
+function isPlainObject(value) {
+  if (!value || typeof value !== 'object') return false;
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+}
+
+function sanitizeFirestoreValue(value) {
+  if (value === undefined) return undefined;
+  if (Array.isArray(value)) {
+    return value
+      .map(sanitizeFirestoreValue)
+      .filter((entry) => entry !== undefined);
+  }
+  if (isPlainObject(value)) {
+    return Object.fromEntries(
+      Object.entries(value)
+        .map(([key, entryValue]) => [key, sanitizeFirestoreValue(entryValue)])
+        .filter(([, entryValue]) => entryValue !== undefined),
+    );
+  }
+  return value;
 }
 
 function initializeFirebaseAdmin() {

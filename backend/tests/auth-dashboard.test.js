@@ -330,6 +330,7 @@ test('x bookmark oauth callback and manual sync imports new bookmarks', async ()
             author_id: 'author-1',
             text: 'OpenAI bookmark about Codex workflows https://t.co/codex',
             created_at: '2026-05-15T20:39:00.000Z',
+            attachments: { media_keys: ['media-1'] },
             entities: {
               urls: [{
                 url: 'https://t.co/codex',
@@ -340,6 +341,11 @@ test('x bookmark oauth callback and manual sync imports new bookmarks', async ()
           }],
           includes: {
             users: [{ id: 'author-1', username: 'testingcatalog', name: 'Testing Catalog' }],
+            media: [{
+              media_key: 'media-1',
+              type: 'photo',
+              url: 'https://pbs.twimg.com/media/test.jpg',
+            }],
           },
         }),
       };
@@ -382,6 +388,10 @@ test('x bookmark oauth callback and manual sync imports new bookmarks', async ()
   assert.equal(memories.body.memories.length, 1);
   assert.equal(memories.body.memories[0].authorUsername, 'testingcatalog');
   assert.match(memories.body.memories[0].body, /Codex workflows/);
+  assert.deepEqual(memories.body.memories[0].media, [{
+    type: 'photo',
+    url: 'https://pbs.twimg.com/media/test.jpg',
+  }]);
 
   for (const [key, value] of Object.entries(previousEnv)) {
     if (value === undefined) delete process.env[key];

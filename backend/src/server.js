@@ -189,9 +189,30 @@ function generateMemoryMetadata(text = '') {
 }
 
 function cleanObject(value) {
-  return Object.fromEntries(
-    Object.entries(value).filter(([, entryValue]) => entryValue !== undefined),
-  );
+  return sanitizeFirestoreValue(value);
+}
+
+function isPlainObject(value) {
+  if (!value || typeof value !== 'object') return false;
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+}
+
+function sanitizeFirestoreValue(value) {
+  if (value === undefined) return undefined;
+  if (Array.isArray(value)) {
+    return value
+      .map(sanitizeFirestoreValue)
+      .filter((entry) => entry !== undefined);
+  }
+  if (isPlainObject(value)) {
+    return Object.fromEntries(
+      Object.entries(value)
+        .map(([key, entryValue]) => [key, sanitizeFirestoreValue(entryValue)])
+        .filter(([, entryValue]) => entryValue !== undefined),
+    );
+  }
+  return value;
 }
 
 function timestampFromValue(value, fallback = Date.now()) {
@@ -274,7 +295,7 @@ function parseXPostUrl(url = '') {
 
 function normalizeXLinks(urls = []) {
   return urls
-    .map((item) => ({
+    .map((item) => cleanObject({
       url: item.unwound_url || item.expanded_url || item.url,
       displayUrl: item.display_url,
       title: item.title,
@@ -293,7 +314,7 @@ function normalizeXMedia(media = []) {
           bitRate: variant.bit_rate,
         }))
       : undefined;
-    return {
+    return cleanObject({
       type: item.type,
       url: item.url,
       previewImageUrl: item.preview_image_url,
@@ -301,7 +322,7 @@ function normalizeXMedia(media = []) {
       width: item.width,
       height: item.height,
       variants,
-    };
+    });
   });
 }
 
