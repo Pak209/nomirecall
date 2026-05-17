@@ -399,3 +399,85 @@ test('x bookmark oauth callback and manual sync imports new bookmarks', async ()
   }
   global.fetch = previousFetch;
 });
+
+test('x bookmark sync can use fresh stored access token before refreshing', async () => {
+  const email = `x.bookmarks.access.${Date.now()}@example.com`;
+  const password = 'password123';
+
+  const signup = await request(app)
+    .post('/api/auth/email/signup')
+    .send({ email, password });
+  assert.equal(signup.status, 201);
+  const authHeader = { Authorization: `Bearer ${signup.body.token}` };
+
+  const previousEnv = {
+    X_CLIENT_ID: process.env.X_CLIENT_ID,
+    X_CLIENT_SECRET: process.env.X_CLIENT_SECRET,
+    X_REDIRECT_URI: process.env.X_REDIRECT_URI,
+    X_TOKEN_ENCRYPTION_KEY: process.env.X_TOKEN_ENCRYPTION_KEY,
+  };
+  const previousFetch = global.fetch;
+  process.env.X_CLIENT_ID = 'client-id';
+  delete process.env.X_CLIENT_SECRET;
+  process.env.X_REDIRECT_URI = 'https://nomi.example.com/api/x/oauth/callback';
+  process.env.X_TOKEN_ENCRYPTION_KEY = 'test-encryption-key';
+
+  const connect = await request(app)
+    .get('/api/x/bookmarks/connect')
+    .set(authHeader);
+  const state = new URL(connect.body.authorizationUrl).searchParams.get('state');
+
+  let tokenExchangeCalls = 0;
+  global.fetch = async (url) => {
+    const rawUrl = String(url);
+    if (rawUrl.includes('/oauth2/token')) {
+      tokenExchangeCalls += 1;
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          access_token: 'fresh-access-token',
+          refresh_token: 'refresh-token',
+          expires_in: 7200,
+          scope: 'tweet.read users.read bookmark.read offline.access',
+        }),
+      };
+    }
+    if (rawUrl.includes('/2/users/me')) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          data: { id: 'x-user-2', username: 'fresh_user', name: 'Fresh User' },
+        }),
+      };
+    }
+    if (rawUrl.includes('/2/users/x-user-2/bookmarks')) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ data: [] }),
+      };
+    }
+    throw new Error(`Unexpected fetch: ${rawUrl}`);
+  };
+
+  const callback = await request(app)
+    .get(`/api/x/oauth/callback?code=test-code&state=${state}`);
+  assert.equal(callback.status, 200);
+  assert.equal(tokenExchangeCalls, 1);
+
+  const sync = await request(app)
+    .post('/api/x/bookmarks/sync')
+    .set(authHeader)
+    .send({ limit: 10 });
+  assert.equal(sync.status, 200);
+  assert.equal(sync.body.imported, 0);
+  assert.equal(tokenExchangeCalls, 1);
+
+  for (const [key, value] of Object.entries(previousEnv)) {
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+  }
+  global.fetch = previousFetch;
+});

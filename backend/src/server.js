@@ -509,6 +509,11 @@ function decryptToken(value) {
   ]).toString('utf8');
 }
 
+function isTokenFresh(expiresAt) {
+  if (!expiresAt) return false;
+  return new Date(expiresAt).getTime() > Date.now() + 60_000;
+}
+
 function xTokenRequestHeaders(config) {
   const headers = { 'Content-Type': 'application/x-www-form-urlencoded' };
   if (config.clientSecret) {
@@ -557,9 +562,40 @@ async function refreshXAccessToken(connection) {
   });
   const payload = await tokenRes.json().catch(() => null);
   if (!tokenRes.ok) {
-    throw new Error(payload?.error_description || payload?.detail || payload?.error || 'X token refresh failed.');
+    const message = payload?.error_description || payload?.detail || payload?.error || 'X token refresh failed.';
+    if (/invalid|expired|revoked|token/i.test(message)) {
+      throw new Error('X rejected the saved refresh token. Disconnect and reconnect X Bookmarks, then sync again.');
+    }
+    throw new Error(message);
   }
   return payload;
+}
+
+async function xAccessTokenForSync(connection) {
+  const existingAccessToken = decryptToken(connection.encryptedAccessToken);
+  if (existingAccessToken && isTokenFresh(connection.tokenExpiresAt)) {
+    return {
+      accessToken: existingAccessToken,
+      connectionPatch: {},
+    };
+  }
+
+  const tokenPayload = await refreshXAccessToken(connection);
+  const connectionPatch = {
+    encryptedAccessToken: encryptToken(tokenPayload.access_token),
+    tokenExpiresAt: tokenPayload.expires_in
+      ? new Date(Date.now() + Number(tokenPayload.expires_in) * 1000).toISOString()
+      : null,
+    lastSyncError: null,
+  };
+  if (tokenPayload.refresh_token) {
+    connectionPatch.encryptedRefreshToken = encryptToken(tokenPayload.refresh_token);
+  }
+
+  return {
+    accessToken: tokenPayload.access_token,
+    connectionPatch,
+  };
 }
 
 async function fetchXMe(accessToken) {
@@ -1160,19 +1196,8 @@ app.post('/api/x/bookmarks/sync', auth, async (req, res) => {
   }
 
   try {
-    const tokenPayload = await refreshXAccessToken(connection);
-    const nextConnectionPatch = {
-      encryptedAccessToken: encryptToken(tokenPayload.access_token),
-      tokenExpiresAt: tokenPayload.expires_in
-        ? new Date(Date.now() + Number(tokenPayload.expires_in) * 1000).toISOString()
-        : null,
-      lastSyncError: null,
-    };
-    if (tokenPayload.refresh_token) {
-      nextConnectionPatch.encryptedRefreshToken = encryptToken(tokenPayload.refresh_token);
-    }
-
-    const payload = await fetchXBookmarks(connection.xUserId, tokenPayload.access_token, parsed.data.limit);
+    const { accessToken, connectionPatch } = await xAccessTokenForSync(connection);
+    const payload = await fetchXBookmarks(connection.xUserId, accessToken, parsed.data.limit);
     const existingSources = await store.listSources(req.userId);
     const existingBookmarkIds = new Set(
       existingSources
@@ -1197,7 +1222,8 @@ app.post('/api/x/bookmarks/sync', auth, async (req, res) => {
     }
 
     await store.upsertXBookmarkConnection(req.userId, {
-      ...nextConnectionPatch,
+      ...connectionPatch,
+      lastSyncError: null,
       lastSyncedAt: new Date().toISOString(),
       lastImportedCount: imported.length,
       lastSeenBookmarkId: sources[0]?.externalId || connection.lastSeenBookmarkId || null,
