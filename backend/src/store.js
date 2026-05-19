@@ -12,6 +12,7 @@ class MemoryStore {
     this.passwordResetTokens = new Map();
     this.xOAuthStates = new Map();
     this.xBookmarkConnections = new Map();
+    this.xBookmarkSyncStates = new Map();
     this.feedItems = [...DEFAULT_FEED_ITEMS];
   }
 
@@ -22,6 +23,21 @@ class MemoryStore {
   async getUserById(userId) {
     for (const user of this.usersByEmail.values()) {
       if (user.id === userId) return user;
+    }
+    return null;
+  }
+
+  async listUsers(options = {}) {
+    return Array.from(this.usersByEmail.values()).slice(0, Number(options.limit || 500));
+  }
+
+  async updateUserById(userId, patch) {
+    for (const [email, user] of this.usersByEmail.entries()) {
+      if (user.id === userId) {
+        const updated = { ...user, ...patch, updatedAt: new Date().toISOString() };
+        this.usersByEmail.set(email, updated);
+        return updated;
+      }
     }
     return null;
   }
@@ -39,6 +55,7 @@ class MemoryStore {
     }
     this.sourcesByUser.delete(userId);
     this.xBookmarkConnections.delete(userId);
+    this.xBookmarkSyncStates.delete(userId);
   }
 
   async addSource(userId, source) {
@@ -136,6 +153,26 @@ class MemoryStore {
   async deleteXBookmarkConnection(userId) {
     return this.xBookmarkConnections.delete(userId);
   }
+
+  async getXBookmarkSyncState(userId) {
+    return this.xBookmarkSyncStates.get(userId) || null;
+  }
+
+  async updateXBookmarkSyncState(userId, patch) {
+    const current = this.xBookmarkSyncStates.get(userId) || defaultXBookmarkSyncState();
+    const next = { ...current, ...patch, userId, updatedAt: new Date().toISOString() };
+    this.xBookmarkSyncStates.set(userId, next);
+    return next;
+  }
+
+  async listXBookmarkSyncCandidates(options = {}) {
+    const limit = Number(options.limit || 500);
+    return Array.from(this.xBookmarkConnections.entries()).slice(0, limit).map(([userId, connection]) => ({
+      userId,
+      connection,
+      syncState: this.xBookmarkSyncStates.get(userId) || defaultXBookmarkSyncState(),
+    }));
+  }
 }
 
 class FirestoreStore {
@@ -175,9 +212,38 @@ class FirestoreStore {
   }
 
   async getUserById(userId) {
+    const direct = await this.userCollection().doc(userId).get();
+    if (direct.exists) return { id: direct.id, ...direct.data() };
     const snapshot = await this.userCollection().where('id', '==', userId).limit(1).get();
     if (snapshot.empty) return null;
     return snapshot.docs[0].data();
+  }
+
+  async listUsers(options = {}) {
+    const limit = Math.max(1, Math.min(1000, Number(options.limit || 500)));
+    const snapshot = await this.userCollection().limit(limit).get();
+    return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+  }
+
+  async updateUserById(userId, patch) {
+    const direct = await this.userCollection().doc(userId).get();
+    if (direct.exists) {
+      await direct.ref.set(this.withoutUndefined({
+        ...patch,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }), { merge: true });
+      const updated = await direct.ref.get();
+      return { id: updated.id, ...updated.data() };
+    }
+
+    const snapshot = await this.userCollection().where('id', '==', userId).limit(1).get();
+    if (snapshot.empty) return null;
+    await snapshot.docs[0].ref.set(this.withoutUndefined({
+      ...patch,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }), { merge: true });
+    const updated = await snapshot.docs[0].ref.get();
+    return updated.data();
   }
 
   async upsertUser(user) {
@@ -195,13 +261,15 @@ class FirestoreStore {
     const users = await this.userCollection().where('id', '==', userId).get();
     const sources = await this.sourceCollection().where('userId', '==', userId).get();
     const xConnection = await this.xBookmarkConnectionCollection().doc(userId).get();
+    const xSyncState = await this.userCollection().doc(userId).collection('sync').doc('xBookmarks').get();
     const batch = this.db.batch();
 
     users.docs.forEach((doc) => batch.delete(doc.ref));
     sources.docs.forEach((doc) => batch.delete(doc.ref));
     if (xConnection.exists) batch.delete(xConnection.ref);
+    if (xSyncState.exists) batch.delete(xSyncState.ref);
 
-    if (!users.empty || !sources.empty || xConnection.exists) {
+    if (!users.empty || !sources.empty || xConnection.exists || xSyncState.exists) {
       await batch.commit();
     }
   }
@@ -329,6 +397,67 @@ class FirestoreStore {
     await this.xBookmarkConnectionCollection().doc(userId).delete();
     return true;
   }
+
+  async getXBookmarkSyncState(userId) {
+    const doc = await this.userCollection()
+      .doc(userId)
+      .collection('sync')
+      .doc('xBookmarks')
+      .get();
+    return doc.exists ? doc.data() : null;
+  }
+
+  async updateXBookmarkSyncState(userId, patch) {
+    const ref = this.userCollection().doc(userId).collection('sync').doc('xBookmarks');
+    const current = await ref.get();
+    const next = this.withoutUndefined({
+      ...(current.exists ? current.data() : defaultXBookmarkSyncState()),
+      ...patch,
+      provider: 'x',
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    await ref.set(next, { merge: true });
+    const doc = await ref.get();
+    return doc.data();
+  }
+
+  async listXBookmarkSyncCandidates(options = {}) {
+    const limit = Math.max(1, Math.min(1000, Number(options.limit || 500)));
+    const snapshot = await this.xBookmarkConnectionCollection().limit(limit).get();
+    const candidates = [];
+    for (const doc of snapshot.docs) {
+      const userId = doc.id;
+      const syncState = await this.getXBookmarkSyncState(userId);
+      candidates.push({
+        userId,
+        connection: { userId, ...doc.data() },
+        syncState: syncState || defaultXBookmarkSyncState(),
+      });
+    }
+    return candidates;
+  }
+}
+
+function defaultXBookmarkSyncState() {
+  return {
+    provider: 'x',
+    enabled: false,
+    lastSyncedAt: null,
+    lastSuccessfulSyncAt: null,
+    lastFailedSyncAt: null,
+    lastErrorMessage: null,
+    lastScheduledSyncAt: null,
+    lastManualSyncAt: null,
+    lastResult: null,
+    lastError: null,
+    importedCount: 0,
+    skippedDuplicateCount: 0,
+    failedCount: 0,
+    nextEligibleSyncAt: null,
+    totalImported: 0,
+    totalFailed: 0,
+    syncInProgress: false,
+  };
 }
 
 function isPlainObject(value) {

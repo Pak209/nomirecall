@@ -8,6 +8,38 @@ const admin = require('firebase-admin');
 const { z } = require('zod');
 const { createStore, newSource } = require('./store');
 const { privacyPolicyPage, termsPage } = require('./legal');
+const { aiConfig } = require('./ai/aiConfig');
+const {
+  extractCleanTextFromMemory,
+  processMemoryForAI,
+  processMemoryIds,
+  processUnprocessedMemoriesForUser,
+  processRecentImportedMemories,
+} = require('./ai/processMemory');
+const {
+  getAIProcessingDailyUsage,
+  getAIProcessingLimitForUser,
+  getUserAIUsageTier,
+  limitReachedPayload,
+} = require('./ai/aiUsage');
+const {
+  dateKeyFor,
+  generateDailyBriefForUser,
+  getDailyBrief,
+  listDailyBriefs,
+} = require('./ai/dailyBriefs');
+const {
+  archiveProject,
+  assignMemoryToProject,
+  createProject,
+  generateProjectSummary,
+  getProject,
+  listProjectMemories,
+  listProjects,
+  removeMemoryFromProject,
+  suggestMemoriesForProject,
+  updateProject,
+} = require('./projects');
 
 dotenv.config();
 
@@ -87,6 +119,7 @@ const INGEST_SCHEMA = z.object({
     links: z.array(z.any()).optional(),
     media: z.array(z.any()).optional(),
   })).max(8).optional(),
+  processWithAI: z.boolean().optional().default(false),
 });
 
 const BRAIN_QUERY_SCHEMA = z.object({
@@ -104,6 +137,20 @@ const X_DISCOVER_QUERY_SCHEMA = z.object({
 
 const X_BOOKMARK_SYNC_SCHEMA = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(25),
+  mode: z.enum(['manual', 'daily']).default('manual'),
+  processWithAI: z.boolean().optional().default(false),
+});
+
+const X_BOOKMARK_DAILY_SYNC_SCHEMA = z.object({
+  enabled: z.boolean(),
+});
+
+const SCHEDULED_RUN_SCHEMA = z.object({
+  force: z.boolean().optional().default(false),
+  limit: z.coerce.number().int().min(1).max(1000).optional(),
+  processWithAI: z.boolean().optional().default(false),
+  dateKey: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  timezone: z.string().optional().default('UTC'),
 });
 
 const PASSWORD_FORGOT_SCHEMA = z.object({
@@ -119,6 +166,48 @@ const MEMORY_UPDATE_SCHEMA = z.object({
   title: z.string().min(1).optional(),
   category: z.string().min(1).optional(),
   tags: z.array(z.string().min(1)).max(12).optional(),
+});
+
+const PROCESS_MEMORY_AI_SCHEMA = z.object({
+  forceReprocess: z.boolean().optional().default(false),
+});
+
+const PROCESS_MEMORIES_BATCH_SCHEMA = z.object({
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+  forceReprocess: z.boolean().optional().default(false),
+});
+
+const DAILY_BRIEF_QUERY_SCHEMA = z.object({
+  dateKey: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  timezone: z.string().optional().default('UTC'),
+  forceRegenerate: z.coerce.boolean().optional().default(false),
+});
+
+const PROJECT_CREATE_SCHEMA = z.object({
+  name: z.string().min(1).max(100),
+  description: z.string().max(1000).optional(),
+  tags: z.array(z.string().min(1)).max(20).optional(),
+  concepts: z.array(z.string().min(1)).max(20).optional(),
+  color: z.string().max(40).optional(),
+  icon: z.string().max(40).optional(),
+});
+
+const PROJECT_UPDATE_SCHEMA = z.object({
+  name: z.string().min(1).max(100).optional(),
+  description: z.string().max(1000).optional(),
+  status: z.enum(['active', 'paused', 'completed', 'archived']).optional(),
+  tags: z.array(z.string().min(1)).max(20).optional(),
+  concepts: z.array(z.string().min(1)).max(20).optional(),
+  color: z.string().max(40).optional(),
+  icon: z.string().max(40).optional(),
+});
+
+const PROJECT_MEMORY_SCHEMA = z.object({
+  memoryId: z.string().min(1),
+});
+
+const PROJECT_SUMMARY_SCHEMA = z.object({
+  forceRegenerate: z.boolean().optional().default(false),
 });
 
 function sourceTimestampMs(source) {
@@ -228,22 +317,106 @@ function timestampFromValue(value, fallback = Date.now()) {
   return admin.firestore.Timestamp.fromMillis(fallback);
 }
 
+function memorySourceType(sourceType = '', importSource = '') {
+  const normalizedImport = String(importSource || '').toLowerCase();
+  if (normalizedImport === 'x_bookmark') return 'x_bookmark';
+
+  const normalized = String(sourceType || '').toLowerCase();
+  if (normalized === 'tweet') return 'x_bookmark';
+  if (normalized === 'text' || normalized === 'note') return 'manual_note';
+  if (normalized === 'url' || normalized === 'rss') return 'link';
+  if (normalized === 'image') return 'image';
+  if (normalized === 'voice') return 'voice';
+  return 'unknown';
+}
+
+function rawPayloadHash(value) {
+  return crypto
+    .createHash('sha256')
+    .update(JSON.stringify(cleanObject(value) || {}))
+    .digest('hex');
+}
+
+function contentHash(value = '') {
+  return crypto.createHash('sha256').update(String(value || '')).digest('hex');
+}
+
 function nativeMemoryFromSource(source, firebaseUserId) {
   const content = String(source.body || source.content || source.summary || '');
   const createdAtMs = sourceTimestampMs(source) || Date.now();
   const sourceDate = source.postDate || source.sourceDate;
+  const sourceType = memorySourceType(source.source_type || source.type, source.importSource);
+  const sourceId = source.externalId ? String(source.externalId) : undefined;
+  const sourceUrl = source.source_url || source.sourceURL;
+  const tags = Array.isArray(source.tags) ? source.tags.map(String).slice(0, 12) : [];
+  const summary = source.summary ? String(source.summary) : content.slice(0, 240);
+  const cleanTextResult = extractCleanTextFromMemory({
+    rawText: content,
+    title: source.title,
+    sourceType,
+    sourceUrl,
+  });
+  const author = cleanObject({
+    id: source.authorId,
+    username: source.authorUsername || source.sourceUsername,
+    displayName: source.authorDisplayName,
+    avatarUrl: source.authorAvatarUrl,
+  });
 
   return cleanObject({
     id: String(source.id),
     userId: firebaseUserId,
+    sourceType,
+    sourceUrl,
+    sourceId,
     title: String(source.title || fallbackTitle(content) || 'Untitled memory'),
-    content,
+    rawText: content,
+    cleanText: cleanTextResult.cleanText,
+    contentHash: cleanTextResult.contentHash || contentHash(content),
+    summary,
     category: String(source.category || 'General'),
-    tags: Array.isArray(source.tags) ? source.tags.map(String).slice(0, 12) : [],
+    tags,
+    concepts: Array.isArray(source.concepts) ? source.concepts.map(String) : [],
+    entities: Array.isArray(source.entities) ? source.entities.map(String) : [],
+    author: Object.keys(author || {}).length ? author : undefined,
+    intent: source.intent || 'unknown',
+    projectIds: Array.isArray(source.projectIds) ? source.projectIds.map(String) : [],
+    confidenceScore: typeof source.confidenceScore === 'number' ? source.confidenceScore : undefined,
+    isArchived: source.isArchived === true,
+    isFavorite: source.isFavorite === true,
+    capturedAt: sourceDate ? timestampFromValue(sourceDate, createdAtMs) : timestampFromValue(source.createdAt, createdAtMs),
+    ai: cleanObject({
+      summary: source.ai?.summary,
+      category: source.ai?.category,
+      tags: source.ai?.tags,
+      concepts: source.ai?.concepts,
+      entities: source.ai?.entities,
+      claims: source.ai?.claims,
+      actionItems: source.ai?.actionItems,
+      keyTakeaways: source.ai?.keyTakeaways,
+      suggestedProjects: source.ai?.suggestedProjects,
+      importanceScore: source.ai?.importanceScore,
+      modelUsed: source.ai?.modelUsed,
+      processedAt: source.ai?.processedAt ? timestampFromValue(source.ai.processedAt, createdAtMs) : undefined,
+      processingVersion: source.ai?.processingVersion,
+      processingStatus: source.ai?.processingStatus || 'pending',
+      errorMessage: source.ai?.errorMessage,
+    }),
+    sync: cleanObject({
+      provider: source.importSource === 'x_bookmark' ? 'x' : 'manual',
+      importStatus: source.importSource === 'x_bookmark' ? 'imported' : undefined,
+      importedAt: source.importSource === 'x_bookmark' ? admin.firestore.FieldValue.serverTimestamp() : undefined,
+      lastSyncAttemptAt: source.importSource === 'x_bookmark' ? admin.firestore.FieldValue.serverTimestamp() : undefined,
+      retryCount: Number(source.retryCount || 0),
+      rawPayloadHash: source.rawPayloadHash,
+    }),
+
+    // Legacy fields kept for current native screens and existing API clients.
+    content,
     createdAt: timestampFromValue(source.createdAt, createdAtMs),
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     type: String(source.source_type || source.type || 'note'),
-    sourceURL: source.source_url || source.sourceURL,
+    sourceURL: sourceUrl,
     sourceUsername: source.authorUsername || source.sourceUsername,
     sourceDate: sourceDate ? timestampFromValue(sourceDate, createdAtMs) : undefined,
     links: Array.isArray(source.links) ? source.links : [],
@@ -253,6 +426,20 @@ function nativeMemoryFromSource(source, firebaseUserId) {
     importSource: source.importSource,
     importedFromLegacyBackend: true,
     legacyUserId: source.userId,
+  });
+}
+
+function failedNativeMemoryFromSource(source, firebaseUserId, error) {
+  return cleanObject({
+    ...nativeMemoryFromSource(source, firebaseUserId),
+    sync: {
+      provider: 'x',
+      importStatus: 'failed',
+      lastSyncAttemptAt: admin.firestore.FieldValue.serverTimestamp(),
+      errorMessage: error?.message || String(error || 'Import failed.'),
+      retryCount: Number(source.retryCount || 0) + 1,
+      rawPayloadHash: source.rawPayloadHash,
+    },
   });
 }
 
@@ -648,7 +835,10 @@ function mapXBookmarkPayloadToSources(payload = {}) {
       body: text,
       summary: text.slice(0, 240),
       source_url: xTweetUrl(username, tweet.id),
+      authorId: user?.id || tweet.author_id,
       authorUsername: username,
+      authorDisplayName: user?.name,
+      authorAvatarUrl: user?.profile_image_url,
       postDate: tweet.created_at,
       links: normalizeXLinks(tweet.entities?.urls),
       media: xMediaForTweet(tweet, mediaByKey),
@@ -657,19 +847,25 @@ function mapXBookmarkPayloadToSources(payload = {}) {
       tags: ['xpost', 'bookmark', ...generated.tags],
       externalId: tweet.id,
       importSource: 'x_bookmark',
+      rawPayloadHash: rawPayloadHash(tweet),
     };
   });
 }
 
 async function nativeMemoryExists(userId, externalId) {
   if (!admin.apps.length) return false;
-  const doc = await admin.firestore()
+  const memories = admin.firestore()
     .collection('users')
     .doc(userId)
-    .collection('memories')
-    .doc(`x_bookmark_${externalId}`)
+    .collection('memories');
+  const doc = await memories.doc(`x_bookmark_${externalId}`).get();
+  if (doc.exists) return true;
+  const snapshot = await memories
+    .where('sourceType', '==', 'x_bookmark')
+    .where('sourceId', '==', String(externalId))
+    .limit(1)
     .get();
-  return doc.exists;
+  return !snapshot.empty;
 }
 
 async function writeNativeMemoryFromSource(userId, source) {
@@ -677,9 +873,463 @@ async function writeNativeMemoryFromSource(userId, source) {
   const db = admin.firestore();
   const reference = db.collection('users').doc(userId).collection('memories').doc(source.id);
   const existing = await reference.get();
-  if (existing.exists) return false;
+  const cleanTextResult = extractCleanTextFromMemory({
+    rawText: source.body,
+    title: source.title,
+    sourceType: 'x_bookmark',
+    sourceUrl: source.source_url,
+  });
+  if (existing.exists) {
+    const existingData = existing.data() || {};
+    await reference.set(cleanObject({
+      sourceType: 'x_bookmark',
+      sourceUrl: source.source_url,
+      sourceId: String(source.externalId),
+      rawText: String(source.body || ''),
+      cleanText: cleanTextResult.cleanText,
+      contentHash: cleanTextResult.contentHash,
+      summary: String(existingData.summary || '').trim()
+        ? undefined
+        : String(source.summary || source.body || '').slice(0, 240),
+      author: cleanObject({
+        id: source.authorId,
+        username: source.authorUsername,
+        displayName: source.authorDisplayName,
+        avatarUrl: source.authorAvatarUrl,
+      }),
+      links: Array.isArray(source.links) ? source.links : [],
+      media: Array.isArray(source.media) ? source.media : [],
+      referencedPosts: Array.isArray(source.referencedPosts) ? source.referencedPosts : [],
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      sync: {
+        ...(existingData.sync || {}),
+        provider: 'x',
+        importStatus: 'imported',
+        lastSyncAttemptAt: admin.firestore.FieldValue.serverTimestamp(),
+        rawPayloadHash: source.rawPayloadHash,
+      },
+      externalId: source.externalId,
+      importSource: source.importSource,
+    }), { merge: true });
+    return false;
+  }
   await reference.set(nativeMemoryFromSource({ ...source, userId }, userId), { merge: true });
   return true;
+}
+
+async function writeNativeMemoryDocumentFromSource(userId, source) {
+  if (!admin.apps.length) return false;
+  const reference = admin.firestore()
+    .collection('users')
+    .doc(userId)
+    .collection('memories')
+    .doc(String(source.id));
+  await reference.set(nativeMemoryFromSource({ ...source, userId }, userId), { merge: true });
+  return true;
+}
+
+async function markNativeMemoryImportFailed(userId, source, error) {
+  if (!admin.apps.length) return;
+  const reference = admin.firestore()
+    .collection('users')
+    .doc(userId)
+    .collection('memories')
+    .doc(source.id);
+  await reference.set(failedNativeMemoryFromSource({ ...source, userId }, userId, error), { merge: true });
+}
+
+function syncTimestamp() {
+  return admin.apps.length ? admin.firestore.FieldValue.serverTimestamp() : new Date().toISOString();
+}
+
+async function getXBookmarkSyncState(userId) {
+  const state = await store.getXBookmarkSyncState?.(userId);
+  return state || {
+    provider: 'x',
+    enabled: false,
+    lastSyncedAt: null,
+    lastSuccessfulSyncAt: null,
+    lastFailedSyncAt: null,
+    lastErrorMessage: null,
+    lastScheduledSyncAt: null,
+    lastManualSyncAt: null,
+    lastResult: null,
+    lastError: null,
+    importedCount: 0,
+    skippedDuplicateCount: 0,
+    failedCount: 0,
+    nextEligibleSyncAt: null,
+    totalImported: 0,
+    totalFailed: 0,
+    syncInProgress: false,
+  };
+}
+
+async function updateXBookmarkSyncState(userId, patch) {
+  if (!store.updateXBookmarkSyncState) return null;
+  return store.updateXBookmarkSyncState(userId, {
+    provider: 'x',
+    ...patch,
+  });
+}
+
+function syncStatusFromCounts(importedCount, failedCount) {
+  if (failedCount > 0 && importedCount > 0) return 'partial_success';
+  if (failedCount > 0) return 'failed';
+  return 'success';
+}
+
+function isoFromDate(date) {
+  return date instanceof Date ? date.toISOString() : new Date(date).toISOString();
+}
+
+function dateValueMs(value) {
+  if (!value) return 0;
+  if (typeof value?.toDate === 'function') return value.toDate().getTime();
+  if (typeof value?._seconds === 'number') return value._seconds * 1000;
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) ? date.getTime() : 0;
+}
+
+function nextDailySyncIso(fromDate = new Date()) {
+  return new Date(fromDate.getTime() + 24 * 60 * 60 * 1000).toISOString();
+}
+
+async function syncXBookmarksForUser(userId, options = {}) {
+  const mode = options.mode || 'manual';
+  const limit = Math.max(1, Math.min(100, Number(options.limit || 25)));
+  const processWithAI = options.processWithAI === true;
+  const previousState = await getXBookmarkSyncState(userId);
+
+  await updateXBookmarkSyncState(userId, {
+    enabled: previousState.enabled === true,
+    syncInProgress: true,
+    lastErrorMessage: null,
+    lastError: null,
+  });
+
+  const connection = await store.getXBookmarkConnection(userId);
+  if (!connection) {
+    const message = 'Connect X bookmarks before syncing.';
+    await updateXBookmarkSyncState(userId, {
+      syncInProgress: false,
+      lastFailedSyncAt: syncTimestamp(),
+      lastErrorMessage: message,
+      lastError: message,
+      lastResult: 'failed',
+      failedCount: 1,
+      totalFailed: Number(previousState.totalFailed || 0) + 1,
+    });
+    return {
+      status: 'failed',
+      importedCount: 0,
+      duplicateCount: 0,
+      failedCount: 1,
+      aiProcessedCount: 0,
+      aiSkippedCount: 0,
+      aiFailedCount: 0,
+      aiLimitReached: false,
+      aiUsage: null,
+      errors: [message],
+      checkedCount: 0,
+      memories: [],
+    };
+  }
+
+  try {
+    const { accessToken, connectionPatch } = await xAccessTokenForSync(connection);
+    const payload = await fetchXBookmarks(connection.xUserId, accessToken, limit);
+    const existingSources = await store.listSources(userId);
+    const existingBookmarkIds = new Set(
+      existingSources
+        .filter((source) => source.importSource === 'x_bookmark' || source.id?.startsWith?.('x_bookmark_'))
+        .map((source) => String(source.externalId || String(source.id || '').replace(/^x_bookmark_/, ''))),
+    );
+
+    const sources = mapXBookmarkPayloadToSources(payload);
+    const imported = [];
+    const duplicates = [];
+    const failed = [];
+    const errors = [];
+    const importedMemoryIds = [];
+
+    for (const source of sources) {
+      const sourceId = String(source.externalId);
+      try {
+        if (existingBookmarkIds.has(sourceId) || await nativeMemoryExists(userId, source.externalId)) {
+          duplicates.push(sourceId);
+          await writeNativeMemoryFromSource(userId, source);
+          continue;
+        }
+
+        await store.addSource(userId, source);
+        await writeNativeMemoryFromSource(userId, source);
+        existingBookmarkIds.add(sourceId);
+        imported.push(source);
+        importedMemoryIds.push(source.id);
+      } catch (error) {
+        failed.push(sourceId);
+        const message = error.message || `Failed to import X bookmark ${sourceId}.`;
+        errors.push(message);
+        console.warn(`[x-bookmarks] import failed for user=${userId} sourceId=${sourceId}: ${message}`);
+        try {
+          await markNativeMemoryImportFailed(userId, source, error);
+        } catch (trackingError) {
+          console.warn(`[x-bookmarks] failed to record import error for user=${userId} sourceId=${sourceId}: ${trackingError.message}`);
+        }
+      }
+    }
+
+    const status = syncStatusFromCounts(imported.length, failed.length);
+    let aiProcessing = {
+      processedCount: 0,
+      skippedCount: 0,
+      failedCount: 0,
+      errors: [],
+    };
+    if (processWithAI && importedMemoryIds.length) {
+      try {
+        aiProcessing = await processMemoryIds(userId, importedMemoryIds, { forceReprocess: false, store });
+      } catch (error) {
+        const message = error.message || 'AI processing after X sync failed.';
+        aiProcessing.failedCount = importedMemoryIds.length;
+        aiProcessing.errors = [message];
+        errors.push(message);
+        console.warn(`[x-bookmarks] ai processing failed for user=${userId}: ${message}`);
+      }
+    }
+    const now = syncTimestamp();
+    const nowIso = new Date().toISOString();
+    const failedCount = failed.length;
+    await updateXBookmarkSyncState(userId, {
+      lastSyncedAt: now,
+      lastSuccessfulSyncAt: status === 'failed' ? previousState.lastSuccessfulSyncAt || null : now,
+      lastFailedSyncAt: failedCount > 0 ? now : previousState.lastFailedSyncAt || null,
+      lastErrorMessage: errors[0] || null,
+      lastError: errors[0] || null,
+      lastResult: status,
+      lastScheduledSyncAt: mode === 'daily' ? now : previousState.lastScheduledSyncAt || null,
+      lastManualSyncAt: mode === 'manual' ? now : previousState.lastManualSyncAt || null,
+      importedCount: imported.length,
+      skippedDuplicateCount: duplicates.length,
+      failedCount,
+      nextEligibleSyncAt: mode === 'daily' ? nextDailySyncIso(new Date()) : previousState.nextEligibleSyncAt || null,
+      totalImported: Number(previousState.totalImported || 0) + imported.length,
+      totalFailed: Number(previousState.totalFailed || 0) + failedCount,
+      syncInProgress: false,
+    });
+
+    await store.upsertXBookmarkConnection(userId, {
+      ...connectionPatch,
+      lastSyncError: errors[0] || null,
+      lastSyncedAt: nowIso,
+      lastImportedCount: imported.length,
+      lastDuplicateCount: duplicates.length,
+      lastFailedCount: failedCount,
+      lastSyncStatus: status,
+      lastSyncMode: mode,
+      lastSeenBookmarkId: sources[0]?.externalId || connection.lastSeenBookmarkId || null,
+    });
+
+    return {
+      status,
+      importedCount: imported.length,
+      duplicateCount: duplicates.length,
+      failedCount,
+      aiProcessedCount: aiProcessing.processedCount,
+      aiSkippedCount: aiProcessing.skippedCount,
+      aiFailedCount: aiProcessing.failedCount,
+      aiLimitReached: aiProcessing.limitReached === true,
+      aiUsage: aiProcessing.usage,
+      errors,
+      checkedCount: sources.length,
+      memories: imported.map((source) => ({
+        id: source.id,
+        title: source.title,
+        sourceURL: source.source_url,
+        authorUsername: source.authorUsername,
+        externalId: source.externalId,
+      })),
+    };
+  } catch (error) {
+    const message = error.message || 'X bookmark sync failed.';
+    const now = syncTimestamp();
+    await updateXBookmarkSyncState(userId, {
+      lastSyncedAt: now,
+      lastFailedSyncAt: now,
+      lastErrorMessage: message,
+      lastError: message,
+      lastResult: 'failed',
+      lastScheduledSyncAt: mode === 'daily' ? now : previousState.lastScheduledSyncAt || null,
+      lastManualSyncAt: mode === 'manual' ? now : previousState.lastManualSyncAt || null,
+      failedCount: 1,
+      nextEligibleSyncAt: mode === 'daily' ? nextDailySyncIso(new Date()) : previousState.nextEligibleSyncAt || null,
+      totalFailed: Number(previousState.totalFailed || 0) + 1,
+      syncInProgress: false,
+    });
+    await store.upsertXBookmarkConnection(userId, {
+      lastSyncError: message,
+      lastSyncedAt: new Date().toISOString(),
+      lastFailedCount: 1,
+      lastSyncStatus: 'failed',
+      lastSyncMode: mode,
+    });
+    return {
+      status: 'failed',
+      importedCount: 0,
+      duplicateCount: 0,
+      failedCount: 1,
+      aiProcessedCount: 0,
+      aiSkippedCount: 0,
+      aiFailedCount: 0,
+      aiLimitReached: false,
+      aiUsage: null,
+      errors: [message],
+      checkedCount: 0,
+      memories: [],
+    };
+  }
+}
+
+async function retryFailedBookmarkImports(userId) {
+  return syncXBookmarksForUser(userId, { mode: 'manual', limit: 100 });
+}
+
+function xConnectionHasTokenData(connection = {}) {
+  return Boolean(connection.xUserId && (connection.encryptedRefreshToken || connection.encryptedAccessToken));
+}
+
+function isDailySyncCandidateReady(candidate, now = new Date()) {
+  if (!candidate?.userId || !candidate.connection) return false;
+  if (!xConnectionHasTokenData(candidate.connection)) return false;
+  const syncState = candidate.syncState || {};
+  if (syncState.enabled !== true) return false;
+  if (syncState.syncInProgress === true) return false;
+  const nextEligibleMs = dateValueMs(syncState.nextEligibleSyncAt);
+  return !nextEligibleMs || nextEligibleMs <= now.getTime();
+}
+
+async function runScheduledXBookmarkSync(options = {}) {
+  const config = aiConfig();
+  if (!config.dailySyncEnabled && options.force !== true) {
+    return {
+      status: 'disabled',
+      processedUsers: 0,
+      skippedUsers: 0,
+      failedUsers: 0,
+      results: [],
+    };
+  }
+
+  const candidates = options.candidates || (await store.listXBookmarkSyncCandidates?.({ limit: options.limit || 500 })) || [];
+  const syncUser = options.syncUser || syncXBookmarksForUser;
+  const results = [];
+  let skippedUsers = 0;
+  let failedUsers = 0;
+
+  for (const candidate of candidates) {
+    if (!isDailySyncCandidateReady(candidate)) {
+      skippedUsers += 1;
+      continue;
+    }
+    try {
+      const result = await syncUser(candidate.userId, {
+        mode: 'daily',
+        limit: options.bookmarkLimit || 100,
+        processWithAI: options.processWithAI === true,
+      });
+      if (result.status === 'failed') failedUsers += 1;
+      results.push({
+        userId: candidate.userId,
+        status: result.status,
+        importedCount: result.importedCount,
+        duplicateCount: result.duplicateCount,
+        failedCount: result.failedCount,
+        aiLimitReached: result.aiLimitReached === true,
+      });
+    } catch (error) {
+      failedUsers += 1;
+      const message = error.message || 'Scheduled X bookmark sync failed.';
+      await updateXBookmarkSyncState(candidate.userId, {
+        syncInProgress: false,
+        lastFailedSyncAt: syncTimestamp(),
+        lastErrorMessage: message,
+        lastError: message,
+        lastResult: 'failed',
+        failedCount: 1,
+        nextEligibleSyncAt: nextDailySyncIso(new Date()),
+      }).catch(() => {});
+      results.push({ userId: candidate.userId, status: 'failed', error: message });
+    }
+  }
+
+  return {
+    status: failedUsers > 0 && results.length > failedUsers ? 'partial_success' : (failedUsers > 0 ? 'failed' : 'success'),
+    processedUsers: results.length,
+    skippedUsers,
+    failedUsers,
+    results,
+  };
+}
+
+async function runScheduledDailyBriefGeneration(options = {}) {
+  const config = aiConfig();
+  if (!config.dailyBriefSchedulerEnabled && options.force !== true) {
+    return {
+      status: 'disabled',
+      processedUsers: 0,
+      skippedUsers: 0,
+      failedUsers: 0,
+      results: [],
+    };
+  }
+
+  const timezone = options.timezone || 'UTC';
+  const dateKey = options.dateKey || dateKeyFor(new Date(), timezone);
+  const users = options.users || (await store.listUsers?.({ limit: options.limit || 500 })) || [];
+  const generateBrief = options.generateBrief || generateDailyBriefForUser;
+  const results = [];
+  let skippedUsers = 0;
+  let failedUsers = 0;
+
+  for (const user of users) {
+    const userId = user.id || user.uid;
+    if (!userId) {
+      skippedUsers += 1;
+      continue;
+    }
+    try {
+      const brief = await generateBrief(userId, dateKey, {
+        timezone,
+        forceRegenerate: options.forceRegenerate === true,
+        store,
+      });
+      results.push({
+        userId,
+        dateKey,
+        status: brief?.status || brief?.ai?.status || 'generated',
+        memoryCount: Number(brief?.memoryCount || brief?.savedCount || 0),
+        usedAi: brief?.usedAi === true,
+      });
+    } catch (error) {
+      failedUsers += 1;
+      results.push({
+        userId,
+        dateKey,
+        status: 'failed',
+        error: error.message || 'Scheduled Daily Brief generation failed.',
+      });
+    }
+  }
+
+  return {
+    status: failedUsers > 0 && results.length > failedUsers ? 'partial_success' : (failedUsers > 0 ? 'failed' : 'success'),
+    processedUsers: results.length,
+    skippedUsers,
+    failedUsers,
+    dateKey,
+    results,
+  };
 }
 
 async function fetchXDiscoveryForTopic(topic, limit) {
@@ -779,6 +1429,15 @@ function parseBody(schema, req, res) {
   return parsed.data;
 }
 
+function parseQuery(schema, req, res) {
+  const parsed = schema.safeParse(req.query || {});
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.issues[0]?.message || 'Invalid request query' });
+    return null;
+  }
+  return parsed.data;
+}
+
 async function auth(req, res, next) {
   const raw = req.headers.authorization;
   if (!raw || !raw.startsWith('Bearer ')) {
@@ -802,6 +1461,16 @@ async function auth(req, res, next) {
     } catch {
       return res.status(401).json({ error: 'Invalid token' });
     }
+  }
+}
+
+async function requireAdmin(req, res, next) {
+  try {
+    const user = await store.getUserById?.(req.userId);
+    if (getUserAIUsageTier(user || req.firebaseUser || {}) === 'admin') return next();
+    return res.status(403).json({ error: 'Admin access required' });
+  } catch {
+    return res.status(403).json({ error: 'Admin access required' });
   }
 }
 
@@ -1151,6 +1820,11 @@ app.get('/api/x/oauth/callback', async (req, res) => {
       connectedAt: new Date().toISOString(),
       lastSyncError: null,
     });
+    await updateXBookmarkSyncState(stateRecord.userId, {
+      enabled: false,
+      syncInProgress: false,
+      lastErrorMessage: null,
+    });
 
     return res.type('html').send(`
       <html>
@@ -1168,19 +1842,74 @@ app.get('/api/x/oauth/callback', async (req, res) => {
 
 app.get('/api/x/bookmarks/status', auth, async (req, res) => {
   const connection = await store.getXBookmarkConnection(req.userId);
+  const syncState = await getXBookmarkSyncState(req.userId);
+  const aiLimit = await getAIProcessingLimitForUser(req.userId, { store }).catch(() => null);
   return res.json({
     connected: !!connection,
     username: connection?.username || null,
     xUserId: connection?.xUserId || null,
     connectedAt: connection?.connectedAt || null,
-    lastSyncedAt: connection?.lastSyncedAt || null,
+    lastSyncedAt: connection?.lastSyncedAt || syncState.lastSyncedAt || null,
+    lastSuccessfulSyncAt: syncState.lastSuccessfulSyncAt || null,
+    lastFailedSyncAt: syncState.lastFailedSyncAt || null,
+    lastScheduledSyncAt: syncState.lastScheduledSyncAt || null,
+    lastManualSyncAt: syncState.lastManualSyncAt || null,
     lastImportedCount: connection?.lastImportedCount || 0,
-    lastSyncError: connection?.lastSyncError || null,
+    lastDuplicateCount: connection?.lastDuplicateCount || 0,
+    lastFailedCount: connection?.lastFailedCount || 0,
+    lastSyncStatus: connection?.lastSyncStatus || syncState.lastResult || 'idle',
+    lastSyncError: connection?.lastSyncError || syncState.lastError || syncState.lastErrorMessage || null,
+    lastResult: syncState.lastResult || connection?.lastSyncStatus || null,
+    importedCount: Number(syncState.importedCount || connection?.lastImportedCount || 0),
+    skippedDuplicateCount: Number(syncState.skippedDuplicateCount || connection?.lastDuplicateCount || 0),
+    failedCount: Number(syncState.failedCount || connection?.lastFailedCount || 0),
+    nextEligibleSyncAt: syncState.nextEligibleSyncAt || null,
+    dailySyncEnabled: syncState.enabled === true,
+    syncInProgress: syncState.syncInProgress === true,
+    totalImported: Number(syncState.totalImported || 0),
+    totalFailed: Number(syncState.totalFailed || 0),
+    aiUsage: aiLimit ? {
+      tier: aiLimit.tier,
+      limit: aiLimit.limit,
+      used: aiLimit.used,
+      remaining: aiLimit.remaining,
+      dateKey: aiLimit.dateKey,
+      processedCount: aiLimit.processedCount,
+      briefGeneratedCount: aiLimit.briefGeneratedCount,
+      projectSummaryCount: aiLimit.projectSummaryCount,
+      failedCount: aiLimit.failedCount,
+      skippedCount: aiLimit.skippedCount,
+    } : undefined,
+  });
+});
+
+app.get('/api/ai/usage', auth, async (req, res) => {
+  const usage = await getAIProcessingDailyUsage(req.userId, { store }).catch(() => null);
+  const limit = await getAIProcessingLimitForUser(req.userId, { store }).catch(() => null);
+  if (!usage || !limit) return res.status(503).json({ error: 'AI usage is not available.' });
+  return res.json({
+    tier: limit.tier,
+    limit: limit.limit,
+    used: limit.used,
+    remaining: limit.remaining,
+    dateKey: limit.dateKey,
+    processedCount: limit.processedCount,
+    briefGeneratedCount: limit.briefGeneratedCount,
+    projectSummaryCount: limit.projectSummaryCount,
+    failedCount: limit.failedCount,
+    skippedCount: limit.skippedCount,
+    lastProcessedAt: usage.lastProcessedAt || null,
+    updatedAt: usage.updatedAt || null,
   });
 });
 
 app.delete('/api/x/bookmarks/connection', auth, async (req, res) => {
   await store.deleteXBookmarkConnection(req.userId);
+  await updateXBookmarkSyncState(req.userId, {
+    enabled: false,
+    syncInProgress: false,
+    lastErrorMessage: null,
+  });
   return res.json({ ok: true });
 });
 
@@ -1190,65 +1919,82 @@ app.post('/api/x/bookmarks/sync', auth, async (req, res) => {
     return res.status(400).json({ error: parsed.error.issues[0]?.message || 'Invalid sync request' });
   }
 
-  const connection = await store.getXBookmarkConnection(req.userId);
-  if (!connection) {
-    return res.status(409).json({ error: 'Connect X bookmarks before syncing.' });
+  const result = await syncXBookmarksForUser(req.userId, parsed.data);
+  const responseBody = {
+    ok: result.status !== 'failed',
+    status: result.status,
+    imported: result.importedCount,
+    skipped: result.duplicateCount,
+    checked: result.checkedCount,
+    importedCount: result.importedCount,
+    duplicateCount: result.duplicateCount,
+    failedCount: result.failedCount,
+    aiProcessedCount: result.aiProcessedCount || 0,
+    aiSkippedCount: result.aiSkippedCount || 0,
+    aiFailedCount: result.aiFailedCount || 0,
+    aiLimitReached: result.aiLimitReached === true,
+    aiUsage: result.aiUsage,
+    errors: result.errors,
+    memories: result.memories,
+  };
+
+  if (result.status === 'failed') {
+    return res.status(result.errors[0] === 'Connect X bookmarks before syncing.' ? 409 : 502).json({
+      ...responseBody,
+      error: result.errors[0] || 'X bookmark sync failed.',
+    });
   }
 
-  try {
-    const { accessToken, connectionPatch } = await xAccessTokenForSync(connection);
-    const payload = await fetchXBookmarks(connection.xUserId, accessToken, parsed.data.limit);
-    const existingSources = await store.listSources(req.userId);
-    const existingBookmarkIds = new Set(
-      existingSources
-        .filter((source) => source.importSource === 'x_bookmark' || source.id?.startsWith?.('x_bookmark_'))
-        .map((source) => String(source.externalId || String(source.id || '').replace(/^x_bookmark_/, ''))),
-    );
+  return res.json(responseBody);
+});
 
-    const sources = mapXBookmarkPayloadToSources(payload);
-    const imported = [];
-    const skipped = [];
+app.post('/api/x/bookmarks/daily-sync', auth, async (req, res) => {
+  const data = parseBody(X_BOOKMARK_DAILY_SYNC_SCHEMA, req, res);
+  if (!data) return;
 
-    for (const source of sources) {
-      if (existingBookmarkIds.has(String(source.externalId)) || await nativeMemoryExists(req.userId, source.externalId)) {
-        skipped.push(source.externalId);
-        continue;
-      }
+  const state = await updateXBookmarkSyncState(req.userId, {
+    enabled: data.enabled,
+    nextEligibleSyncAt: data.enabled ? nextDailySyncIso(new Date(Date.now() - 24 * 60 * 60 * 1000)) : null,
+    lastErrorMessage: null,
+    lastError: null,
+  });
+  await store.updateUserById?.(req.userId, {
+    xBookmarksDailySyncEnabled: data.enabled,
+  }).catch(() => null);
 
-      await store.addSource(req.userId, source);
-      await writeNativeMemoryFromSource(req.userId, source);
-      existingBookmarkIds.add(String(source.externalId));
-      imported.push(source);
-    }
+  return res.json({
+    ok: true,
+    dailySyncEnabled: state?.enabled === true,
+    syncState: state,
+  });
+});
 
-    await store.upsertXBookmarkConnection(req.userId, {
-      ...connectionPatch,
-      lastSyncError: null,
-      lastSyncedAt: new Date().toISOString(),
-      lastImportedCount: imported.length,
-      lastSeenBookmarkId: sources[0]?.externalId || connection.lastSeenBookmarkId || null,
-    });
+app.post('/api/admin/x-bookmarks/run-scheduled', auth, requireAdmin, async (req, res) => {
+  const data = parseBody(SCHEDULED_RUN_SCHEMA, req, res);
+  if (!data) return;
+  const result = await runScheduledXBookmarkSync(data);
+  return res.status(result.status === 'disabled' ? 202 : 200).json(result);
+});
 
-    return res.json({
-      ok: true,
-      imported: imported.length,
-      skipped: skipped.length,
-      checked: sources.length,
-      memories: imported.map((source) => ({
-        id: source.id,
-        title: source.title,
-        sourceURL: source.source_url,
-        authorUsername: source.authorUsername,
-        externalId: source.externalId,
-      })),
-    });
-  } catch (error) {
-    await store.upsertXBookmarkConnection(req.userId, {
-      lastSyncError: error.message || 'X bookmark sync failed.',
-      lastSyncedAt: new Date().toISOString(),
-    });
-    return res.status(502).json({ error: error.message || 'X bookmark sync failed.' });
-  }
+app.post('/api/x/bookmarks/retry', auth, async (req, res) => {
+  const result = await retryFailedBookmarkImports(req.userId);
+  return res.status(result.status === 'failed' ? 502 : 200).json({
+    ok: result.status !== 'failed',
+    status: result.status,
+    imported: result.importedCount,
+    skipped: result.duplicateCount,
+    checked: result.checkedCount,
+    importedCount: result.importedCount,
+    duplicateCount: result.duplicateCount,
+    failedCount: result.failedCount,
+    aiProcessedCount: result.aiProcessedCount || 0,
+    aiSkippedCount: result.aiSkippedCount || 0,
+    aiFailedCount: result.aiFailedCount || 0,
+    aiLimitReached: result.aiLimitReached === true,
+    aiUsage: result.aiUsage,
+    errors: result.errors,
+    memories: result.memories,
+  });
 });
 
 app.get('/api/feed', auth, async (_req, res) => {
@@ -1275,6 +2021,7 @@ app.post('/api/feed/:id/ingest', auth, async (req, res) => {
     tags: Array.isArray(item.tags) && item.tags.length ? item.tags : ['feed'],
   };
   await store.addSource(req.userId, source);
+  await writeNativeMemoryDocumentFromSource(req.userId, source);
 
   return res.json({
     success: true,
@@ -1416,11 +2163,17 @@ app.post('/api/ingest', auth, async (req, res) => {
     tags,
   };
   await store.addSource(req.userId, source);
+  await writeNativeMemoryDocumentFromSource(req.userId, source);
+  let aiProcessing;
+  if (data.processWithAI) {
+    aiProcessing = await processMemoryForAI(req.userId, source.id, { forceReprocess: false, store });
+  }
   return res.json({
     success: true,
     source_id: source.id,
     title: String(title),
     message: 'Source queued for processing',
+    aiProcessing,
   });
 });
 
@@ -1455,14 +2208,38 @@ app.get('/api/memories', auth, async (req, res) => {
     .map((source) => ({
       id: String(source.id),
       title: String(source.title || 'Untitled memory'),
+      sourceType: memorySourceType(source.source_type, source.importSource),
+      sourceUrl: source.source_url,
+      sourceId: source.externalId ? String(source.externalId) : undefined,
+      rawText: String(source.body || ''),
+      summary: String(source.summary || source.body || '').slice(0, 240),
       source_type: String(source.source_type || 'note'),
       createdAt: source.createdAt,
+      capturedAt: source.postDate || source.createdAt,
       category: source.category || 'General',
       tags: Array.isArray(source.tags) ? source.tags : [],
+      concepts: Array.isArray(source.concepts) ? source.concepts : [],
+      entities: Array.isArray(source.entities) ? source.entities : [],
       userId: source.userId,
       body: String(source.body || ''),
       source_url: source.source_url,
       authorUsername: source.authorUsername,
+      author: cleanObject({
+        id: source.authorId,
+        username: source.authorUsername,
+        displayName: source.authorDisplayName,
+        avatarUrl: source.authorAvatarUrl,
+      }),
+      intent: source.intent || 'unknown',
+      projectIds: Array.isArray(source.projectIds) ? source.projectIds : [],
+      isArchived: source.isArchived === true,
+      isFavorite: source.isFavorite === true,
+      sync: cleanObject({
+        provider: source.importSource === 'x_bookmark' ? 'x' : 'manual',
+        importStatus: source.importSource === 'x_bookmark' ? 'imported' : undefined,
+        retryCount: Number(source.retryCount || 0),
+        rawPayloadHash: source.rawPayloadHash,
+      }),
       postDate: source.postDate,
       links: Array.isArray(source.links) ? source.links : [],
       media: Array.isArray(source.media) ? source.media : [],
@@ -1529,6 +2306,56 @@ app.post('/api/memories/import-legacy', auth, async (req, res) => {
   });
 });
 
+app.post('/api/memories/process-unprocessed', auth, async (req, res) => {
+  const data = parseBody(PROCESS_MEMORIES_BATCH_SCHEMA, req, res);
+  if (!data) return;
+  try {
+    const result = await processUnprocessedMemoriesForUser(req.userId, { ...data, store });
+    return res.status(result.limitReached && result.processedCount === 0 ? 429 : 200).json(
+      result.limitReached && result.processedCount === 0
+        ? { ...limitReachedPayload(await getAIProcessingLimitForUser(req.userId, { store })), ...result }
+        : result,
+    );
+  } catch (error) {
+    return res.status(503).json({
+      processedCount: 0,
+      skippedCount: 0,
+      failedCount: 1,
+      errors: [error.message || 'AI batch processing is not available.'],
+    });
+  }
+});
+
+app.post('/api/memories/process-recent', auth, async (req, res) => {
+  const data = parseBody(PROCESS_MEMORIES_BATCH_SCHEMA, req, res);
+  if (!data) return;
+  try {
+    const result = await processRecentImportedMemories(req.userId, { ...data, store });
+    return res.status(result.limitReached && result.processedCount === 0 ? 429 : 200).json(
+      result.limitReached && result.processedCount === 0
+        ? { ...limitReachedPayload(await getAIProcessingLimitForUser(req.userId, { store })), ...result }
+        : result,
+    );
+  } catch (error) {
+    return res.status(503).json({
+      processedCount: 0,
+      skippedCount: 0,
+      failedCount: 1,
+      errors: [error.message || 'AI recent-memory processing is not available.'],
+    });
+  }
+});
+
+app.post('/api/memories/:id/process-ai', auth, async (req, res) => {
+  const data = parseBody(PROCESS_MEMORY_AI_SCHEMA, req, res);
+  if (!data) return;
+  const result = await processMemoryForAI(req.userId, req.params.id, { ...data, store });
+  const statusCode = result.status === 'limited'
+    ? 429
+    : result.status === 'failed' && result.error === 'Memory not found.' ? 404 : 200;
+  return res.status(statusCode).json(result);
+});
+
 app.get('/api/memories/:id', auth, async (req, res) => {
   const memory = await store.getSourceById(req.userId, req.params.id);
   if (!memory) return res.status(404).json({ error: 'Memory not found' });
@@ -1581,6 +2408,186 @@ app.delete('/api/memories/:id', auth, async (req, res) => {
   const removed = await store.deleteSource(req.userId, req.params.id);
   if (!removed) return res.status(404).json({ error: 'Memory not found' });
   return res.json({ ok: true });
+});
+
+app.get('/api/daily-briefs', auth, async (req, res) => {
+  try {
+    const briefs = await listDailyBriefs(req.userId, { limit: req.query.limit });
+    return res.json({ briefs });
+  } catch (error) {
+    return res.status(503).json({ error: error.message || 'Daily Briefs are not available.' });
+  }
+});
+
+app.get('/api/daily-briefs/today', auth, async (req, res) => {
+  const data = parseQuery(DAILY_BRIEF_QUERY_SCHEMA, req, res);
+  if (!data) return;
+  const dateKey = data.dateKey || dateKeyFor(new Date(), data.timezone);
+  try {
+    const brief = await generateDailyBriefForUser(req.userId, dateKey, { ...data, store });
+    return res.json({ brief });
+  } catch (error) {
+    return res.status(503).json({ error: error.message || 'Daily Brief generation is not available.' });
+  }
+});
+
+app.post('/api/daily-briefs/generate-today', auth, async (req, res) => {
+  const data = parseBody(DAILY_BRIEF_QUERY_SCHEMA, req, res);
+  if (!data) return;
+  const dateKey = data.dateKey || dateKeyFor(new Date(), data.timezone);
+  try {
+    const brief = await generateDailyBriefForUser(req.userId, dateKey, { ...data, store });
+    return res.json({ brief });
+  } catch (error) {
+    return res.status(503).json({ error: error.message || 'Daily Brief generation is not available.' });
+  }
+});
+
+app.post('/api/daily-briefs/generate-for-date', auth, async (req, res) => {
+  const data = parseBody(DAILY_BRIEF_QUERY_SCHEMA.extend({
+    dateKey: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  }), req, res);
+  if (!data) return;
+  try {
+    const brief = await generateDailyBriefForUser(req.userId, data.dateKey, { ...data, store });
+    return res.json({ brief });
+  } catch (error) {
+    return res.status(503).json({ error: error.message || 'Daily Brief generation is not available.' });
+  }
+});
+
+app.post('/api/admin/daily-briefs/run-scheduled', auth, requireAdmin, async (req, res) => {
+  const data = parseBody(SCHEDULED_RUN_SCHEMA.extend({
+    forceRegenerate: z.boolean().optional().default(false),
+  }), req, res);
+  if (!data) return;
+  const result = await runScheduledDailyBriefGeneration(data);
+  return res.status(result.status === 'disabled' ? 202 : 200).json(result);
+});
+
+app.get('/api/daily-briefs/:dateKey', auth, async (req, res) => {
+  try {
+    const brief = await getDailyBrief(req.userId, req.params.dateKey);
+    if (!brief) return res.status(404).json({ error: 'Daily Brief not found' });
+    return res.json({ brief });
+  } catch (error) {
+    return res.status(503).json({ error: error.message || 'Daily Briefs are not available.' });
+  }
+});
+
+app.post('/api/daily-briefs/:dateKey/generate', auth, async (req, res) => {
+  const data = parseBody(DAILY_BRIEF_QUERY_SCHEMA, req, res);
+  if (!data) return;
+  try {
+    const brief = await generateDailyBriefForUser(req.userId, req.params.dateKey, { ...data, store });
+    return res.json({ brief });
+  } catch (error) {
+    return res.status(503).json({ error: error.message || 'Daily Brief generation is not available.' });
+  }
+});
+
+app.get('/api/projects', auth, async (req, res) => {
+  try {
+    const projects = await listProjects(req.userId, { includeArchived: String(req.query.includeArchived) === 'true' });
+    return res.json({ projects });
+  } catch (error) {
+    return res.status(503).json({ error: error.message || 'Projects are not available.' });
+  }
+});
+
+app.post('/api/projects', auth, async (req, res) => {
+  const data = parseBody(PROJECT_CREATE_SCHEMA, req, res);
+  if (!data) return;
+  try {
+    const project = await createProject(req.userId, data);
+    return res.status(201).json({ project });
+  } catch (error) {
+    return res.status(503).json({ error: error.message || 'Could not create project.' });
+  }
+});
+
+app.get('/api/projects/:projectId', auth, async (req, res) => {
+  try {
+    const project = await getProject(req.userId, req.params.projectId);
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+    return res.json({ project });
+  } catch (error) {
+    return res.status(503).json({ error: error.message || 'Projects are not available.' });
+  }
+});
+
+app.patch('/api/projects/:projectId', auth, async (req, res) => {
+  const data = parseBody(PROJECT_UPDATE_SCHEMA, req, res);
+  if (!data) return;
+  try {
+    await updateProject(req.userId, req.params.projectId, data);
+    const project = await getProject(req.userId, req.params.projectId);
+    return res.json({ project });
+  } catch (error) {
+    return res.status(503).json({ error: error.message || 'Could not update project.' });
+  }
+});
+
+app.post('/api/projects/:projectId/archive', auth, async (req, res) => {
+  try {
+    await archiveProject(req.userId, req.params.projectId);
+    const project = await getProject(req.userId, req.params.projectId);
+    return res.json({ project });
+  } catch (error) {
+    return res.status(503).json({ error: error.message || 'Could not archive project.' });
+  }
+});
+
+app.get('/api/projects/:projectId/memories', auth, async (req, res) => {
+  try {
+    const memories = await listProjectMemories(req.userId, req.params.projectId);
+    return res.json({ memories });
+  } catch (error) {
+    return res.status(503).json({ error: error.message || 'Project memories are not available.' });
+  }
+});
+
+app.post('/api/projects/:projectId/memories', auth, async (req, res) => {
+  const data = parseBody(PROJECT_MEMORY_SCHEMA, req, res);
+  if (!data) return;
+  try {
+    const ok = await assignMemoryToProject(req.userId, data.memoryId, req.params.projectId);
+    if (!ok) return res.status(404).json({ error: 'Project or memory not found' });
+    return res.json({ ok: true });
+  } catch (error) {
+    return res.status(503).json({ error: error.message || 'Could not assign memory.' });
+  }
+});
+
+app.delete('/api/projects/:projectId/memories/:memoryId', auth, async (req, res) => {
+  try {
+    const ok = await removeMemoryFromProject(req.userId, req.params.memoryId, req.params.projectId);
+    if (!ok) return res.status(404).json({ error: 'Project or memory not found' });
+    return res.json({ ok: true });
+  } catch (error) {
+    return res.status(503).json({ error: error.message || 'Could not remove memory.' });
+  }
+});
+
+app.get('/api/projects/:projectId/suggestions', auth, async (req, res) => {
+  try {
+    const suggestions = await suggestMemoriesForProject(req.userId, req.params.projectId, { limit: req.query.limit });
+    return res.json({ suggestions });
+  } catch (error) {
+    return res.status(503).json({ error: error.message || 'Project suggestions are not available.' });
+  }
+});
+
+app.post('/api/projects/:projectId/summary', auth, async (req, res) => {
+  const data = parseBody(PROJECT_SUMMARY_SCHEMA, req, res);
+  if (!data) return;
+  try {
+    const project = await generateProjectSummary(req.userId, req.params.projectId, { ...data, store });
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+    return res.json({ project });
+  } catch (error) {
+    return res.status(503).json({ error: error.message || 'Project summary is not available.' });
+  }
 });
 
 app.get('/api/dashboard/summary', auth, async (req, res) => {
@@ -1655,4 +2662,10 @@ if (require.main === module && process.env.NODE_ENV !== 'test') {
   });
 }
 
-module.exports = { app };
+module.exports = {
+  app,
+  runScheduledDailyBriefGeneration,
+  runScheduledXBookmarkSync,
+  syncXBookmarksForUser,
+  retryFailedBookmarkImports,
+};
