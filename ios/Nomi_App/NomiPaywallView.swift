@@ -166,6 +166,13 @@ struct NomiPaywallView: View {
                     .multilineTextAlignment(.center)
             }
 
+            if let successMessage = purchaseStore.successMessage {
+                Text(successMessage)
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.green)
+                    .multilineTextAlignment(.center)
+            }
+
             Button("Restore purchases") {
                 Task {
                     await purchaseStore.restorePurchases()

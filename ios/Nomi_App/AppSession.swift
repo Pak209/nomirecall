@@ -67,6 +67,11 @@ final class AppSession: ObservableObject {
         }
     }
 
+    func updateProfileImage(data: Data) async throws {
+        guard let user else { return }
+        profile = try await userProfileService.uploadProfileImage(userId: user.uid, imageData: data)
+    }
+
     func signOut() {
         do {
             try AuthService().signOut()

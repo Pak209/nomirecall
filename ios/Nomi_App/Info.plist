@@ -50,6 +50,10 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Use Face ID to sign in to your remembered Nomi account.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Choose a profile photo for your Nomi account.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

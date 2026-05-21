@@ -2,11 +2,9 @@ import Foundation
 import RevenueCat
 
 enum RevenueCatBootstrap {
-    #if DEBUG
-    static let apiKey = "test_bttPcQWbrAMlgJEOIWVYlokorNq"
-    #else
+    // RevenueCat public SDK keys are intentionally shipped in the client.
+    // This must be the iOS public key from RevenueCat, not a secret API key.
     static let apiKey = "appl_HUPnABuXmDYjCuQKeiuJGmQbKHg"
-    #endif
 
     static let proEntitlementIdentifier = "Nomi Pro"
 
@@ -23,14 +21,16 @@ enum RevenueCatBootstrap {
             return
         }
 
-        #if !DEBUG
         guard !trimmedKey.hasPrefix("test_") else {
-            print("[RevenueCat] Skipping configuration: test API keys cannot be used in Release/TestFlight builds.")
+            print("[RevenueCat] Skipping configuration: test API keys cannot be used in app builds.")
             return
         }
-        #endif
 
+        #if DEBUG
         Purchases.logLevel = .debug
+        #else
+        Purchases.logLevel = .warn
+        #endif
         Purchases.configure(withAPIKey: trimmedKey)
     }
 }

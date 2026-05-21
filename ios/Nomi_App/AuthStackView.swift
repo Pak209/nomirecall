@@ -9,11 +9,16 @@ struct AuthStackView: View {
     @State private var mode: Mode = .signIn
     @State private var email = ""
     @State private var password = ""
+    @State private var rememberMe = false
+    @State private var hasRememberedCredentials = false
+    @State private var biometricDisplayName = "Face ID"
     @State private var isWorking = false
     @State private var isGoogleWorking = false
+    @State private var isBiometricWorking = false
     @State private var errorMessage: String?
 
     private let authService = AuthService()
+    private let credentialStore = BiometricCredentialStore()
 
     var body: some View {
         NavigationStack {
@@ -58,6 +63,38 @@ struct AuthStackView: View {
                             .nomiTextField()
                     }
 
+                    if mode == .signIn {
+                        VStack(spacing: 12) {
+                            Toggle("Remember me", isOn: $rememberMe)
+                                .font(.subheadline.weight(.semibold))
+                                .tint(.pink)
+                                .onChange(of: rememberMe) { _, isEnabled in
+                                    updateRememberMePreference(isEnabled)
+                                }
+
+                            if hasRememberedCredentials && credentialStore.canUseBiometrics {
+                                Button {
+                                    signInWithBiometrics()
+                                } label: {
+                                    HStack(spacing: 10) {
+                                        if isBiometricWorking {
+                                            ProgressView()
+                                        } else {
+                                            Image(systemName: biometricDisplayName == "Face ID" ? "faceid" : "touchid")
+                                                .font(.title3)
+                                        }
+
+                                        Text("Sign in with \(biometricDisplayName)")
+                                            .fontWeight(.bold)
+                                    }
+                                    .frame(maxWidth: .infinity)
+                                }
+                                .buttonStyle(NomiSecondaryButtonStyle())
+                                .disabled(isWorking || isGoogleWorking || isBiometricWorking)
+                            }
+                        }
+                    }
+
                     Button {
                         submit()
                     } label: {
@@ -73,7 +110,7 @@ struct AuthStackView: View {
                         .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(NomiPrimaryButtonStyle())
-                    .disabled(isWorking || isGoogleWorking || email.isEmpty || password.count < 6)
+                    .disabled(isWorking || isGoogleWorking || isBiometricWorking || email.isEmpty || password.count < 6)
 
                     HStack(spacing: 12) {
                         Rectangle()
@@ -113,7 +150,7 @@ struct AuthStackView: View {
                         .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(NomiSecondaryButtonStyle())
-                    .disabled(isWorking || isGoogleWorking)
+                    .disabled(isWorking || isGoogleWorking || isBiometricWorking)
 
                     if let errorMessage {
                         Text(errorMessage)
@@ -125,6 +162,9 @@ struct AuthStackView: View {
                 .padding(24)
             }
             .navigationBarHidden(true)
+            .onAppear {
+                syncRememberedCredentialState()
+            }
         }
     }
 
@@ -137,6 +177,7 @@ struct AuthStackView: View {
                 switch mode {
                 case .signIn:
                     _ = try await authService.signIn(email: email, password: password)
+                    updateSavedCredentialsAfterEmailAuth()
                 case .signUp:
                     _ = try await authService.signUp(email: email, password: password)
                 }
@@ -145,6 +186,27 @@ struct AuthStackView: View {
             }
 
             isWorking = false
+        }
+    }
+
+    private func signInWithBiometrics() {
+        isBiometricWorking = true
+        errorMessage = nil
+
+        Task {
+            do {
+                let credentials = try credentialStore.loadWithBiometrics(
+                    reason: "Use \(biometricDisplayName) to sign in to Nomi."
+                )
+                email = credentials.email
+                password = credentials.password
+                _ = try await authService.signIn(email: credentials.email, password: credentials.password)
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+
+            password = ""
+            isBiometricWorking = false
         }
     }
 
@@ -160,6 +222,46 @@ struct AuthStackView: View {
             }
 
             isGoogleWorking = false
+        }
+    }
+
+    private func updateRememberMePreference(_ isEnabled: Bool) {
+        guard mode == .signIn else { return }
+
+        if isEnabled {
+            credentialStore.isRememberMeEnabled = true
+            return
+        }
+
+        do {
+            try credentialStore.forgetCredentials()
+            syncRememberedCredentialState(shouldKeepTypedEmail: true)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func updateSavedCredentialsAfterEmailAuth() {
+        do {
+            if rememberMe {
+                try credentialStore.save(email: email, password: password)
+            } else {
+                try credentialStore.forgetCredentials()
+            }
+
+            syncRememberedCredentialState()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func syncRememberedCredentialState(shouldKeepTypedEmail: Bool = false) {
+        rememberMe = credentialStore.isRememberMeEnabled
+        hasRememberedCredentials = credentialStore.hasRememberedCredentials
+        biometricDisplayName = credentialStore.biometricDisplayName
+
+        if !shouldKeepTypedEmail, email.isEmpty {
+            email = credentialStore.rememberedEmail
         }
     }
 }

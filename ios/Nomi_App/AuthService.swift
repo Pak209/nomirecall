@@ -1,7 +1,11 @@
 import Foundation
 import FirebaseAuth
 import FirebaseCore
+import FirebaseFirestore
+import FirebaseStorage
 import GoogleSignIn
+import LocalAuthentication
+import Security
 import UIKit
 
 enum AuthServiceError: LocalizedError {
@@ -88,7 +92,297 @@ final class AuthService {
     func signOut() throws {
         guard FirebaseAppReady.isConfigured else { throw AuthServiceError.firebaseNotConfigured }
 
+        GIDSignIn.sharedInstance.signOut()
         try Auth.auth().signOut()
+    }
+}
+
+enum BiometricCredentialError: LocalizedError {
+    case credentialsUnavailable
+    case biometricsUnavailable
+    case passwordEncodingFailed
+
+    var errorDescription: String? {
+        switch self {
+        case .credentialsUnavailable:
+            return "No remembered Nomi login is available yet."
+        case .biometricsUnavailable:
+            return "Turn on Face ID or Touch ID for this iPhone before saving a remembered login."
+        case .passwordEncodingFailed:
+            return "Nomi could not save this password for Face ID."
+        }
+    }
+}
+
+struct RememberedCredentials {
+    let email: String
+    let password: String
+}
+
+final class BiometricCredentialStore {
+    private let service = "com.dkimoto.nomi.recall.auth"
+    private let account = "firebase-email-password"
+    private let rememberEmailKey = "auth.rememberedEmail"
+    private let rememberEnabledKey = "auth.rememberMeEnabled"
+
+    var isRememberMeEnabled: Bool {
+        get { UserDefaults.standard.bool(forKey: rememberEnabledKey) }
+        set { UserDefaults.standard.set(newValue, forKey: rememberEnabledKey) }
+    }
+
+    var rememberedEmail: String {
+        UserDefaults.standard.string(forKey: rememberEmailKey) ?? ""
+    }
+
+    var canUseBiometrics: Bool {
+        let context = LAContext()
+        return context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: nil)
+    }
+
+    var biometricDisplayName: String {
+        let context = LAContext()
+        _ = context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: nil)
+
+        switch context.biometryType {
+        case .faceID:
+            return "Face ID"
+        case .touchID:
+            return "Touch ID"
+        default:
+            return "biometrics"
+        }
+    }
+
+    var hasRememberedCredentials: Bool {
+        !rememberedEmail.isEmpty
+    }
+
+    func save(email: String, password: String) throws {
+        guard let passwordData = password.data(using: .utf8) else {
+            throw BiometricCredentialError.passwordEncodingFailed
+        }
+        guard canUseBiometrics else {
+            throw BiometricCredentialError.biometricsUnavailable
+        }
+
+        var accessControlError: Unmanaged<CFError>?
+        guard let accessControl = SecAccessControlCreateWithFlags(
+            nil,
+            kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly,
+            .biometryCurrentSet,
+            &accessControlError
+        ) else {
+            throw accessControlError?.takeRetainedValue() as Error? ?? BiometricCredentialError.biometricsUnavailable
+        }
+
+        try deleteCredentials()
+
+        var attributes = baseQuery()
+        attributes[kSecValueData as String] = passwordData
+        attributes[kSecAttrAccessControl as String] = accessControl
+
+        let status = SecItemAdd(attributes as CFDictionary, nil)
+        guard status == errSecSuccess else {
+            throw NSError(domain: NSOSStatusErrorDomain, code: Int(status))
+        }
+
+        UserDefaults.standard.set(email.trimmingCharacters(in: .whitespacesAndNewlines), forKey: rememberEmailKey)
+        isRememberMeEnabled = true
+    }
+
+    func loadWithBiometrics(reason: String) throws -> RememberedCredentials {
+        let email = rememberedEmail
+        guard !email.isEmpty else { throw BiometricCredentialError.credentialsUnavailable }
+
+        let context = LAContext()
+        context.localizedCancelTitle = "Cancel"
+        context.localizedReason = reason
+
+        var query = baseQuery()
+        query[kSecReturnData as String] = true
+        query[kSecMatchLimit as String] = kSecMatchLimitOne
+        query[kSecUseAuthenticationContext as String] = context
+
+        var item: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &item)
+        guard status == errSecSuccess, let passwordData = item as? Data, let password = String(data: passwordData, encoding: .utf8) else {
+            throw BiometricCredentialError.credentialsUnavailable
+        }
+
+        return RememberedCredentials(email: email, password: password)
+    }
+
+    func forgetCredentials() throws {
+        try deleteCredentials()
+        UserDefaults.standard.removeObject(forKey: rememberEmailKey)
+        isRememberMeEnabled = false
+    }
+
+    private func deleteCredentials() throws {
+        let status = SecItemDelete(baseQuery() as CFDictionary)
+        guard status == errSecSuccess || status == errSecItemNotFound else {
+            throw NSError(domain: NSOSStatusErrorDomain, code: Int(status))
+        }
+    }
+
+    private func baseQuery() -> [String: Any] {
+        [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account
+        ]
+    }
+}
+
+enum AccountDeletionError: LocalizedError {
+    case userNotSignedIn
+    case requiresRecentLogin
+
+    var errorDescription: String? {
+        switch self {
+        case .userNotSignedIn:
+            return "You need to be signed in before Nomi can delete your account."
+        case .requiresRecentLogin:
+            return "For your security, Firebase needs a fresh sign-in before deleting this account. Please sign out, sign back in, then delete your account again."
+        }
+    }
+}
+
+final class AccountDeletionService {
+    private let database = Firestore.firestore()
+    private let storage = Storage.storage()
+    private let userSubcollections = [
+        "dailyBriefs",
+        "memoryEdges",
+        "projects",
+        "sync",
+        "topicPages",
+        "usage"
+    ]
+    private let memorySubcollections = [
+        "chunks"
+    ]
+
+    func deleteCurrentUserAccount() async throws {
+        guard FirebaseAppReady.isConfigured else { throw AuthServiceError.firebaseNotConfigured }
+        guard let user = Auth.auth().currentUser else { throw AccountDeletionError.userNotSignedIn }
+
+        let userId = user.uid
+
+        guard !needsFreshSignIn(user) else {
+            throw AccountDeletionError.requiresRecentLogin
+        }
+
+        try await deleteStorageFiles(userId: userId)
+        try await deleteFirestoreData(userId: userId)
+
+        do {
+            try await user.delete()
+        } catch {
+            if isRecentLoginRequired(error) {
+                throw AccountDeletionError.requiresRecentLogin
+            }
+
+            throw AuthErrorFormatter.userFacingError(from: error)
+        }
+    }
+
+    private func deleteFirestoreData(userId: String) async throws {
+        let userDocument = database.collection("users").document(userId)
+        try await deleteMemories(userDocument.collection("memories"))
+        for collectionName in userSubcollections {
+            try await deleteCollection(userDocument.collection(collectionName))
+        }
+        try await userDocument.delete()
+    }
+
+    private func deleteMemories(_ collection: CollectionReference, batchSize: Int = 100) async throws {
+        while true {
+            let snapshot = try await collection.limit(to: batchSize).getDocuments()
+            guard !snapshot.documents.isEmpty else { return }
+
+            for document in snapshot.documents {
+                for subcollectionName in memorySubcollections {
+                    try await deleteCollection(document.reference.collection(subcollectionName))
+                }
+            }
+
+            let batch = database.batch()
+            snapshot.documents.forEach { batch.deleteDocument($0.reference) }
+            try await batch.commit()
+
+            if snapshot.documents.count < batchSize {
+                return
+            }
+        }
+    }
+
+    private func deleteCollection(_ collection: CollectionReference, batchSize: Int = 200) async throws {
+        while true {
+            let snapshot = try await collection.limit(to: batchSize).getDocuments()
+            guard !snapshot.documents.isEmpty else { return }
+
+            let batch = database.batch()
+            snapshot.documents.forEach { batch.deleteDocument($0.reference) }
+            try await batch.commit()
+
+            if snapshot.documents.count < batchSize {
+                return
+            }
+        }
+    }
+
+    private func deleteStorageFiles(userId: String) async throws {
+        let userStorageRoot = storage.reference()
+            .child("users")
+            .child(userId)
+
+        try await deleteStorageTree(userStorageRoot)
+    }
+
+    private func deleteStorageTree(_ reference: StorageReference) async throws {
+        let result: StorageListResult
+
+        do {
+            result = try await reference.listAll()
+        } catch {
+            if isStorageObjectNotFound(error) {
+                return
+            }
+
+            throw error
+        }
+
+        for item in result.items {
+            do {
+                try await item.delete()
+            } catch {
+                if !isStorageObjectNotFound(error) {
+                    throw error
+                }
+            }
+        }
+
+        for prefix in result.prefixes {
+            try await deleteStorageTree(prefix)
+        }
+    }
+
+    private func isRecentLoginRequired(_ error: Error) -> Bool {
+        let nsError = error as NSError
+        return AuthErrorCode(_bridgedNSError: nsError)?.code == .requiresRecentLogin
+            || nsError.code == AuthErrorCode.requiresRecentLogin.rawValue
+    }
+
+    private func isStorageObjectNotFound(_ error: Error) -> Bool {
+        let nsError = error as NSError
+        return nsError.domain == StorageErrorDomain
+            && nsError.code == StorageErrorCode.objectNotFound.rawValue
+    }
+
+    private func needsFreshSignIn(_ user: User) -> Bool {
+        guard let lastSignInDate = user.metadata.lastSignInDate else { return false }
+        return Date().timeIntervalSince(lastSignInDate) > 240
     }
 }
 
