@@ -6,6 +6,7 @@ import GoogleSignIn
 struct Nomi_AppApp: App {
     @StateObject private var appSession: AppSession
     @StateObject private var purchaseStore: PurchaseStore
+    @AppStorage("nomi.theme") private var theme = "light"
 
     init() {
         FirebaseBootstrap.configure()
@@ -19,6 +20,7 @@ struct Nomi_AppApp: App {
             ContentView()
                 .environmentObject(appSession)
                 .environmentObject(purchaseStore)
+                .preferredColorScheme(theme == "dark" ? .dark : .light)
                 .task(id: appSession.user?.uid) {
                     await purchaseStore.syncUser(userId: appSession.user?.uid)
                 }

@@ -3,30 +3,42 @@ import SwiftUI
 struct HomeView: View {
     @EnvironmentObject private var appSession: AppSession
     @EnvironmentObject private var memoryStore: MemoryStore
+    @EnvironmentObject private var intelligenceStore: IntelligenceStore
+    @Environment(\.colorScheme) private var colorScheme
     @State private var isShowingSummary = false
+    @State private var isShowingDailyBrief = false
+    @State private var isShowingAskNomi = false
+    @State private var isShowingDrawer = false
+    @State private var isShowingCaptureOptions = false
+    @State private var activeTab: HomeFeedTab = .forYou
 
     var onQuickCapture: () -> Void = {}
 
     private var recentMemories: [NomiMemory] {
-        Array(memoryStore.memories.prefix(5))
+        Array(memoryStore.memories.filter { !$0.isArchived }.prefix(24))
     }
 
     private var todayMemories: [NomiMemory] {
         memoryStore.memories.filter { Calendar.current.isDateInToday($0.createdAt) }
     }
 
+    private var visibleFeedMemories: [NomiMemory] {
+        switch activeTab {
+        case .forYou, .recent:
+            return recentMemories
+        case .projects:
+            return recentMemories.filter { !$0.projectIds.isEmpty || $0.category.localizedCaseInsensitiveContains("project") }
+        case .inbox:
+            return recentMemories.filter {
+                $0.sync?.importStatus == "pending" || $0.ai?.processingStatus == "pending" || $0.ai?.processingStatus == "processing"
+            }
+        }
+    }
+
     private var displayName: String {
         let raw = appSession.profile?.displayName ?? appSession.profile?.email?.split(separator: "@").first.map(String.init)
         let value = raw?.trimmingCharacters(in: .whitespacesAndNewlines)
-        return value?.isEmpty == false ? value! : "there"
-    }
-
-    private var topCategories: String {
-        let categories = Array(Set(memoryStore.memories.map(\.category)))
-            .filter { !$0.isEmpty }
-            .prefix(3)
-            .map { $0.lowercased() }
-        return categories.isEmpty ? "ideas, links, and inspiration" : categories.joined(separator: ", ")
+        return value?.isEmpty == false ? value! : "Nomi user"
     }
 
     var body: some View {
@@ -34,20 +46,90 @@ struct HomeView: View {
             ZStack {
                 NomiBackground()
 
-                ScrollView(showsIndicators: false) {
-                    VStack(alignment: .leading, spacing: 13) {
-                        header
-                        quickCapturePanel
-                        todaySection
-                        recentSection
+                VStack(spacing: 0) {
+                    header
+                    HomeFeedTabRow(activeTab: $activeTab)
+
+                    ScrollView(showsIndicators: false) {
+                        VStack(spacing: 13) {
+                            CompactNativeComposer(onQuickCapture: showCaptureOptions)
+
+                            if memoryStore.isLoading && visibleFeedMemories.isEmpty {
+                                ProgressView()
+                                    .tint(Color.nomiCoral)
+                                    .frame(maxWidth: .infinity, minHeight: 120)
+                                    .background(cardFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                            }
+
+                            if activeTab == .forYou && !memoryStore.memories.isEmpty {
+                                NomiSummaryFeedCard(
+                                    summaryText: summaryText,
+                                    onAsk: { isShowingAskNomi = true },
+                                    onOpen: { isShowingSummary = true }
+                                )
+                            }
+
+                            if visibleFeedMemories.isEmpty && !memoryStore.isLoading {
+                                HomeEmptyFeedState(tab: activeTab)
+                            } else {
+                                LazyVStack(spacing: 12) {
+                                    ForEach(visibleFeedMemories) { memory in
+                                        NavigationLink(value: memory) {
+                                            NativeMemoryFeedCard(
+                                                memory: memory,
+                                                onAsk: { isShowingAskNomi = true },
+                                                onConnect: { isShowingAskNomi = true }
+                                            )
+                                        }
+                                        .buttonStyle(.plain)
+                                    }
+                                }
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.top, 16)
+                        .padding(.bottom, 126)
                     }
-                    .padding(.horizontal, 18)
-                    .padding(.top, 16)
-                    .padding(.bottom, 104)
                 }
                 .refreshable {
                     await loadMemories()
                 }
+
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        Button {
+                            showCaptureOptions()
+                        } label: {
+                            Image(systemName: "plus")
+                                .font(.system(size: 32, weight: .light))
+                                .foregroundStyle(.white)
+                                .frame(width: 64, height: 64)
+                                .background(
+                                    LinearGradient(
+                                        colors: [Color.nomiOrange, Color.nomiCoral, Color.nomiPink],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    ),
+                                    in: Circle()
+                                )
+                                .shadow(color: Color.nomiPink.opacity(0.34), radius: 14, y: 8)
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.trailing, 22)
+                        .padding(.bottom, 98)
+                    }
+                }
+
+                NomiHomeSideDrawer(
+                    isPresented: $isShowingDrawer,
+                    displayName: displayName,
+                    handle: drawerHandle,
+                    memoryCount: memoryStore.memories.count,
+                    projectCount: memoryStore.memories.filter { !$0.projectIds.isEmpty }.count,
+                    onMenuTap: handleDrawerTap
+                )
             }
             .toolbar(.hidden, for: .navigationBar)
             .task {
@@ -64,296 +146,87 @@ struct HomeView: View {
                     topCategories: topCategories
                 )
             }
+            .sheet(isPresented: $isShowingDailyBrief) {
+                DailyBriefView()
+                    .environmentObject(memoryStore)
+                    .environmentObject(intelligenceStore)
+            }
+            .sheet(isPresented: $isShowingAskNomi) {
+                AskNomiSheet()
+                    .environmentObject(memoryStore)
+            }
+            .confirmationDialog("Capture to Nomi", isPresented: $isShowingCaptureOptions, titleVisibility: .visible) {
+                Button("Note") { onQuickCapture() }
+                Button("Link") { onQuickCapture() }
+                Button("Image") { onQuickCapture() }
+                Button("Voice") { onQuickCapture() }
+                Button("Import from X") { onQuickCapture() }
+                Button("Cancel", role: .cancel) {}
+            }
         }
     }
 
     private var header: some View {
-        HStack(alignment: .center, spacing: 12) {
-            HStack(spacing: 8) {
-                Text("\(greeting), \(displayName)")
-                    .font(.system(size: 23, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.nomiInk)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.62)
-
-                Image(systemName: "sun.max.fill")
-                    .font(.system(size: 17, weight: .bold))
-                    .foregroundStyle(Color.nomiOrange)
-                    .accessibilityHidden(true)
-            }
-
-            Spacer(minLength: 8)
-
-            ZStack(alignment: .bottomTrailing) {
-                Image("NomiMascot")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 34, height: 34)
-                    .padding(6)
-                    .background(Color(red: 1.0, green: 0.80, blue: 0.76), in: Circle())
-
-                Circle()
-                    .fill(Color(red: 0.16, green: 0.84, blue: 0.45))
-                    .frame(width: 11, height: 11)
-                    .overlay(Circle().stroke(.white, lineWidth: 2.5))
-            }
-        }
-    }
-
-    private var quickCapturePanel: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Quick capture anything...")
-                    .font(.system(size: 18, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.72)
-
-                Spacer()
-
-                Image(systemName: "sparkle")
-                    .font(.subheadline.weight(.bold))
-                    .foregroundStyle(.white.opacity(0.88))
-                    .frame(width: 34, height: 34)
-                    .background(.white.opacity(0.18), in: Circle())
-            }
-
-            HStack(spacing: 10) {
-                captureButton("Note", "note.text")
-                captureButton("Link", "link")
-                captureButton("Image", "photo")
-                captureButton("Voice", "mic")
-            }
-        }
-        .padding(14)
-        .background(
-            LinearGradient(
-                colors: [Color.nomiOrange, Color.nomiCoral, Color.nomiPink],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .shadow(color: Color.nomiPink.opacity(0.16), radius: 14, y: 7)
-    }
-
-    private func captureButton(_ title: String, _ icon: String) -> some View {
-        Button {
-            onQuickCapture()
-        } label: {
-            VStack(spacing: 7) {
-                Image(systemName: icon)
-                    .font(.system(size: 17, weight: .bold))
-                    .foregroundStyle(.white)
-                    .frame(width: 34, height: 34)
-                    .background(.white.opacity(0.18), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-
-                Text(title)
-                    .font(.caption.weight(.black))
-                    .foregroundStyle(.white)
-                }
-            .frame(maxWidth: .infinity)
-            .frame(height: 68)
-            .background(.white.opacity(0.13), in: RoundedRectangle(cornerRadius: 17, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 17, style: .continuous)
-                    .stroke(.white.opacity(0.24), lineWidth: 1.2)
-            )
-        }
-        .buttonStyle(.plain)
-    }
-
-    private var aiSummaryCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .top, spacing: 11) {
-                Image(systemName: "sparkle")
-                    .font(.system(size: 17, weight: .bold))
-                    .foregroundStyle(Color.nomiPurple)
-                    .frame(width: 38, height: 38)
-                    .background(.white, in: RoundedRectangle(cornerRadius: 13, style: .continuous))
-                    .shadow(color: Color.nomiPurple.opacity(0.10), radius: 6, y: 4)
-
-                VStack(alignment: .leading, spacing: 5) {
-                    HStack(spacing: 8) {
-                        Text("AI summary")
-                            .font(.system(size: 17, weight: .black, design: .rounded))
-                            .foregroundStyle(Color.nomiInk)
-
-                        Text("NEW")
-                            .font(.caption2.weight(.black))
-                            .foregroundStyle(Color.nomiPurple)
-                            .padding(.vertical, 3)
-                            .padding(.horizontal, 8)
-                            .background(.white.opacity(0.85), in: Capsule())
-                            .overlay(Capsule().stroke(Color.nomiPurple.opacity(0.24), lineWidth: 1))
-                    }
-
-                    Text(memoryStore.memories.isEmpty ? "Generated once you start capturing" : "Generated just now")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(Color.nomiMuted)
-                }
-
-                Spacer(minLength: 4)
-
-                Image("NomiMascot")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 30, height: 30)
-                    .opacity(0.92)
-            }
-
-            Text(summaryText)
-                .foregroundStyle(Color.nomiInk)
-                .font(.system(size: 14, weight: .regular, design: .rounded))
-                .lineSpacing(2)
-
+        HStack(spacing: 14) {
             Button {
-                isShowingSummary = true
-            } label: {
-                HStack(spacing: 10) {
-                    Text("View summary")
-                    Image(systemName: "chevron.right")
+                withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
+                    isShowingDrawer = true
                 }
-                .font(.caption.weight(.black))
-                .foregroundStyle(Color.nomiInk)
-                .padding(.vertical, 8)
-                .padding(.horizontal, 14)
-                .background(.white.opacity(0.88), in: Capsule())
-                .overlay(Capsule().stroke(Color.nomiPurple.opacity(0.18), lineWidth: 1))
+            } label: {
+                NomiAvatarView(
+                    name: appSession.profile?.displayName ?? appSession.profile?.email,
+                    imageURL: appSession.profile?.photoURL,
+                    size: 42,
+                    fontSize: 15
+                )
             }
             .buttonStyle(.plain)
-        }
-        .padding(14)
-        .background(
-            LinearGradient(
-                colors: [Color(red: 0.96, green: 0.89, blue: 1.0), Color(red: 1.0, green: 0.91, blue: 0.96)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            ),
-            in: RoundedRectangle(cornerRadius: 22, style: .continuous)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .stroke(Color.nomiPurple.opacity(0.17), lineWidth: 1.2)
-        )
-    }
+            .accessibilityLabel("Open profile menu")
 
-    private var todaySection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            sectionHeader("Today", trailing: todayMemories.isEmpty ? nil : "See all")
+            Spacer()
 
-            if memoryStore.isLoading && memoryStore.memories.isEmpty {
-                ProgressView()
-                    .frame(maxWidth: .infinity, minHeight: 116)
-                    .background(.white.opacity(0.68), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-            } else {
-                aiSummaryCard
-
-                if let resurfaced = memoryStore.memories.dropFirst(min(1, memoryStore.memories.count)).first ?? memoryStore.memories.first {
-                    NavigationLink(value: resurfaced) {
-                        resurfacedCard(resurfaced)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-        }
-    }
-
-    private func resurfacedCard(_ memory: NomiMemory) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(alignment: .firstTextBaseline) {
-                    Text("Resurfaced memory ✦")
-                        .font(.system(size: 16, weight: .black, design: .rounded))
-                        .foregroundStyle(Color.nomiInk)
-
-                    Spacer()
-
-                    Text(memory.displayDate)
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(Color.nomiMuted)
-                }
-
-                Text(memory.previewText.isEmpty ? memory.title : "\"\(memory.previewText)\"")
-                    .font(.system(size: 14, weight: .medium, design: .rounded))
-                    .italic()
-                    .foregroundStyle(Color.nomiInk)
-                    .lineLimit(3)
-
-                Text(memory.sourceUsername ?? memory.category)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(Color.nomiMuted)
-
-                Text("Open note  ›")
-                    .font(.caption.weight(.black))
-                    .foregroundStyle(.white)
-                    .padding(.vertical, 8)
-                    .padding(.horizontal, 14)
-                    .background(Color.nomiInk, in: Capsule())
-            }
-
-            Image("NomiMascot")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 46, height: 46)
-                .opacity(0.84)
-        }
-        .padding(16)
-        .background(Color(red: 1.0, green: 0.94, blue: 0.93).opacity(0.90), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .stroke(Color.nomiCoral.opacity(0.18), lineWidth: 1.2)
-        )
-    }
-
-    private var recentSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            sectionHeader("Recent captures", trailing: recentMemories.isEmpty ? nil : "See all")
-
-            if recentMemories.isEmpty {
-                EmptyStateView(
-                    title: "No memories yet",
-                    message: "Your real captures will show here as soon as you save them."
-                )
-                .background(.white.opacity(0.76), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-            } else {
-                VStack(spacing: 0) {
-                    ForEach(recentMemories) { memory in
-                        NavigationLink(value: memory) {
-                            RecentCaptureRow(memory: memory)
-                        }
-                        .buttonStyle(.plain)
-
-                        if memory.id != recentMemories.last?.id {
-                            Divider()
-                                .padding(.leading, 80)
-                        }
-                    }
-                }
-                .padding(.vertical, 6)
-                .background(.white.opacity(0.94), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
-                        .stroke(Color.black.opacity(0.05), lineWidth: 1)
-                )
-            }
-        }
-    }
-
-    private func sectionHeader(_ title: String, trailing: String?) -> some View {
-        HStack {
-            Text(title)
-                .font(.system(size: 19, weight: .black, design: .rounded))
+            Text("Home")
+                .font(.system(size: 29, weight: .black, design: .rounded))
                 .foregroundStyle(Color.nomiInk)
 
             Spacer()
 
-            if let trailing {
-                Text(trailing)
-                    .font(.subheadline.weight(.black))
-                    .foregroundStyle(Color.nomiCoral)
+            HStack(spacing: 12) {
+                Button {
+                    isShowingAskNomi = true
+                } label: {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 24, weight: .semibold))
+                        .foregroundStyle(Color.nomiInk)
+                        .frame(width: 34, height: 40)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Search memories")
+
+                Button {
+                    isShowingAskNomi = true
+                } label: {
+                    ZStack(alignment: .bottomTrailing) {
+                        Image("NomiMascot")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 36, height: 36)
+                            .padding(5)
+                            .background(avatarBackground, in: Circle())
+
+                        Circle()
+                            .fill(Color(red: 0.16, green: 0.84, blue: 0.45))
+                            .frame(width: 11, height: 11)
+                            .overlay(Circle().stroke(.white, lineWidth: 2.4))
+                    }
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Ask Nomi")
             }
         }
+        .padding(.horizontal, 18)
+        .padding(.top, 10)
+        .padding(.bottom, 6)
     }
 
     private var summaryText: String {
@@ -366,16 +239,611 @@ struct HomeView: View {
         return "You captured \(ideaCount) ideas and \(linkCount) links. Top themes: \(topCategories)."
     }
 
-    private var greeting: String {
-        let hour = Calendar.current.component(.hour, from: Date())
-        if hour < 12 { return "Good morning" }
-        if hour < 18 { return "Good afternoon" }
-        return "Good evening"
+    private var topCategories: String {
+        let categories = Array(Set(memoryStore.memories.map(\.category)))
+            .filter { !$0.isEmpty }
+            .prefix(3)
+            .map { $0.lowercased() }
+        return categories.isEmpty ? "ideas, links, and inspiration" : categories.joined(separator: ", ")
+    }
+
+    private var drawerHandle: String {
+        if let email = appSession.profile?.email, let prefix = email.split(separator: "@").first {
+            return "@\(prefix)"
+        }
+        return "@nomi"
+    }
+
+    private func showCaptureOptions() {
+        isShowingCaptureOptions = true
+    }
+
+    private func handleDrawerTap(_ item: NomiDrawerItem) {
+        switch item {
+        case .dailyBrief:
+            isShowingDailyBrief = true
+        }
+    }
+
+    private var cardFill: Color {
+        colorScheme == .dark ? .white.opacity(0.075) : .white.opacity(0.94)
+    }
+
+    private var cardStroke: Color {
+        colorScheme == .dark ? .white.opacity(0.10) : .black.opacity(0.05)
+    }
+
+    private var avatarBackground: Color {
+        colorScheme == .dark
+            ? Color(red: 0.18, green: 0.16, blue: 0.23)
+            : Color(red: 1.0, green: 0.80, blue: 0.76)
     }
 
     private func loadMemories() async {
         guard let userId = appSession.user?.uid else { return }
         await memoryStore.load(userId: userId)
+    }
+}
+
+private enum HomeFeedTab: String, CaseIterable, Identifiable {
+    case forYou = "For You"
+    case recent = "Recent"
+    case projects = "Projects"
+    case inbox = "Inbox"
+
+    var id: String { rawValue }
+}
+
+private struct HomeFeedTabRow: View {
+    @Binding var activeTab: HomeFeedTab
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(HomeFeedTab.allCases) { tab in
+                Button {
+                    withAnimation(.spring(response: 0.22, dampingFraction: 0.9)) {
+                        activeTab = tab
+                    }
+                } label: {
+                    VStack(spacing: 10) {
+                        Text(tab.rawValue)
+                            .font(.system(size: 16, weight: .black, design: .rounded))
+                            .foregroundStyle(activeTab == tab ? Color.nomiCoral : Color.nomiInk)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.78)
+
+                        Capsule()
+                            .fill(activeTab == tab ? Color.nomiCoral : .clear)
+                            .frame(width: 72, height: 3)
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.top, 8)
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(Color.nomiStroke)
+                .frame(height: 1)
+        }
+    }
+}
+
+private struct CompactNativeComposer: View {
+    let onQuickCapture: () -> Void
+
+    var body: some View {
+        VStack(spacing: 12) {
+            HStack(spacing: 11) {
+                Image("NomiMascot")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 34, height: 34)
+                    .padding(5)
+                    .background(Color.nomiPink.opacity(0.12), in: Circle())
+
+                Text("What do you want to remember?")
+                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                    .foregroundStyle(Color.nomiMuted)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            HStack(spacing: 8) {
+                composerButton("Note", "note.text")
+                composerButton("Link", "link")
+                composerButton("Image", "photo")
+                composerButton("Voice", "mic")
+            }
+        }
+        .padding(12)
+        .background(Color.nomiCardStrong, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(Color.nomiCoral.opacity(0.18), lineWidth: 1.2)
+        )
+    }
+
+    private func composerButton(_ label: String, _ icon: String) -> some View {
+        Button {
+            onQuickCapture()
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(Color.nomiCoral)
+
+                Text(label)
+                    .font(.system(size: 13, weight: .black, design: .rounded))
+                    .foregroundStyle(Color.nomiInk)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.78)
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 42)
+            .background(Color.nomiField, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(Color.nomiCoral.opacity(0.14), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+private struct NomiSummaryFeedCard: View {
+    let summaryText: String
+    let onAsk: () -> Void
+    let onOpen: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 10) {
+                Image("NomiMascot")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 38, height: 38)
+                    .padding(4)
+                    .background(Color.nomiPink.opacity(0.12), in: Circle())
+
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("Nomi · For You")
+                        .font(.system(size: 14, weight: .black, design: .rounded))
+                        .foregroundStyle(Color.nomiInk)
+
+                    Text("Daily memory recap")
+                        .font(.system(size: 16, weight: .semibold, design: .rounded))
+                        .foregroundStyle(Color.nomiInk)
+                }
+
+                Spacer()
+
+                Image(systemName: "ellipsis")
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(Color.nomiMuted)
+            }
+
+            VStack(alignment: .leading, spacing: 5) {
+                Label("Nomi Summary", systemImage: "sparkles")
+                    .font(.caption.weight(.black))
+                    .foregroundStyle(Color.nomiInk)
+
+                Text(summaryText)
+                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                    .foregroundStyle(Color.nomiMuted)
+                    .lineLimit(3)
+            }
+            .padding(12)
+            .background(Color.nomiCoral.opacity(0.075), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+
+            feedActionRow(onAsk: onAsk, onConnect: onAsk, onOpen: onOpen, isFavorite: false)
+        }
+        .padding(12)
+        .background(Color.nomiCardStrong, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(Color.nomiStroke, lineWidth: 1)
+        )
+    }
+}
+
+private struct NativeMemoryFeedCard: View {
+    let memory: NomiMemory
+    let onAsk: () -> Void
+    let onConnect: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: sourceIcon)
+                    .font(.system(size: 21, weight: .bold))
+                    .foregroundStyle(Color.nomiCoral)
+                    .frame(width: 40, height: 40)
+                    .background(Color.nomiCoral.opacity(0.10), in: Circle())
+
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(sourceLine)
+                        .font(.system(size: 14, weight: .black, design: .rounded))
+                        .foregroundStyle(Color.nomiInk)
+                        .lineLimit(1)
+
+                    Text(previewText)
+                        .font(.system(size: 16, weight: .semibold, design: .rounded))
+                        .foregroundStyle(Color.nomiInk)
+                        .lineLimit(4)
+                }
+
+                Spacer(minLength: 4)
+
+                Image(systemName: "ellipsis")
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(Color.nomiMuted)
+            }
+
+            if let summary = nomiSummary {
+                VStack(alignment: .leading, spacing: 5) {
+                    Label("Nomi Summary", systemImage: "sparkles")
+                        .font(.caption.weight(.black))
+                        .foregroundStyle(Color.nomiInk)
+
+                    Text(summary)
+                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        .foregroundStyle(Color.nomiMuted)
+                        .lineLimit(3)
+                }
+                .padding(.vertical, 10)
+                .padding(.horizontal, 12)
+                .background(Color.nomiCoral.opacity(0.075), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .padding(.leading, 50)
+            }
+
+            if !tags.isEmpty {
+                HStack(spacing: 7) {
+                    ForEach(tags, id: \.self) { tag in
+                        Text("#\(tag.replacingOccurrences(of: "#", with: ""))")
+                            .font(.caption.weight(.black))
+                            .foregroundStyle(Color.nomiCoral)
+                            .lineLimit(1)
+                            .padding(.vertical, 4)
+                            .padding(.horizontal, 9)
+                            .background(Color.nomiCoral.opacity(0.09), in: Capsule())
+                    }
+                }
+                .padding(.leading, 50)
+            }
+
+            feedActionRow(onAsk: onAsk, onConnect: onConnect, onOpen: {}, isFavorite: memory.isFavorite)
+                .padding(.leading, 50)
+        }
+        .padding(12)
+        .background(Color.nomiCardStrong, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(Color.nomiStroke, lineWidth: 1)
+        )
+    }
+
+    private var sourceLine: String {
+        let time = memory.displayDate
+        if let username = memory.sourceUsername?.trimmingCharacters(in: .whitespacesAndNewlines), !username.isEmpty {
+            return "@\(username.replacingOccurrences(of: "@", with: "")) on X · \(time)"
+        }
+        if let author = memory.author?.username, !author.isEmpty {
+            return "@\(author.replacingOccurrences(of: "@", with: "")) on X · \(time)"
+        }
+        if let host = memory.sourceURL?.host ?? memory.sourceUrl?.host {
+            return "Link · \(host.replacingOccurrences(of: "www.", with: "")) · \(time)"
+        }
+        return "\(memory.displayType) · \(time)"
+    }
+
+    private var previewText: String {
+        let values = [memory.title, memory.rawText, memory.cleanText ?? "", memory.content, memory.summary ?? ""]
+        return values.first { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty } ?? "Saved memory"
+    }
+
+    private var nomiSummary: String? {
+        let value = memory.summary ?? memory.ai?.summary
+        guard let value, !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        return value
+    }
+
+    private var tags: [String] {
+        let candidates = memory.tags.isEmpty ? (memory.ai?.tags.isEmpty == false ? memory.ai?.tags ?? [] : memory.concepts) : memory.tags
+        let values = ([memory.category] + candidates)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+            .filter { !$0.isEmpty && $0 != "general" }
+        return Array(Set(values)).sorted().prefix(3).map { $0 }
+    }
+
+    private var sourceIcon: String {
+        let source = "\(memory.sourceType) \(memory.type)".lowercased()
+        if source.contains("tweet") || source.contains("x") { return "bubble.left.and.bubble.right.fill" }
+        if source.contains("link") || source.contains("url") { return "link" }
+        if source.contains("image") { return "photo" }
+        if source.contains("voice") { return "mic" }
+        return "note.text"
+    }
+}
+
+private func feedActionRow(onAsk: @escaping () -> Void, onConnect: @escaping () -> Void, onOpen: @escaping () -> Void, isFavorite: Bool) -> some View {
+    HStack(spacing: 0) {
+        feedAction("Ask", "bubble.left", action: onAsk)
+        feedAction("Connect", "arrow.triangle.2.circlepath", action: onConnect)
+        feedAction("Open", "arrow.up.forward.square", action: onOpen)
+
+        Spacer(minLength: 8)
+
+        Image(systemName: isFavorite ? "bookmark.fill" : "bookmark")
+            .font(.system(size: 17, weight: .semibold))
+            .foregroundStyle(Color.nomiMuted)
+            .frame(width: 32, height: 28)
+
+        Image(systemName: "ellipsis")
+            .font(.system(size: 17, weight: .bold))
+            .foregroundStyle(Color.nomiMuted)
+            .frame(width: 32, height: 28)
+    }
+}
+
+private func feedAction(_ label: String, _ icon: String, action: @escaping () -> Void) -> some View {
+    Button(action: action) {
+        HStack(spacing: 5) {
+            Image(systemName: icon)
+            Text(label)
+        }
+        .font(.caption.weight(.bold))
+        .foregroundStyle(Color.nomiMuted)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(height: 28)
+    }
+    .buttonStyle(.plain)
+}
+
+private struct HomeEmptyFeedState: View {
+    let tab: HomeFeedTab
+
+    var body: some View {
+        VStack(spacing: 10) {
+            Image(systemName: tab == .inbox ? "tray" : "sparkles")
+                .font(.title3.bold())
+                .foregroundStyle(Color.nomiCoral)
+                .frame(width: 48, height: 48)
+                .background(Color.nomiCoral.opacity(0.10), in: Circle())
+
+            Text(title)
+                .font(.headline.weight(.black))
+                .foregroundStyle(Color.nomiInk)
+
+            Text(bodyText)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Color.nomiMuted)
+                .multilineTextAlignment(.center)
+                .lineLimit(3)
+        }
+        .padding(.vertical, 28)
+        .padding(.horizontal, 20)
+        .frame(maxWidth: .infinity)
+        .background(Color.nomiCardStrong, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(Color.nomiStroke, lineWidth: 1)
+        )
+    }
+
+    private var title: String {
+        switch tab {
+        case .forYou: return "Your memory feed is ready"
+        case .recent: return "No recent captures yet"
+        case .projects: return "No project-linked memories"
+        case .inbox: return "Inbox is clear"
+        }
+    }
+
+    private var bodyText: String {
+        switch tab {
+        case .forYou: return "Save a note, link, image, or voice thought and Nomi will shape it into a calm personal feed."
+        case .recent: return "Your newest memories will land here as compact feed cards."
+        case .projects: return "Project-connected memories will appear here when available."
+        case .inbox: return "Unprocessed captures will show here when Nomi needs your attention."
+        }
+    }
+}
+
+private enum NomiDrawerItem: CaseIterable, Identifiable {
+    case dailyBrief
+
+    var id: Self { self }
+
+    var title: String {
+        switch self {
+        case .dailyBrief: return "Daily Brief"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .dailyBrief: return "sun.max"
+        }
+    }
+
+    var hasDividerBefore: Bool {
+        false
+    }
+}
+
+private struct NomiHomeSideDrawer: View {
+    @Binding var isPresented: Bool
+    let displayName: String
+    let handle: String
+    let memoryCount: Int
+    let projectCount: Int
+    let onMenuTap: (NomiDrawerItem) -> Void
+
+    var body: some View {
+        GeometryReader { proxy in
+            let drawerWidth = min(proxy.size.width * 0.84, 336)
+
+            ZStack(alignment: .leading) {
+                if isPresented {
+                    Color.black.opacity(0.42)
+                        .ignoresSafeArea()
+                        .onTapGesture {
+                            withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
+                                isPresented = false
+                            }
+                        }
+                        .transition(.opacity)
+                }
+
+                drawerContent
+                    .frame(width: drawerWidth)
+                    .frame(maxHeight: .infinity)
+                    .background(Color.nomiCardStrong)
+                    .clipShape(UnevenRoundedRectangle(bottomTrailingRadius: 26, topTrailingRadius: 26))
+                    .shadow(color: .black.opacity(0.20), radius: 22, x: 10, y: 0)
+                    .offset(x: isPresented ? 0 : -drawerWidth - 24)
+                    .gesture(
+                        DragGesture()
+                            .onEnded { value in
+                                if value.translation.width < -72 {
+                                    withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
+                                        isPresented = false
+                                    }
+                                }
+                            }
+                    )
+            }
+            .animation(.spring(response: 0.32, dampingFraction: 0.86), value: isPresented)
+        }
+        .allowsHitTesting(isPresented)
+    }
+
+    private var drawerContent: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            HStack(spacing: 12) {
+                NomiAvatarView(name: displayName, imageURL: nil, size: 58, fontSize: 20)
+
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(displayName)
+                        .font(.system(size: 19, weight: .black, design: .rounded))
+                        .foregroundStyle(Color.nomiInk)
+                        .lineLimit(1)
+
+                    Text(handle)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Color.nomiMuted)
+                        .lineLimit(1)
+                }
+
+                Spacer()
+
+                Image("NomiMascot")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 44, height: 44)
+                    .padding(5)
+                    .background(Color.nomiPink.opacity(0.12), in: Circle())
+            }
+            .padding(.top, 58)
+
+            HStack(spacing: 0) {
+                drawerStat(memoryCount, "Memories")
+                Rectangle()
+                    .fill(Color.nomiStroke)
+                    .frame(width: 1, height: 34)
+                drawerStat(projectCount, "Projects")
+            }
+            .frame(height: 70)
+            .background(Color.nomiCoral.opacity(0.065), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).stroke(Color.nomiCoral.opacity(0.13), lineWidth: 1))
+
+            VStack(spacing: 0) {
+                ForEach(NomiDrawerItem.allCases) { item in
+                    if item.hasDividerBefore {
+                        Divider()
+                            .padding(.vertical, 9)
+                    }
+
+                    Button {
+                        withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
+                            isPresented = false
+                        }
+                        onMenuTap(item)
+                    } label: {
+                        HStack(spacing: 16) {
+                            Image(systemName: item.icon)
+                                .font(.system(size: 22, weight: .semibold))
+                                .foregroundStyle(Color.nomiOrange)
+                                .frame(width: 28)
+
+                            Text(item.title)
+                                .font(.system(size: 17, weight: .bold, design: .rounded))
+                                .foregroundStyle(Color.nomiInk)
+
+                            Spacer()
+
+                            Image(systemName: "chevron.right")
+                                .font(.caption.weight(.black))
+                                .foregroundStyle(Color.nomiMuted)
+                        }
+                        .frame(height: 52)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            Spacer(minLength: 8)
+
+            Button {
+                withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
+                    isPresented = false
+                }
+                onMenuTap(.dailyBrief)
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "sun.max.fill")
+                        .font(.title3.weight(.bold))
+                        .foregroundStyle(.white)
+                        .frame(width: 46, height: 46)
+                        .background(
+                            LinearGradient(colors: [Color.nomiOrange, Color.nomiPink], startPoint: .topLeading, endPoint: .bottomTrailing),
+                            in: Circle()
+                        )
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Daily Brief")
+                            .font(.headline.weight(.black))
+                        Text("Generate a grounded recap from your saved memories.")
+                            .font(.caption.weight(.bold))
+                            .lineLimit(2)
+                    }
+
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.black))
+                }
+                .foregroundStyle(Color.nomiPink)
+                .padding(14)
+                .background(Color.nomiPink.opacity(0.10), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(Color.nomiPink.opacity(0.18), lineWidth: 1))
+            }
+            .buttonStyle(.plain)
+            .padding(.bottom, 18)
+        }
+        .padding(.horizontal, 20)
+    }
+
+    private func drawerStat(_ value: Int, _ label: String) -> some View {
+        VStack(spacing: 2) {
+            Text(value.formatted())
+                .font(.system(size: 20, weight: .black, design: .rounded))
+                .foregroundStyle(Color.nomiInk)
+            Text(label)
+                .font(.caption.weight(.bold))
+                .foregroundStyle(Color.nomiMuted)
+        }
+        .frame(maxWidth: .infinity)
     }
 }
 
@@ -544,6 +1012,366 @@ private struct DailySummaryView: View {
     }
 }
 
+struct AskNomiSheet: View {
+    @EnvironmentObject private var appSession: AppSession
+    @EnvironmentObject private var memoryStore: MemoryStore
+    @Environment(\.dismiss) private var dismiss
+
+    let project: NomiProject?
+
+    @State private var question = ""
+    @State private var response: BrainQueryResponse?
+    @State private var errorMessage: String?
+    @State private var isLoading = false
+    @State private var openingSourceMemoryId: String?
+    @State private var sourceOpenErrorMessage: String?
+    @State private var openedSourceMemory: NomiMemory?
+
+    private let backendService = XBackendService()
+
+    init(project: NomiProject? = nil) {
+        self.project = project
+    }
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                NomiBackground()
+
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 16) {
+                        header
+                        questionBox
+                        resultContent
+                    }
+                    .padding(18)
+                    .padding(.bottom, 28)
+                }
+            }
+            .navigationBarHidden(true)
+            .navigationDestination(for: NomiMemory.self) { memory in
+                MemoryDetailView(memory: memory)
+            }
+            .navigationDestination(item: $openedSourceMemory) { memory in
+                MemoryDetailView(memory: memory)
+            }
+            .alert("Source unavailable", isPresented: sourceOpenErrorBinding) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(sourceOpenErrorMessage ?? "Nomi couldn’t open that memory. It may have been deleted or is no longer available.")
+            }
+        }
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+    }
+
+    private var header: some View {
+        HStack(spacing: 12) {
+            Image("NomiMascot")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 42, height: 42)
+                .padding(8)
+                .background(Color.nomiPink.opacity(0.18), in: Circle())
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Ask Nomi")
+                    .font(.system(size: 26, weight: .black, design: .rounded))
+                    .foregroundStyle(Color.nomiInk)
+
+                Text(projectSubtitle)
+                    .font(.subheadline)
+                    .foregroundStyle(Color.nomiMuted)
+                    .lineLimit(2)
+            }
+
+            Spacer()
+
+            Button {
+                dismiss()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.headline.weight(.bold))
+                    .foregroundStyle(Color.nomiMuted)
+                    .frame(width: 40, height: 40)
+                    .background(Color.nomiCardStrong, in: Circle())
+                    .overlay(Circle().stroke(Color.nomiStroke, lineWidth: 1))
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private var questionBox: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            TextField("What do I know about...", text: $question, axis: .vertical)
+                .lineLimit(2...5)
+                .textInputAutocapitalization(.sentences)
+                .foregroundStyle(Color.nomiInk)
+                .tint(Color.nomiPink)
+                .padding(14)
+                .background(Color.nomiField, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(Color.nomiStroke, lineWidth: 1)
+                )
+
+            Button {
+                Task { await askNomi() }
+            } label: {
+                HStack {
+                    if isLoading {
+                        ProgressView()
+                            .tint(.white)
+                    }
+
+                    Text(isLoading ? "Asking Nomi..." : "Ask Nomi")
+                    Image(systemName: "sparkles")
+                }
+                .font(.headline.weight(.black))
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .background(canAsk ? Color.nomiPink : Color.nomiMuted.opacity(0.45), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            }
+            .disabled(!canAsk)
+            .buttonStyle(.plain)
+        }
+        .padding(14)
+        .background(Color.nomiCardStrong, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .stroke(Color.nomiStroke, lineWidth: 1)
+        )
+    }
+
+    @ViewBuilder
+    private var resultContent: some View {
+        if let errorMessage {
+            Text(errorMessage)
+                .font(.subheadline)
+                .foregroundStyle(Color.nomiCoral)
+                .padding(14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.nomiCardStrong, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        } else if let response {
+            answerCard(response)
+        } else {
+            EmptyStateView(
+                title: "Ask from your library",
+                message: "Nomi will answer only from memories you have saved."
+            )
+            .background(Color.nomiCardStrong, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        }
+    }
+
+    private func answerCard(_ response: BrainQueryResponse) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Text("Answer")
+                    .font(.headline.bold())
+                    .foregroundStyle(Color.nomiInk)
+
+                Spacer()
+
+                Text(response.confidence)
+                    .font(.caption.weight(.black))
+                    .foregroundStyle(response.confidence.caseInsensitiveCompare("low") == .orderedSame ? Color.nomiOrange : Color.nomiPink)
+                    .padding(.vertical, 6)
+                    .padding(.horizontal, 9)
+                    .background(Color.nomiField, in: Capsule())
+            }
+
+            if response.sources.isEmpty {
+                Text(noContextMessage)
+                    .font(.subheadline)
+                    .foregroundStyle(Color.nomiMuted)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                scopeLabel(for: response)
+
+                Text(response.answer)
+                    .font(.body)
+                    .foregroundStyle(Color.nomiInk)
+                    .lineSpacing(3)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                if response.confidence.caseInsensitiveCompare("low") == .orderedSame {
+                    Label("Low confidence — based only on a few matching memories.", systemImage: "exclamationmark.triangle")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Color.nomiOrange)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Sources")
+                        .font(.caption.weight(.black))
+                        .foregroundStyle(Color.nomiMuted)
+                        .textCase(.uppercase)
+
+                    ForEach(response.sources) { source in
+                        sourceCard(source)
+                    }
+                }
+            }
+        }
+        .padding(14)
+        .background(Color.nomiCardStrong, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .stroke(Color.nomiStroke, lineWidth: 1)
+        )
+    }
+
+    private func scopeLabel(for response: BrainQueryResponse) -> some View {
+        Text(scopeTitle(for: response))
+            .font(.caption.weight(.black))
+            .foregroundStyle(Color.nomiMuted)
+            .padding(.vertical, 5)
+            .padding(.horizontal, 8)
+            .background(Color.nomiField, in: Capsule())
+            .overlay(Capsule().stroke(Color.nomiStroke, lineWidth: 1))
+    }
+
+    private func scopeTitle(for response: BrainQueryResponse) -> String {
+        if response.scope?.type == "project" || project != nil {
+            let responseTitle = response.scope?.projectTitle?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let title = responseTitle?.isEmpty == false ? responseTitle : project?.name
+            return "Project: \(title ?? "Selected project")"
+        }
+        return "Global memory search"
+    }
+
+    private func sourceCard(_ source: BrainQuerySource) -> some View {
+        let matchedMemory = memoryStore.memories.first { $0.id == source.memoryId }
+        let isLoading = openingSourceMemoryId == source.memoryId
+
+        return Group {
+            if let matchedMemory {
+                NavigationLink(value: matchedMemory) {
+                    sourceCardContent(source, isOpenable: true, isLoading: false)
+                }
+                .buttonStyle(.plain)
+            } else {
+                Button {
+                    Task { await openSource(source) }
+                } label: {
+                    sourceCardContent(source, isOpenable: true, isLoading: isLoading)
+                }
+                .disabled(isLoading)
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private func sourceCardContent(_ source: BrainQuerySource, isOpenable: Bool, isLoading: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(source.title)
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(Color.nomiInk)
+                    .lineLimit(1)
+
+                Spacer()
+
+                if isLoading {
+                    ProgressView()
+                        .controlSize(.mini)
+                } else if isOpenable {
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(Color.nomiMuted)
+                }
+            }
+
+            if let relevanceReason = source.relevanceReason, !relevanceReason.isEmpty {
+                Text(relevanceReason)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Color.nomiPink)
+                    .lineLimit(1)
+            }
+
+            Text(source.snippet)
+                .font(.caption)
+                .foregroundStyle(Color.nomiMuted)
+                .lineLimit(3)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if let date = source.capturedAt ?? source.createdAt {
+                Text(NomiFormatters.shortDate.string(from: date))
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(Color.nomiMuted)
+            }
+        }
+        .padding(11)
+        .background(Color.nomiField, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(Color.nomiStroke, lineWidth: 1)
+        )
+    }
+
+    private var canAsk: Bool {
+        !isLoading && !question.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var projectSubtitle: String {
+        if let project {
+            return "Ask about memories linked to \(project.name)."
+        }
+        return "Ask a question about your saved memories."
+    }
+
+    private var noContextMessage: String {
+        if project != nil {
+            return "Nomi couldn’t find enough saved context in this project to answer that yet."
+        }
+        return "Nomi couldn’t find enough saved context to answer that yet."
+    }
+
+    private var sourceOpenErrorBinding: Binding<Bool> {
+        Binding(
+            get: { sourceOpenErrorMessage != nil },
+            set: { if !$0 { sourceOpenErrorMessage = nil } }
+        )
+    }
+
+    private func askNomi() async {
+        let trimmed = question.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+
+        do {
+            response = try await backendService.askMemories(question: trimmed, projectId: project?.id, limit: 6)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func openSource(_ source: BrainQuerySource) async {
+        guard openingSourceMemoryId == nil else { return }
+        guard let userId = appSession.user?.uid else {
+            sourceOpenErrorMessage = "Sign in before opening saved memories."
+            return
+        }
+
+        openingSourceMemoryId = source.memoryId
+        defer { openingSourceMemoryId = nil }
+
+        do {
+            guard let memory = try await memoryStore.memory(id: source.memoryId, userId: userId) else {
+                sourceOpenErrorMessage = "Nomi couldn’t open that memory. It may have been deleted or is no longer available."
+                return
+            }
+            openedSourceMemory = memory
+        } catch {
+            sourceOpenErrorMessage = "Nomi couldn’t open that memory. It may have been deleted or is no longer available."
+        }
+    }
+}
+
 private struct SummaryStatCard: View {
     let title: String
     let value: String
@@ -570,6 +1398,8 @@ private struct SummaryStatCard: View {
 }
 
 private struct RecentCaptureRow: View {
+    @Environment(\.colorScheme) private var colorScheme
+
     let memory: NomiMemory
 
     var body: some View {
@@ -578,7 +1408,7 @@ private struct RecentCaptureRow: View {
                 .font(.system(size: 16, weight: .bold))
                 .foregroundStyle(Color.nomiCoral)
                 .frame(width: 40, height: 40)
-                .background(Color(red: 1.0, green: 0.91, blue: 0.86), in: RoundedRectangle(cornerRadius: 13, style: .continuous))
+                .background(iconFill, in: RoundedRectangle(cornerRadius: 13, style: .continuous))
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(memory.title)
@@ -598,11 +1428,19 @@ private struct RecentCaptureRow: View {
                 .foregroundStyle(Color.nomiCoral)
                 .padding(.vertical, 6)
                 .padding(.horizontal, 10)
-                .background(Color(red: 1.0, green: 0.91, blue: 0.87), in: Capsule())
+                .background(tagFill, in: Capsule())
                 .lineLimit(1)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 9)
+    }
+
+    private var iconFill: Color {
+        colorScheme == .dark ? Color.nomiCoral.opacity(0.18) : Color(red: 1.0, green: 0.91, blue: 0.86)
+    }
+
+    private var tagFill: Color {
+        colorScheme == .dark ? Color.nomiCoral.opacity(0.14) : Color(red: 1.0, green: 0.91, blue: 0.87)
     }
 
     private var icon: String {
