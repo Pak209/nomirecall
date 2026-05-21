@@ -201,12 +201,11 @@ struct QuickCaptureView: View {
     }
 
     private var sourceURL: URL? {
-        URL(string: link.trimmingCharacters(in: .whitespacesAndNewlines))
+        Self.normalizedWebURL(from: link)
     }
 
     private var isXPostLink: Bool {
-        let value = link.lowercased()
-        return value.contains("x.com/") || value.contains("twitter.com/")
+        Self.xPostURL(from: link) != nil
     }
 
     private var errorBinding: Binding<Bool> {
@@ -288,9 +287,11 @@ struct QuickCaptureView: View {
         defer { isImportingXPost = false }
 
         do {
-            let response = try await xBackendService.previewPost(url: link)
+            let previewURL = Self.xPostURL(from: link)?.absoluteString ?? link
+            let response = try await xBackendService.previewPost(url: previewURL)
             guard let post = response.post else { return }
 
+            link = post.url?.absoluteString ?? previewURL
             title = post.title ?? title
             content = post.text ?? content
             category = post.category ?? category
@@ -326,6 +327,45 @@ struct QuickCaptureView: View {
         }
 
         pendingSharePayload = nil
+    }
+
+    private static func normalizedWebURL(from value: String) -> URL? {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        if let url = URL(string: trimmed), url.scheme != nil {
+            return url
+        }
+
+        return URL(string: "https://\(trimmed)")
+    }
+
+    private static func xPostURL(from value: String) -> URL? {
+        guard let url = normalizedWebURL(from: value),
+              let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              let host = components.host?.lowercased(),
+              isXHost(host) else {
+            return nil
+        }
+
+        let pathParts = components.path
+            .split(separator: "/")
+            .map(String.init)
+
+        guard let statusIndex = pathParts.firstIndex(where: { $0.lowercased() == "status" }),
+              pathParts.indices.contains(statusIndex + 1),
+              pathParts[statusIndex + 1].allSatisfy(\.isNumber) else {
+            return nil
+        }
+
+        return url
+    }
+
+    private static func isXHost(_ host: String) -> Bool {
+        host == "x.com" ||
+            host.hasSuffix(".x.com") ||
+            host == "twitter.com" ||
+            host.hasSuffix(".twitter.com")
     }
 }
 

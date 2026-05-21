@@ -13,13 +13,28 @@ struct MemoryCardView: View {
 
                 Spacer(minLength: 12)
 
-                Text(memory.category)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.pink)
-                    .padding(.vertical, 6)
-                    .padding(.horizontal, 10)
-                    .background(.pink.opacity(0.1))
-                    .clipShape(Capsule())
+                HStack(spacing: 7) {
+                    if memory.isFavorite {
+                        Image(systemName: "heart.fill")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(Color.nomiPink)
+                    }
+
+                    if memory.isArchived {
+                        Image(systemName: "archivebox.fill")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(Color.nomiMuted)
+                    }
+
+                    Text(memory.category.isEmpty ? "General" : memory.category)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.pink)
+                        .lineLimit(1)
+                }
+                .padding(.vertical, 6)
+                .padding(.horizontal, 10)
+                .background(.pink.opacity(0.1))
+                .clipShape(Capsule())
             }
 
             Text("\(memory.displayType) · \(memory.displayDate)")
@@ -49,6 +64,17 @@ struct MemoryCardView: View {
                 .foregroundStyle(.secondary)
             }
 
+            if !memory.concepts.isEmpty || !memory.entities.isEmpty {
+                HStack(spacing: 8) {
+                    ForEach(Array((memory.concepts + memory.entities).prefix(3)), id: \.self) { value in
+                        Text(value)
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(Color.nomiMuted)
+                            .lineLimit(1)
+                    }
+                }
+            }
+
             if !memory.tags.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
@@ -62,11 +88,11 @@ struct MemoryCardView: View {
             }
         }
         .padding(16)
-        .background(.white.opacity(0.92))
+        .background(Color.nomiCardStrong)
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(Color.black.opacity(0.06), lineWidth: 1)
+                .stroke(Color.nomiStroke, lineWidth: 1)
         )
     }
 }
