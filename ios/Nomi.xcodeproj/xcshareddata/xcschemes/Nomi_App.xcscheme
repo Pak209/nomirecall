@@ -59,6 +59,13 @@
             ReferencedContainer = "container:Nomi.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
+      <EnvironmentVariables>
+         <EnvironmentVariable
+            key = "NOMI_BACKEND_API_BASE_URL"
+            value = "http://localhost:3000/api"
+            isEnabled = "YES">
+         </EnvironmentVariable>
+      </EnvironmentVariables>
    </LaunchAction>
    <ProfileAction
       buildConfiguration = "Release"

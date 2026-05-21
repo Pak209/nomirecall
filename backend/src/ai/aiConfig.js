@@ -1,6 +1,7 @@
 const DEFAULT_PROCESSING_VERSION = 'v1';
 const DEFAULT_SMALL_MODEL = 'gpt-4o-mini';
 const DEFAULT_SUMMARY_MODEL = 'gpt-4o-mini';
+const DEFAULT_EMBEDDING_MODEL = 'text-embedding-3-small';
 const DEFAULT_FREE_DAILY_LIMIT = 10;
 const DEFAULT_EARLY_ACCESS_DAILY_LIMIT = 50;
 const DEFAULT_ADMIN_DAILY_LIMIT = 150;
@@ -15,6 +16,7 @@ function aiConfig() {
   const processingVersion = process.env.NOMI_AI_PROCESSING_VERSION || DEFAULT_PROCESSING_VERSION;
   const model = process.env.NOMI_AI_MODEL_SMALL || DEFAULT_SMALL_MODEL;
   const summaryModel = process.env.NOMI_AI_MODEL_SUMMARY || DEFAULT_SUMMARY_MODEL;
+  const embeddingModel = process.env.NOMI_AI_EMBEDDING_MODEL || DEFAULT_EMBEDDING_MODEL;
   const minProcessChars = Number(process.env.NOMI_AI_MIN_PROCESS_CHARS || 40);
   const maxInputChars = Number(process.env.NOMI_AI_MAX_INPUT_CHARS || 6000);
   const defaultBatchLimit = Number(process.env.NOMI_AI_BATCH_LIMIT || 20);
@@ -32,6 +34,7 @@ function aiConfig() {
     processingVersion,
     model,
     summaryModel,
+    embeddingModel,
     minProcessChars: Math.max(1, minProcessChars),
     maxInputChars: Math.max(500, maxInputChars),
     defaultBatchLimit: Math.max(1, Math.min(100, defaultBatchLimit)),

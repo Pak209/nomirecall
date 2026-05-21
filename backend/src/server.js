@@ -9,6 +9,7 @@ const { z } = require('zod');
 const { createStore, newSource } = require('./store');
 const { privacyPolicyPage, termsPage } = require('./legal');
 const { aiConfig } = require('./ai/aiConfig');
+const { createAIProvider } = require('./ai/aiProvider');
 const {
   extractCleanTextFromMemory,
   processMemoryForAI,
@@ -16,6 +17,24 @@ const {
   processUnprocessedMemoriesForUser,
   processRecentImportedMemories,
 } = require('./ai/processMemory');
+const { answerQuestionFromMemories, traceQuestionRetrieval } = require('./ai/queryMemories');
+const {
+  backfillEmbeddingsForUser,
+  deleteMemoryChunks,
+  indexMemoryForRetrieval,
+} = require('./ai/memoryChunks');
+const {
+  backfillMemoryEdgesForUser,
+  recomputeEdgesForMemory,
+} = require('./ai/memoryEdges');
+const { backfillTopicPagesForUser } = require('./ai/topicPages');
+const {
+  debugMemoryChunks,
+  debugMemoryEdges,
+  getDebugTopicPage,
+  isDebugEnabled,
+  listDebugTopicPages,
+} = require('./debugInspect');
 const {
   getAIProcessingDailyUsage,
   getAIProcessingLimitForUser,
@@ -124,6 +143,15 @@ const INGEST_SCHEMA = z.object({
 
 const BRAIN_QUERY_SCHEMA = z.object({
   question: z.string().min(1, 'question is required'),
+  projectId: z.string().min(1).optional(),
+  limit: z.coerce.number().int().min(1).max(12).optional(),
+  allowGlobalFallback: z.boolean().optional().default(false),
+});
+
+const DEBUG_QUERY_TRACE_SCHEMA = z.object({
+  question: z.string().min(1, 'question is required'),
+  projectId: z.string().min(1).optional(),
+  limit: z.coerce.number().int().min(1).max(12).optional(),
 });
 
 const X_POST_PREVIEW_SCHEMA = z.object({
@@ -175,6 +203,11 @@ const PROCESS_MEMORY_AI_SCHEMA = z.object({
 const PROCESS_MEMORIES_BATCH_SCHEMA = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
   forceReprocess: z.boolean().optional().default(false),
+});
+
+const BACKFILL_SCHEMA = z.object({
+  limit: z.coerce.number().int().min(1).max(100).default(25),
+  force: z.boolean().optional().default(false),
 });
 
 const DAILY_BRIEF_QUERY_SCHEMA = z.object({
@@ -385,6 +418,7 @@ function nativeMemoryFromSource(source, firebaseUserId) {
     isArchived: source.isArchived === true,
     isFavorite: source.isFavorite === true,
     capturedAt: sourceDate ? timestampFromValue(sourceDate, createdAtMs) : timestampFromValue(source.createdAt, createdAtMs),
+    translation: source.translation,
     ai: cleanObject({
       summary: source.ai?.summary,
       category: source.ai?.category,
@@ -424,6 +458,7 @@ function nativeMemoryFromSource(source, firebaseUserId) {
     referencedPosts: Array.isArray(source.referencedPosts) ? source.referencedPosts : [],
     externalId: source.externalId,
     importSource: source.importSource,
+    originalText: source.translation?.originalText,
     importedFromLegacyBackend: true,
     legacyUserId: source.userId,
   });
@@ -645,6 +680,72 @@ function mapXSearchPayloadToFeedItems(payload, topic) {
   });
 }
 
+const COMMON_NON_ENGLISH_MARKERS = [
+  ' ahora ',
+  ' aprender ',
+  ' como ',
+  ' comprar ',
+  ' mayoría ',
+  ' gente ',
+  ' para ',
+  ' que ',
+  ' con ',
+  ' una ',
+  ' por ',
+  ' mais ',
+  ' muito ',
+  ' avec ',
+  ' pour ',
+  ' der ',
+  ' die ',
+  ' und ',
+  ' nicht ',
+  ' esto ',
+  ' este ',
+  ' esta ',
+  ' será ',
+  ' tendrá ',
+];
+
+function likelyNeedsEnglishTranslation(text = '') {
+  const value = ` ${String(text || '').toLowerCase().replace(/\s+/g, ' ')} `;
+  if (/[áéíóúñ¿¡àèìòùâêîôûãõçäëïöüß]/i.test(value)) return true;
+  return COMMON_NON_ENGLISH_MARKERS.some((marker) => value.includes(marker));
+}
+
+async function translateXImportText(text) {
+  const originalText = String(text || '').trim();
+  if (!originalText || !likelyNeedsEnglishTranslation(originalText)) {
+    return { text: originalText, translation: null };
+  }
+  const config = aiConfig();
+  if (!config.openaiApiKey || config.provider !== 'openai') {
+    return { text: originalText, translation: null };
+  }
+
+  try {
+    const translation = await createAIProvider(config).translateMemoryText({ text: originalText });
+    if (!translation.wasTranslated || !translation.translatedText) {
+      return { text: originalText, translation: null };
+    }
+    return {
+      text: translation.translatedText,
+      translation: {
+        originalText,
+        translatedText: translation.translatedText,
+        sourceLanguage: translation.sourceLanguage,
+        targetLanguage: 'English',
+        provider: config.provider,
+        modelUsed: config.summaryModel,
+        translatedAt: new Date().toISOString(),
+      },
+    };
+  } catch (error) {
+    console.warn(`[x-import] translation failed: ${error.message}`);
+    return { text: originalText, translation: null };
+  }
+}
+
 function xOAuthConfig() {
   const clientId = process.env.X_CLIENT_ID || process.env.TWITTER_CLIENT_ID;
   const clientSecret = process.env.X_CLIENT_SECRET || process.env.TWITTER_CLIENT_SECRET;
@@ -814,14 +915,16 @@ async function fetchXBookmarks(xUserId, accessToken, limit) {
   return payload || {};
 }
 
-function mapXBookmarkPayloadToSources(payload = {}) {
+async function mapXBookmarkPayloadToSources(payload = {}) {
   const users = new Map((payload.includes?.users || []).map((user) => [user.id, user]));
   const mediaByKey = new Map((payload.includes?.media || []).map((item) => [item.media_key, item]));
 
-  return (payload.data || []).map((tweet) => {
+  return Promise.all((payload.data || []).map(async (tweet) => {
     const user = users.get(tweet.author_id);
     const username = user?.username || '';
-    const text = tweet.note_tweet?.text || tweet.text || '';
+    const originalText = tweet.note_tweet?.text || tweet.text || '';
+    const translated = await translateXImportText(originalText);
+    const text = translated.text;
     let generated = { category: 'General', tags: [] };
     try {
       generated = generateMemoryMetadata(text);
@@ -847,9 +950,10 @@ function mapXBookmarkPayloadToSources(payload = {}) {
       tags: ['xpost', 'bookmark', ...generated.tags],
       externalId: tweet.id,
       importSource: 'x_bookmark',
+      translation: translated.translation,
       rawPayloadHash: rawPayloadHash(tweet),
     };
-  });
+  }));
 }
 
 async function nativeMemoryExists(userId, externalId) {
@@ -900,6 +1004,8 @@ async function writeNativeMemoryFromSource(userId, source) {
       links: Array.isArray(source.links) ? source.links : [],
       media: Array.isArray(source.media) ? source.media : [],
       referencedPosts: Array.isArray(source.referencedPosts) ? source.referencedPosts : [],
+      translation: source.translation,
+      originalText: source.translation?.originalText,
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       sync: {
         ...(existingData.sync || {}),
@@ -924,7 +1030,14 @@ async function writeNativeMemoryDocumentFromSource(userId, source) {
     .doc(userId)
     .collection('memories')
     .doc(String(source.id));
-  await reference.set(nativeMemoryFromSource({ ...source, userId }, userId), { merge: true });
+  const memory = nativeMemoryFromSource({ ...source, userId }, userId);
+  await reference.set(memory, { merge: true });
+  await indexMemoryForRetrieval(userId, String(source.id), { memory: { id: String(source.id), ...memory } }).catch((error) => {
+    console.warn(`[memory-index] failed user=${userId} memory=${source.id}: ${error.message}`);
+  });
+  await recomputeEdgesForMemory(userId, String(source.id), { store }).catch((error) => {
+    console.warn(`[memory-edges] failed user=${userId} memory=${source.id}: ${error.message}`);
+  });
   return true;
 }
 
@@ -1046,7 +1159,7 @@ async function syncXBookmarksForUser(userId, options = {}) {
         .map((source) => String(source.externalId || String(source.id || '').replace(/^x_bookmark_/, ''))),
     );
 
-    const sources = mapXBookmarkPayloadToSources(payload);
+    const sources = await mapXBookmarkPayloadToSources(payload);
     const imported = [];
     const duplicates = [];
     const failed = [];
@@ -1472,6 +1585,11 @@ async function requireAdmin(req, res, next) {
   } catch {
     return res.status(403).json({ error: 'Admin access required' });
   }
+}
+
+function requireDebugAccess(_req, res, next) {
+  if (!isDebugEnabled()) return res.status(404).json({ error: 'Not found' });
+  return next();
 }
 
 async function handleEmailAuth(req, res, forcedIntent) {
@@ -2060,18 +2178,78 @@ app.get('/api/entities', auth, (_req, res) => {
 app.post('/api/brain/query', auth, async (req, res) => {
   const data = parseBody(BRAIN_QUERY_SCHEMA, req, res);
   if (!data) return;
-  const query = String(data.question || '').toLowerCase();
-  const sources = await store.listSources(req.userId);
-  const related = sources
-    .filter((source) => (`${source.title || ''} ${source.body || ''}`).toLowerCase().includes(query))
-    .slice(0, 3)
-    .map((source) => String(source.id));
-  return res.json({
-    answer: related.length
-      ? `I found ${related.length} related memories for "${data.question}".`
-      : `I do not see an exact match for "${data.question}" yet, but keep capturing and I will get sharper.`,
-    sources: related,
-  });
+  try {
+    const result = await answerQuestionFromMemories(req.userId, data.question, {
+      projectId: data.projectId,
+      limit: data.limit,
+      allowGlobalFallback: data.allowGlobalFallback,
+      store,
+    });
+    return res.json(result);
+  } catch (error) {
+    return res.status(503).json({
+      error: error.message || 'Nomi could not answer from your memories right now.',
+    });
+  }
+});
+
+app.get('/api/debug/brain/query-trace', auth, requireDebugAccess, async (req, res) => {
+  const data = parseQuery(DEBUG_QUERY_TRACE_SCHEMA, req, res);
+  if (!data) return;
+  try {
+    const trace = await traceQuestionRetrieval(req.userId, data.question, {
+      projectId: data.projectId,
+      limit: data.limit,
+      store,
+    });
+    return res.json(trace);
+  } catch (error) {
+    return res.status(503).json({ error: error.message || 'Could not build retrieval trace.' });
+  }
+});
+
+app.get('/api/debug/memories/:memoryId/chunks', auth, requireDebugAccess, async (req, res) => {
+  try {
+    const chunks = await debugMemoryChunks(req.userId, req.params.memoryId, { store });
+    if (chunks === null) return res.status(404).json({ error: 'Memory not found' });
+    return res.json({
+      memoryId: req.params.memoryId,
+      chunks,
+    });
+  } catch (error) {
+    return res.status(503).json({ error: error.message || 'Could not load memory chunks.' });
+  }
+});
+
+app.get('/api/debug/memories/:memoryId/edges', auth, requireDebugAccess, async (req, res) => {
+  try {
+    const edges = await debugMemoryEdges(req.userId, req.params.memoryId, { store });
+    return res.json({
+      memoryId: req.params.memoryId,
+      edges,
+    });
+  } catch (error) {
+    return res.status(503).json({ error: error.message || 'Could not load memory edges.' });
+  }
+});
+
+app.get('/api/debug/topic-pages', auth, requireDebugAccess, async (req, res) => {
+  try {
+    const topicPages = await listDebugTopicPages(req.userId, { store });
+    return res.json({ topicPages });
+  } catch (error) {
+    return res.status(503).json({ error: error.message || 'Could not load topic pages.' });
+  }
+});
+
+app.get('/api/debug/topic-pages/:topicPageId', auth, requireDebugAccess, async (req, res) => {
+  try {
+    const topicPage = await getDebugTopicPage(req.userId, req.params.topicPageId, { store });
+    if (!topicPage) return res.status(404).json({ error: 'Topic page not found' });
+    return res.json({ topicPage });
+  } catch (error) {
+    return res.status(503).json({ error: error.message || 'Could not load topic page.' });
+  }
 });
 
 app.post('/api/x-post/preview', auth, async (req, res) => {
@@ -2356,6 +2534,27 @@ app.post('/api/memories/:id/process-ai', auth, async (req, res) => {
   return res.status(statusCode).json(result);
 });
 
+app.post('/api/backfill/embeddings', auth, async (req, res) => {
+  const data = parseBody(BACKFILL_SCHEMA, req, res);
+  if (!data) return;
+  const result = await backfillEmbeddingsForUser(req.userId, { ...data, store });
+  return res.json(result);
+});
+
+app.post('/api/backfill/memory-edges', auth, async (req, res) => {
+  const data = parseBody(BACKFILL_SCHEMA, req, res);
+  if (!data) return;
+  const result = await backfillMemoryEdgesForUser(req.userId, { ...data, store });
+  return res.json(result);
+});
+
+app.post('/api/backfill/topic-pages', auth, async (req, res) => {
+  const data = parseBody(BACKFILL_SCHEMA, req, res);
+  if (!data) return;
+  const result = await backfillTopicPagesForUser(req.userId, { ...data, store });
+  return res.json(result);
+});
+
 app.get('/api/memories/:id', auth, async (req, res) => {
   const memory = await store.getSourceById(req.userId, req.params.id);
   if (!memory) return res.status(404).json({ error: 'Memory not found' });
@@ -2384,6 +2583,11 @@ app.patch('/api/memories/:id', auth, async (req, res) => {
   if (!data) return;
   const updated = await store.updateSource(req.userId, req.params.id, data);
   if (!updated) return res.status(404).json({ error: 'Memory not found' });
+  if (admin.apps.length) {
+    await writeNativeMemoryDocumentFromSource(req.userId, updated).catch((error) => {
+      console.warn(`[memory-index] patch reindex failed user=${req.userId} memory=${req.params.id}: ${error.message}`);
+    });
+  }
   return res.json({
     memory: {
       id: String(updated.id),
@@ -2407,6 +2611,9 @@ app.patch('/api/memories/:id', auth, async (req, res) => {
 app.delete('/api/memories/:id', auth, async (req, res) => {
   const removed = await store.deleteSource(req.userId, req.params.id);
   if (!removed) return res.status(404).json({ error: 'Memory not found' });
+  await deleteMemoryChunks(req.userId, req.params.id, { store }).catch((error) => {
+    console.warn(`[memory-index] chunk delete failed user=${req.userId} memory=${req.params.id}: ${error.message}`);
+  });
   return res.json({ ok: true });
 });
 
@@ -2664,6 +2871,7 @@ if (require.main === module && process.env.NODE_ENV !== 'test') {
 
 module.exports = {
   app,
+  _store: store,
   runScheduledDailyBriefGeneration,
   runScheduledXBookmarkSync,
   syncXBookmarksForUser,

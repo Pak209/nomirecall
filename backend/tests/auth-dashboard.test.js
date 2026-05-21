@@ -224,6 +224,72 @@ test('x discovery maps posts and saves selected post to brain', async () => {
   global.fetch = previousFetch;
 });
 
+test('brain query retrieves only the signed-in users saved memories with citations', async () => {
+  const previousOpenAIKey = process.env.OPENAI_API_KEY;
+  const previousNomiOpenAIKey = process.env.NOMI_OPENAI_API_KEY;
+  delete process.env.OPENAI_API_KEY;
+  delete process.env.NOMI_OPENAI_API_KEY;
+
+  const password = 'password123';
+  const atlasSignup = await request(app)
+    .post('/api/auth/email/signup')
+    .send({ email: `rag.atlas.${Date.now()}@example.com`, password });
+  assert.equal(atlasSignup.status, 201);
+  const atlasAuth = { Authorization: `Bearer ${atlasSignup.body.token}` };
+
+  const otherSignup = await request(app)
+    .post('/api/auth/email/signup')
+    .send({ email: `rag.other.${Date.now()}@example.com`, password });
+  assert.equal(otherSignup.status, 201);
+  const otherAuth = { Authorization: `Bearer ${otherSignup.body.token}` };
+
+  const ingest = await request(app)
+    .post('/api/ingest')
+    .set(atlasAuth)
+    .send({
+      raw_text: 'Project Atlas launch checklist: finish the pricing page and send beta invites to design partners.',
+      title: 'Project Atlas launch checklist',
+      type: 'note',
+      category: 'Work',
+      tags: ['atlas', 'launch'],
+    });
+  assert.equal(ingest.status, 200);
+
+  const answer = await request(app)
+    .post('/api/brain/query')
+    .set(atlasAuth)
+    .send({ question: 'What do I know about Project Atlas pricing?' });
+  assert.equal(answer.status, 200);
+  assert.equal(answer.body.retrievalMode, 'keyword-semantic-lite');
+  assert.ok(Array.isArray(answer.body.sources));
+  assert.equal(answer.body.sources.length, 1);
+  assert.equal(answer.body.sources[0].memoryId, ingest.body.source_id);
+  assert.match(answer.body.sources[0].snippet, /pricing page/i);
+  assert.match(answer.body.sources[0].relevanceReason, /Matched/i);
+  assert.match(answer.body.answer, /Project Atlas|pricing page/i);
+
+  const miss = await request(app)
+    .post('/api/brain/query')
+    .set(atlasAuth)
+    .send({ question: 'What did I save about sourdough starters?' });
+  assert.equal(miss.status, 200);
+  assert.deepEqual(miss.body.sources, []);
+  assert.equal(miss.body.confidence, 'low');
+  assert.match(miss.body.answer, /not have enough saved context/i);
+
+  const otherAnswer = await request(app)
+    .post('/api/brain/query')
+    .set(otherAuth)
+    .send({ question: 'What do I know about Project Atlas pricing?' });
+  assert.equal(otherAnswer.status, 200);
+  assert.deepEqual(otherAnswer.body.sources, []);
+
+  if (previousOpenAIKey === undefined) delete process.env.OPENAI_API_KEY;
+  else process.env.OPENAI_API_KEY = previousOpenAIKey;
+  if (previousNomiOpenAIKey === undefined) delete process.env.NOMI_OPENAI_API_KEY;
+  else process.env.NOMI_OPENAI_API_KEY = previousNomiOpenAIKey;
+});
+
 test('x bookmark connect reports missing oauth config', async () => {
   const email = `x.bookmarks.config.${Date.now()}@example.com`;
   const password = 'password123';
@@ -266,12 +332,16 @@ test('x bookmark oauth callback and manual sync imports new bookmarks', async ()
     X_CLIENT_SECRET: process.env.X_CLIENT_SECRET,
     X_REDIRECT_URI: process.env.X_REDIRECT_URI,
     X_TOKEN_ENCRYPTION_KEY: process.env.X_TOKEN_ENCRYPTION_KEY,
+    OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+    NOMI_AI_PROVIDER: process.env.NOMI_AI_PROVIDER,
   };
   const previousFetch = global.fetch;
   process.env.X_CLIENT_ID = 'client-id';
   delete process.env.X_CLIENT_SECRET;
   process.env.X_REDIRECT_URI = 'https://nomi.example.com/api/x/oauth/callback';
   process.env.X_TOKEN_ENCRYPTION_KEY = 'test-encryption-key';
+  process.env.OPENAI_API_KEY = 'test-openai-key';
+  process.env.NOMI_AI_PROVIDER = 'openai';
 
   const connect = await request(app)
     .get('/api/x/bookmarks/connect')
@@ -328,7 +398,7 @@ test('x bookmark oauth callback and manual sync imports new bookmarks', async ()
           data: [{
             id: '987',
             author_id: 'author-1',
-            text: 'OpenAI bookmark about Codex workflows https://t.co/codex',
+            text: 'APRENDER CLAUDE AHORA ES COMO COMPRAR BITCOIN EN 2017.',
             created_at: '2026-05-15T20:39:00.000Z',
             attachments: { media_keys: ['media-1'] },
             entities: {
@@ -347,6 +417,23 @@ test('x bookmark oauth callback and manual sync imports new bookmarks', async ()
               url: 'https://pbs.twimg.com/media/test.jpg',
             }],
           },
+        }),
+      };
+    }
+    if (rawUrl.includes('/v1/chat/completions')) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          choices: [{
+            message: {
+              content: JSON.stringify({
+                translatedText: 'Learning Claude now is like buying Bitcoin in 2017.',
+                sourceLanguage: 'Spanish',
+                wasTranslated: true,
+              }),
+            },
+          }],
         }),
       };
     }
@@ -387,7 +474,7 @@ test('x bookmark oauth callback and manual sync imports new bookmarks', async ()
   assert.equal(memories.status, 200);
   assert.equal(memories.body.memories.length, 1);
   assert.equal(memories.body.memories[0].authorUsername, 'testingcatalog');
-  assert.match(memories.body.memories[0].body, /Codex workflows/);
+  assert.match(memories.body.memories[0].body, /Learning Claude now/i);
   assert.deepEqual(memories.body.memories[0].media, [{
     type: 'photo',
     url: 'https://pbs.twimg.com/media/test.jpg',

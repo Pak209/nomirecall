@@ -13,6 +13,9 @@ class MemoryStore {
     this.xOAuthStates = new Map();
     this.xBookmarkConnections = new Map();
     this.xBookmarkSyncStates = new Map();
+    this.chunksByUser = new Map();
+    this.memoryEdgesByUser = new Map();
+    this.topicPagesByUser = new Map();
     this.feedItems = [...DEFAULT_FEED_ITEMS];
   }
 
@@ -54,6 +57,9 @@ class MemoryStore {
       }
     }
     this.sourcesByUser.delete(userId);
+    this.chunksByUser.delete(userId);
+    this.memoryEdgesByUser.delete(userId);
+    this.topicPagesByUser.delete(userId);
     this.xBookmarkConnections.delete(userId);
     this.xBookmarkSyncStates.delete(userId);
   }
@@ -94,6 +100,57 @@ class MemoryStore {
 
   async countSources(userId) {
     return (this.sourcesByUser.get(userId) || []).length;
+  }
+
+  async upsertChunks(userId, memoryId, chunks) {
+    const byMemory = this.chunksByUser.get(userId) || new Map();
+    byMemory.set(String(memoryId), chunks.map((chunk) => ({ ...chunk, memoryId: String(memoryId) })));
+    this.chunksByUser.set(userId, byMemory);
+    return chunks;
+  }
+
+  async listChunks(userId, options = {}) {
+    const byMemory = this.chunksByUser.get(userId) || new Map();
+    if (options.memoryId) return byMemory.get(String(options.memoryId)) || [];
+    return Array.from(byMemory.values()).flat();
+  }
+
+  async deleteChunks(userId, memoryId) {
+    const byMemory = this.chunksByUser.get(userId) || new Map();
+    const deletedCount = (byMemory.get(String(memoryId)) || []).length;
+    byMemory.delete(String(memoryId));
+    this.chunksByUser.set(userId, byMemory);
+    return { deletedCount };
+  }
+
+  async upsertMemoryEdges(userId, edges) {
+    const byId = this.memoryEdgesByUser.get(userId) || new Map();
+    for (const edge of edges) byId.set(edge.edgeId || edge.id, edge);
+    this.memoryEdgesByUser.set(userId, byId);
+    return edges;
+  }
+
+  async listMemoryEdges(userId, memoryId) {
+    const edges = Array.from((this.memoryEdgesByUser.get(userId) || new Map()).values());
+    if (!memoryId) return edges;
+    return edges
+      .filter((edge) => edge.fromMemoryId === memoryId || edge.toMemoryId === memoryId)
+      .sort((a, b) => Number(b.score || 0) - Number(a.score || 0));
+  }
+
+  async upsertTopicPages(userId, pages) {
+    const byId = this.topicPagesByUser.get(userId) || new Map();
+    for (const page of pages) byId.set(page.topicPageId || page.id, page);
+    this.topicPagesByUser.set(userId, byId);
+    return pages;
+  }
+
+  async listTopicPages(userId) {
+    return Array.from((this.topicPagesByUser.get(userId) || new Map()).values());
+  }
+
+  async getTopicPage(userId, topicPageId) {
+    return (this.topicPagesByUser.get(userId) || new Map()).get(String(topicPageId)) || null;
   }
 
   async getFeedItems() {
@@ -544,5 +601,6 @@ function newSource(title, sourceType) {
 
 module.exports = {
   createStore,
+  initializeFirebaseAdmin,
   newSource,
 };

@@ -104,8 +104,86 @@ function projectSummaryPrompt(input) {
   ].join('\n');
 }
 
+function answerMemoryQuestionPrompt(input) {
+  const memories = input.memories.map((memory) => [
+    `${memory.citation} memoryId=${memory.memoryId}`,
+    `title: ${memory.title || 'Untitled memory'}`,
+    memory.sourceType ? `sourceType: ${memory.sourceType}` : null,
+    memory.sourceUrl ? `sourceUrl: ${memory.sourceUrl}` : null,
+    memory.category ? `category: ${memory.category}` : null,
+    memory.tags?.length ? `tags: ${memory.tags.join(', ')}` : null,
+    memory.concepts?.length ? `concepts: ${memory.concepts.join(', ')}` : null,
+    memory.entities?.length ? `entities: ${memory.entities.join(', ')}` : null,
+    memory.capturedAt ? `capturedAt: ${memory.capturedAt}` : null,
+    `snippet: ${memory.snippet || ''}`,
+  ].filter(Boolean).join('\n')).join('\n\n');
+
+  return [
+    'Answer the user question using only the saved memory snippets below.',
+    'If the snippets do not contain enough information, say that Nomi does not have enough saved context yet.',
+    'Do not use outside knowledge. Do not invent details. Keep the answer concise and useful.',
+    'Cite supporting memories inline using their citation labels like [1] or [2].',
+    'Return compact JSON only.',
+    '',
+    `Question: ${input.question}`,
+    '',
+    'Retrieved memories:',
+    memories || 'none',
+    '',
+    'JSON shape:',
+    '{"answer":"string with inline citations","confidence":"low|medium|high","relatedMemoryIds":["memoryId"]}',
+  ].join('\n');
+}
+
+function topicPagePrompt(input) {
+  const memories = input.memories.map((memory, index) => [
+    `#${index + 1} id=${memory.id}`,
+    `title: ${memory.title || 'Untitled memory'}`,
+    memory.summary ? `summary: ${memory.summary}` : null,
+    memory.rawText ? `snippet: ${String(memory.rawText).replace(/\s+/g, ' ').trim().slice(0, 420)}` : null,
+    memory.tags?.length ? `tags: ${memory.tags.join(', ')}` : null,
+    memory.concepts?.length ? `concepts: ${memory.concepts.join(', ')}` : null,
+    memory.entities?.length ? `entities: ${memory.entities.join(', ')}` : null,
+  ].filter(Boolean).join('\n')).join('\n\n');
+
+  return [
+    'Create a private wiki topic page grounded only in the saved memories below.',
+    'Do not use outside facts. Do not explain what a product/person/topic is unless a saved memory says it.',
+    'Every key idea must include supportingMemoryIds from the saved memory ids below.',
+    'Only include a key idea when at least one cited memory directly supports it.',
+    'Keep the summary compact and based only on the cited key ideas.',
+    'Return compact JSON only.',
+    '',
+    `Topic candidate: ${input.title}`,
+    '',
+    'Saved memories:',
+    memories || 'none',
+    '',
+    'JSON shape:',
+    '{"title":"string","summary":"string","keyIdeas":[{"idea":"string","supportingMemoryIds":["memoryId"]}],"openQuestions":["string"],"possibleRelatedTopics":["string"]}',
+  ].join('\n');
+}
+
+function translateMemoryTextPrompt(input) {
+  return [
+    'Translate this user-saved post into natural English if it is not already English.',
+    'If it is already English, return the original text unchanged.',
+    'Preserve names, product names, URLs, handles, hashtags, and line breaks as much as practical.',
+    'Do not add commentary or explanations. Return compact JSON only.',
+    '',
+    'Text:',
+    input.text || '',
+    '',
+    'JSON shape:',
+    '{"translatedText":"string","sourceLanguage":"language name or unknown","wasTranslated":true}',
+  ].join('\n');
+}
+
 module.exports = {
+  answerMemoryQuestionPrompt,
   processMemoryPrompt,
   dailyBriefPrompt,
   projectSummaryPrompt,
+  topicPagePrompt,
+  translateMemoryTextPrompt,
 };

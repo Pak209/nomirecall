@@ -26,6 +26,33 @@ service cloud.firestore {
           && request.resource.data.userId == userId;
         allow delete: if owns(userId);
       }
+
+      match /memoryEdges/{edgeId} {
+        allow read: if owns(userId);
+        allow create: if owns(userId)
+          && request.resource.data.userId == userId;
+        allow update: if owns(userId)
+          && request.resource.data.userId == userId;
+        allow delete: if owns(userId);
+      }
+
+      match /dailyBriefs/{briefId} {
+        allow read: if owns(userId);
+        allow create: if owns(userId)
+          && request.resource.data.userId == userId;
+        allow update: if owns(userId)
+          && request.resource.data.userId == userId;
+        allow delete: if owns(userId);
+      }
+
+      match /projects/{projectId} {
+        allow read: if owns(userId);
+        allow create: if owns(userId)
+          && request.resource.data.userId == userId;
+        allow update: if owns(userId)
+          && request.resource.data.userId == userId;
+        allow delete: if owns(userId);
+      }
     }
   }
 }

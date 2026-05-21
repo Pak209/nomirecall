@@ -28,6 +28,48 @@ If Firebase env vars are not set, backend falls back to in-memory mode.
 
 In production (`NODE_ENV=production`), Firebase Admin config is required and the backend will fail closed instead of falling back to memory mode.
 
+## Developer retrieval/debug eval
+
+The Ask Nomi debug endpoints and CLI tools are developer-only. Keep them disabled in production.
+
+Enable them locally in `backend/.env`:
+
+```env
+ENABLE_NOMI_DEBUG=true
+NOMI_API_BASE_URL=http://localhost:3000
+```
+
+Start the backend:
+
+```bash
+cd backend
+npm run dev
+```
+
+To get a token for your real signed-in Firebase user:
+
+1. Run a DEBUG iOS build pointed at the local backend, for example `NOMI_BACKEND_API_BASE_URL=http://localhost:3000/api`.
+2. Sign in with your dev account.
+3. Open Settings.
+4. In the local-only Developer Debug card, tap `Copy debug auth token`.
+5. Use that clipboard value only as an environment variable. Do not paste it into code, docs, commits, screenshots, or shell history you plan to share.
+
+Run retrieval eval:
+
+```bash
+cd backend
+NOMI_DEBUG_AUTH_TOKEN="<paste-token>" npm run eval:brain
+```
+
+Run a one-off trace:
+
+```bash
+cd backend
+NOMI_DEBUG_AUTH_TOKEN="<paste-token>" npm run debug:brain -- --question="What have I saved about pricing?"
+```
+
+The native token copy action is compiled only in DEBUG builds and appears only when the iOS app is pointed at `localhost`, `127.0.0.1`, or `::1`. The CLI never prints token values.
+
 ## Render environment
 
 Set production secrets only in the Render dashboard. Do not commit real `.env` files or Firebase service account JSON.

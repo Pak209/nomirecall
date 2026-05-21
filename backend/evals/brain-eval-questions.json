@@ -1,0 +1,20 @@
+[
+  {
+    "question": "What have I saved about pricing?",
+    "expectedMemoryIds": ["x_bookmark_2056384226686087232"],
+    "expectedProjectId": null,
+    "notes": "Should retrieve the pricing/conversion memory about adding no-payment-required copy."
+  },
+  {
+    "question": "What ideas do I have for the knowledge galaxy?",
+    "expectedMemoryIds": ["x_bookmark_2056498722943664239"],
+    "expectedProjectId": null,
+    "notes": "Good canary for Nomi graph, edge, topic, and galaxy planning memories."
+  },
+  {
+    "question": "What have I saved from X bookmarks?",
+    "expectedMemoryIds": ["x_bookmark_2056355087648199106"],
+    "expectedProjectId": null,
+    "notes": "Checks source metadata without relying only on generic bookmark tags."
+  }
+]

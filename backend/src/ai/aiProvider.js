@@ -4,7 +4,14 @@ const {
   normalizeProcessedMemoryAI,
   normalizeProjectSummaryOutput,
 } = require('./aiSchemas');
-const { dailyBriefPrompt, processMemoryPrompt, projectSummaryPrompt } = require('./prompts');
+const {
+  answerMemoryQuestionPrompt,
+  dailyBriefPrompt,
+  processMemoryPrompt,
+  projectSummaryPrompt,
+  topicPagePrompt,
+  translateMemoryTextPrompt,
+} = require('./prompts');
 
 class OpenAIProvider {
   constructor(config = aiConfig()) {
@@ -54,6 +61,96 @@ class OpenAIProvider {
       modelUsed: this.config.summaryModel,
       processingVersion: this.config.processingVersion,
     });
+  }
+
+  async answerMemoryQuestion(input) {
+    const parsed = await this.jsonCompletion({
+      prompt: answerMemoryQuestionPrompt(input),
+      model: this.config.summaryModel,
+      system: 'You are Nomi memory question answering. Use only supplied saved memories. Return compact valid JSON only.',
+      emptyMessage: 'OpenAI returned an empty memory answer.',
+      invalidMessage: 'OpenAI returned invalid JSON for memory question answering.',
+    });
+
+    const confidence = ['low', 'medium', 'high'].includes(parsed?.confidence)
+      ? parsed.confidence
+      : 'low';
+
+    return {
+      answer: typeof parsed?.answer === 'string' ? parsed.answer.trim().slice(0, 2400) : '',
+      confidence,
+      relatedMemoryIds: Array.isArray(parsed?.relatedMemoryIds)
+        ? parsed.relatedMemoryIds.map(String).filter(Boolean).slice(0, 8)
+        : [],
+    };
+  }
+
+  async synthesizeTopicPage(input) {
+    const parsed = await this.jsonCompletion({
+      prompt: topicPagePrompt(input),
+      model: this.config.summaryModel,
+      system: 'You are Nomi private wiki synthesis. Use only saved memories. Return compact valid JSON only.',
+      emptyMessage: 'OpenAI returned an empty topic page.',
+      invalidMessage: 'OpenAI returned invalid JSON for topic page synthesis.',
+    });
+
+    return {
+      title: typeof parsed?.title === 'string' ? parsed.title.trim().slice(0, 120) : String(input.title || 'Topic').slice(0, 120),
+      summary: typeof parsed?.summary === 'string' ? parsed.summary.trim().slice(0, 1600) : '',
+      keyIdeas: Array.isArray(parsed?.keyIdeas) ? parsed.keyIdeas.slice(0, 10) : [],
+      openQuestions: Array.isArray(parsed?.openQuestions) ? parsed.openQuestions.map(String).filter(Boolean).slice(0, 8) : [],
+      possibleRelatedTopics: Array.isArray(parsed?.possibleRelatedTopics) ? parsed.possibleRelatedTopics.map(String).filter(Boolean).slice(0, 8) : [],
+    };
+  }
+
+  async translateMemoryText(input) {
+    const parsed = await this.jsonCompletion({
+      prompt: translateMemoryTextPrompt(input),
+      model: this.config.summaryModel,
+      system: 'You translate user-saved memory text into English. Return compact valid JSON only.',
+      emptyMessage: 'OpenAI returned an empty translation result.',
+      invalidMessage: 'OpenAI returned invalid JSON for memory translation.',
+    });
+
+    const translatedText = typeof parsed?.translatedText === 'string'
+      ? parsed.translatedText.trim().slice(0, 12000)
+      : '';
+
+    return {
+      translatedText,
+      sourceLanguage: typeof parsed?.sourceLanguage === 'string' ? parsed.sourceLanguage.trim().slice(0, 80) : 'unknown',
+      wasTranslated: parsed?.wasTranslated === true && translatedText.length > 0,
+    };
+  }
+
+  async embedText(input) {
+    if (!this.config.openaiApiKey) {
+      throw new Error('OPENAI_API_KEY is not configured.');
+    }
+
+    const response = await fetch('https://api.openai.com/v1/embeddings', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${this.config.openaiApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: this.config.embeddingModel,
+        input: String(input || '').slice(0, 8000),
+      }),
+    });
+
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) {
+      const message = payload?.error?.message || payload?.error || `OpenAI embedding request failed with ${response.status}.`;
+      throw new Error(message);
+    }
+
+    const embedding = payload?.data?.[0]?.embedding;
+    if (!Array.isArray(embedding) || !embedding.length) {
+      throw new Error('OpenAI returned an empty embedding.');
+    }
+    return embedding.map(Number);
   }
 
   async jsonCompletion({ prompt, model, system, emptyMessage, invalidMessage }) {

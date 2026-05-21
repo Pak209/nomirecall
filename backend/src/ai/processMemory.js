@@ -3,6 +3,8 @@ const admin = require('firebase-admin');
 
 const { aiConfig } = require('./aiConfig');
 const { createAIProvider } = require('./aiProvider');
+const { indexMemoryForRetrieval } = require('./memoryChunks');
+const { recomputeEdgesForMemory } = require('./memoryEdges');
 const {
   canProcessAIMemory,
   getAIProcessingLimitForUser,
@@ -266,6 +268,15 @@ async function processMemoryForAI(userId, memoryId, options = {}) {
       ...safeTopLevelPatch(memory, ai),
       updatedAt: serverTimestampOrIso(),
     }), { merge: true });
+
+    const updatedDoc = await ref.get();
+    const updatedMemory = updatedDoc.exists ? { id: updatedDoc.id, ...updatedDoc.data() } : { id: memoryId, ...memory, ai: aiPatch };
+    await indexMemoryForRetrieval(userId, memoryId, { ...options, memory: updatedMemory }).catch((indexError) => {
+      console.warn(`[ai] retrieval indexing failed user=${userId} memory=${memoryId}: ${indexError.message}`);
+    });
+    await recomputeEdgesForMemory(userId, memoryId, options).catch((edgeError) => {
+      console.warn(`[ai] edge recompute failed user=${userId} memory=${memoryId}: ${edgeError.message}`);
+    });
 
     await recordAIProcessingUsage(userId, { processedCount: 1 }, options).catch((usageError) => {
       console.warn(`[ai-usage] failed to record processed memory user=${userId}: ${usageError.message}`);

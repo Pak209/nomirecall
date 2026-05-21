@@ -6,6 +6,15 @@
   "scripts": {
     "dev": "node src/server.js",
     "start": "node src/server.js",
+    "backfill:embeddings": "node scripts/backfill-embeddings.js",
+    "backfill:memory-edges": "node scripts/backfill-memory-edges.js",
+    "backfill:topic-pages": "node scripts/backfill-topic-pages.js",
+    "debug:brain": "node scripts/nomi-debug.js brain",
+    "debug:chunks": "node scripts/nomi-debug.js chunks",
+    "debug:edges": "node scripts/nomi-debug.js edges",
+    "debug:topics": "node scripts/nomi-debug.js topics",
+    "debug:topic": "node scripts/nomi-debug.js topic",
+    "eval:brain": "node scripts/brain-eval.js",
     "test": "node --test tests/*.js",
     "staging": "dotenv -e .env.staging -- node src/server.js"
   },
