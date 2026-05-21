@@ -26,3 +26,30 @@ if (fs.existsSync(devMenuPath)) {
     console.log('Patched expo-dev-menu for Swift simulator detection.');
   }
 }
+
+const permissionsServicePath = path.join(
+  __dirname,
+  '..',
+  'node_modules',
+  'expo-modules-core',
+  'android',
+  'src',
+  'main',
+  'java',
+  'expo',
+  'modules',
+  'adapters',
+  'react',
+  'permissions',
+  'PermissionsService.kt',
+);
+
+if (fs.existsSync(permissionsServicePath)) {
+  const before = '        return requestedPermissions.contains(permission)';
+  const after = '        return requestedPermissions?.contains(permission) == true';
+  const source = fs.readFileSync(permissionsServicePath, 'utf8');
+  if (source.includes(before)) {
+    fs.writeFileSync(permissionsServicePath, source.replace(before, after));
+    console.log('Patched expo-modules-core Android permission nullability.');
+  }
+}
