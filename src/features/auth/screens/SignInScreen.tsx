@@ -3,7 +3,7 @@ import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View 
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useNavigation } from '@react-navigation/native';
 import { useMutation } from '@tanstack/react-query';
-import { signInWithEmail } from '../../../services/auth';
+import { signInWithEmail, signInWithGoogle } from '../../../services/auth';
 import { RootStackParamList } from '../../../types';
 import { useToast } from '../../ui/shared/ToastProvider';
 
@@ -19,14 +19,27 @@ export default function SignInScreen() {
     onSuccess: () => showToast('Welcome back!', 'success'),
     onError: (e: any) => showToast(e?.message || 'Sign in failed', 'error'),
   });
+  const googleMutation = useMutation({
+    mutationFn: signInWithGoogle,
+    onSuccess: () => showToast('Welcome back!', 'success'),
+    onError: (e: any) => {
+      if (e?.code !== 'ERR_REQUEST_CANCELED') {
+        showToast(e?.message || 'Google sign in failed', 'error');
+      }
+    },
+  });
+  const loading = signInMutation.isLoading || googleMutation.isLoading;
 
   return (
     <View style={styles.root}>
       <Text style={styles.title}>Sign in</Text>
       <TextInput style={styles.input} placeholder="Email" value={email} onChangeText={setEmail} autoCapitalize="none" />
       <TextInput style={styles.input} placeholder="Password" value={password} onChangeText={setPassword} secureTextEntry />
-      <TouchableOpacity style={styles.primaryBtn} onPress={() => signInMutation.mutate()} disabled={signInMutation.isLoading}>
+      <TouchableOpacity style={styles.primaryBtn} onPress={() => signInMutation.mutate()} disabled={loading}>
         {signInMutation.isLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>Sign in</Text>}
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.googleBtn} onPress={() => googleMutation.mutate()} disabled={loading}>
+        {googleMutation.isLoading ? <ActivityIndicator color="#1C1C22" /> : <Text style={styles.googleBtnText}>Continue with Google</Text>}
       </TouchableOpacity>
       <TouchableOpacity onPress={() => nav.navigate('ForgotPassword')}>
         <Text style={styles.link}>Forgot password?</Text>
@@ -44,5 +57,7 @@ const styles = StyleSheet.create({
   input: { height: 50, borderRadius: 12, borderWidth: 1, borderColor: '#E8D8CA', backgroundColor: '#fff', paddingHorizontal: 14, marginBottom: 10 },
   primaryBtn: { height: 50, borderRadius: 12, backgroundColor: '#FF2D8E', alignItems: 'center', justifyContent: 'center', marginTop: 8 },
   primaryBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  googleBtn: { height: 50, borderRadius: 12, borderWidth: 1, borderColor: '#E8D8CA', backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', marginTop: 10 },
+  googleBtnText: { color: '#1C1C22', fontWeight: '700', fontSize: 15 },
   link: { marginTop: 12, color: '#7B3FF2', textAlign: 'center', fontWeight: '600' },
 });

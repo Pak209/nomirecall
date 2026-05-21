@@ -10,9 +10,11 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { RouteProp, useRoute } from '@react-navigation/native';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import * as DocumentPicker from 'expo-document-picker';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { IngestAPI, XPostAPI } from '../../../services/api';
 import { MainTabParamList, MemoryLink, MemoryMedia } from '../../../types';
@@ -21,12 +23,14 @@ import { useToast } from '../../ui/shared/ToastProvider';
 type CaptureMode = 'note' | 'link' | 'image' | 'voice';
 type CaptureRoute = RouteProp<MainTabParamList, 'Capture'>;
 
-const CAPTURE_MODES: { id: CaptureMode; label: string; icon: string }[] = [
-  { id: 'note', label: 'Note', icon: '📝' },
-  { id: 'link', label: 'Link', icon: '🔗' },
-  { id: 'image', label: 'Image', icon: '🖼️' },
-  { id: 'voice', label: 'Voice', icon: '🎙️' },
+const CAPTURE_MODES: { id: CaptureMode; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
+  { id: 'note', label: 'Note', icon: 'reader' },
+  { id: 'link', label: 'Link', icon: 'link' },
+  { id: 'image', label: 'Image', icon: 'image' },
+  { id: 'voice', label: 'Voice', icon: 'mic' },
 ];
+
+const CATEGORIES = ['General', 'Work', 'Personal', 'AI & Tech', 'Finance', 'Health', 'Ideas'];
 
 function fallbackTitle(text: string, mode: CaptureMode): string {
   const trimmed = text.trim();
@@ -55,6 +59,15 @@ function isXPostUrl(url: string): boolean {
   return /(?:https?:\/\/)?(?:www\.)?(?:x|twitter)\.com\/[^/?#]+\/status\/\d+/i.test(url.trim());
 }
 
+function parseTags(value: string): string[] {
+  return Array.from(new Set(
+    value
+      .split(',')
+      .map((tag) => tag.trim())
+      .filter(Boolean),
+  )).slice(0, 12);
+}
+
 export default function CaptureScreen() {
   const route = useRoute<CaptureRoute>();
   const insets = useSafeAreaInsets();
@@ -65,6 +78,8 @@ export default function CaptureScreen() {
   const [link, setLink] = useState('');
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState('General');
+  const [tagText, setTagText] = useState('');
+  const [categoryMenuOpen, setCategoryMenuOpen] = useState(false);
   const [xPostText, setXPostText] = useState('');
   const [xUsername, setXUsername] = useState('');
   const [xPostDate, setXPostDate] = useState('');
@@ -83,6 +98,7 @@ export default function CaptureScreen() {
   }, [link, mode, xUsername]);
 
   const isXPost = mode === 'link' && isXPostUrl(link);
+  const tags = useMemo(() => parseTags(tagText), [tagText]);
 
   const captureText = useMemo(() => {
     if (mode === 'link') return isXPost ? xPostText || link : link;
@@ -106,6 +122,8 @@ export default function CaptureScreen() {
     setLink('');
     setTitle('');
     setCategory('General');
+    setTagText('');
+    setCategoryMenuOpen(false);
     setXPostText('');
     setXUsername('');
     setXPostDate('');
@@ -122,7 +140,7 @@ export default function CaptureScreen() {
         title: title.trim() || (isXPost && xUsername ? `@${xUsername} on X` : fallbackTitle(captureText, mode)),
         type: isXPost ? 'tweet' : (mode === 'link' ? 'url' : mode),
         category: category.trim() || 'General',
-        tags: isXPost ? ['xpost', category.trim() || 'General'] : undefined,
+        tags: isXPost ? ['xpost', ...tags] : tags.length ? tags : undefined,
         authorUsername: isXPost ? xUsername.trim().replace(/^@/, '') || parseXUsername(link) : undefined,
         postDate: isXPost ? xPostDate.trim() || undefined : undefined,
         links: isXPost ? xLinks : undefined,
@@ -156,12 +174,35 @@ export default function CaptureScreen() {
         day: 'numeric',
       }));
       if (post.category) setCategory(post.category);
+      if (post.tags?.length) setTagText(post.tags.join(', '));
       setXLinks(post.links || []);
       setXMedia(post.media || []);
       showToast(res.needsApiKey ? (res.message || 'X API key needed for automatic content.') : 'Post content imported', res.needsApiKey ? 'warning' : 'success');
     },
     onError: (e: any) => showToast(e?.message || 'Could not fetch this X post', 'error'),
   });
+
+  const saveButton = (
+    <TouchableOpacity
+      style={[styles.button, (!canSave || saveMutation.isLoading) && styles.buttonDisabled]}
+      onPress={() => saveMutation.mutate()}
+      disabled={!canSave || saveMutation.isLoading}
+      activeOpacity={0.9}
+    >
+      <LinearGradient
+        colors={['#FFB172', '#FF2D8E']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={styles.buttonGradient}
+      >
+        {saveMutation.isLoading ? (
+          <ActivityIndicator color="#fff" />
+        ) : (
+          <Text style={styles.buttonText}>Save memory</Text>
+        )}
+      </LinearGradient>
+    </TouchableOpacity>
+  );
 
   return (
     <KeyboardAvoidingView
@@ -171,12 +212,16 @@ export default function CaptureScreen() {
       <ScrollView
         contentContainerStyle={[
           styles.content,
-          { paddingTop: insets.top + 28 },
+          { paddingTop: insets.top + 14 },
         ]}
         keyboardShouldPersistTaps="handled"
       >
-        <Text style={styles.title}>Quick capture</Text>
-        <Text style={styles.subtitle}>Save notes, links, images, and voice thoughts to your Nomi memory.</Text>
+        <Text style={styles.navTitle}>Quick Capture</Text>
+
+        <View style={styles.header}>
+          <Text style={styles.title}>Save anything</Text>
+          <Text style={styles.subtitle}>Capture notes, links, images, and voice thoughts to your Nomi memory.</Text>
+        </View>
 
         <View style={styles.modeRow}>
           {CAPTURE_MODES.map((item) => {
@@ -188,53 +233,45 @@ export default function CaptureScreen() {
                 onPress={() => setMode(item.id)}
                 activeOpacity={0.85}
               >
-                <Text style={styles.modeIcon}>{item.icon}</Text>
+                <Ionicons
+                  name={item.icon}
+                  size={22}
+                  color={active ? '#FF2D72' : '#111116'}
+                />
                 <Text style={[styles.modeLabel, active && styles.modeLabelActive]}>{item.label}</Text>
               </TouchableOpacity>
             );
           })}
         </View>
 
-        <Text style={styles.fieldLabel}>Title</Text>
         <TextInput
           style={styles.input}
-          placeholder="Optional"
-          placeholderTextColor="#A09187"
+          placeholder="Optional title"
+          placeholderTextColor="#B9B4B7"
           value={title}
           onChangeText={setTitle}
         />
 
-        <Text style={styles.fieldLabel}>Category</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="General"
-          placeholderTextColor="#A09187"
-          value={category}
-          onChangeText={setCategory}
-        />
-
         {mode === 'note' ? (
-          <>
-            <Text style={styles.fieldLabel}>Note</Text>
+          <View style={styles.textareaWrap}>
             <TextInput
               style={styles.textarea}
-              placeholder="Write your memory..."
-              placeholderTextColor="#A09187"
+              placeholder="Write a thought, quote, or idea..."
+              placeholderTextColor="#B9B4B7"
               value={draft}
               onChangeText={setDraft}
               multiline
               textAlignVertical="top"
             />
-          </>
+          </View>
         ) : null}
 
         {mode === 'link' ? (
           <>
-            <Text style={styles.fieldLabel}>Link</Text>
             <TextInput
               style={styles.input}
-              placeholder="Paste a link or X post URL"
-              placeholderTextColor="#A09187"
+              placeholder="https://example.com"
+              placeholderTextColor="#B9B4B7"
               value={link}
               onChangeText={setLink}
               autoCapitalize="none"
@@ -244,7 +281,6 @@ export default function CaptureScreen() {
             {isXPost ? (
               <View style={styles.xCard}>
                 <Text style={styles.xHeader}>X post import</Text>
-                <Text style={styles.xHint}>Fetch post content automatically with an X API key, or paste the text manually.</Text>
                 <TouchableOpacity
                   style={[styles.fetchButton, fetchXPostMutation.isLoading && styles.buttonDisabled]}
                   onPress={() => fetchXPostMutation.mutate()}
@@ -257,33 +293,61 @@ export default function CaptureScreen() {
                     <Text style={styles.fetchButtonText}>Fetch post</Text>
                   )}
                 </TouchableOpacity>
-                <Text style={styles.fieldLabel}>Username</Text>
+                {xLinks.length || xMedia.length ? (
+                  <View style={styles.importedCard}>
+                    <Text style={styles.importedTitle}>Imported extras</Text>
+                    <View style={styles.importedRow}>
+                      {xMedia.length ? <Text style={styles.importedMeta}>{xMedia.length} media</Text> : null}
+                      {xLinks.length ? <Text style={styles.importedMeta}>{xLinks.length} links</Text> : null}
+                    </View>
+                  </View>
+                ) : null}
+              </View>
+            ) : null}
+
+            {saveButton}
+
+            {isXPost ? (
+              <View style={styles.xCard}>
                 <TextInput
                   style={styles.input}
                   placeholder="@username"
-                  placeholderTextColor="#A09187"
+                  placeholderTextColor="#B9B4B7"
                   value={xUsername}
                   onChangeText={setXUsername}
                   autoCapitalize="none"
                   autoCorrect={false}
                 />
-                <Text style={styles.fieldLabel}>Post content</Text>
+                <View style={styles.textareaWrap}>
+                  <TextInput
+                    style={[styles.textarea, styles.xTextarea]}
+                    placeholder="Paste the post text..."
+                    placeholderTextColor="#B9B4B7"
+                    value={xPostText}
+                    onChangeText={setXPostText}
+                    multiline
+                    textAlignVertical="top"
+                  />
+                </View>
                 <TextInput
-                  style={[styles.textarea, styles.xTextarea]}
-                  placeholder="Paste the post text..."
-                  placeholderTextColor="#A09187"
-                  value={xPostText}
-                  onChangeText={setXPostText}
-                  multiline
-                  textAlignVertical="top"
-                />
-                <Text style={styles.fieldLabel}>Post date</Text>
-                <TextInput
-                  style={styles.input}
+                  style={[styles.input, styles.xDateInput]}
                   placeholder="May 7, 2026"
-                  placeholderTextColor="#A09187"
+                  placeholderTextColor="#B9B4B7"
                   value={xPostDate}
                   onChangeText={setXPostDate}
+                />
+              </View>
+            ) : null}
+            {!isXPost ? (
+              <View style={styles.textareaWrap}>
+                <TextInput
+                  style={styles.textarea}
+                  placeholder="Add notes about this link..."
+                  placeholderTextColor="#B9B4B7"
+                  value={draft}
+                  onChangeText={setDraft}
+                  multiline
+                  textAlignVertical="top"
                 />
               </View>
             ) : null}
@@ -291,47 +355,76 @@ export default function CaptureScreen() {
         ) : null}
 
         {mode === 'image' ? (
-          <>
-            <Text style={styles.fieldLabel}>Image</Text>
+          <View style={styles.textareaWrap}>
             <TouchableOpacity style={styles.picker} onPress={pickImage} activeOpacity={0.85}>
-              <Text style={styles.pickerIcon}>🖼️</Text>
+              <Ionicons name="image" size={30} color="#FF2D72" />
               <Text style={styles.pickerTitle}>{pickedImage?.name || 'Choose an image'}</Text>
               <Text style={styles.pickerSub}>
                 {pickedImage ? 'Ready to save with this memory' : 'Select from Photos or Files'}
               </Text>
             </TouchableOpacity>
-          </>
+          </View>
         ) : null}
 
         {mode === 'voice' ? (
-          <>
-            <Text style={styles.fieldLabel}>Voice thought</Text>
+          <View style={styles.textareaWrap}>
             <TextInput
               style={styles.textarea}
               placeholder="Record-to-text is next; add the voice thought transcript here for now..."
-              placeholderTextColor="#A09187"
+              placeholderTextColor="#B9B4B7"
               value={draft}
               onChangeText={setDraft}
               multiline
               textAlignVertical="top"
             />
-          </>
+          </View>
         ) : null}
 
-        <TouchableOpacity
-          style={[styles.button, (!canSave || saveMutation.isLoading) && styles.buttonDisabled]}
-          onPress={() => saveMutation.mutate()}
-          disabled={!canSave || saveMutation.isLoading}
-          activeOpacity={0.9}
-        >
-          {saveMutation.isLoading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.buttonText}>Save memory</Text>
-          )}
-        </TouchableOpacity>
+        <TextInput
+          style={styles.input}
+          placeholder="Tags, separated by commas"
+          placeholderTextColor="#C8C3C6"
+          value={tagText}
+          onChangeText={setTagText}
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
 
-        {!canSave ? <Text style={styles.emptyHint}>Add content to enable save.</Text> : null}
+        <Text style={styles.categoryLabel}>Category</Text>
+        <TouchableOpacity
+          style={styles.categoryPicker}
+          onPress={() => setCategoryMenuOpen((open) => !open)}
+          activeOpacity={0.86}
+        >
+          <Text style={styles.categoryValue}>{category}</Text>
+          <Ionicons
+            name={categoryMenuOpen ? 'chevron-up' : 'chevron-down'}
+            size={18}
+            color="#FF2D72"
+          />
+        </TouchableOpacity>
+        {categoryMenuOpen ? (
+          <View style={styles.categoryMenu}>
+            {CATEGORIES.map((item) => (
+              <TouchableOpacity
+                key={item}
+                style={[styles.categoryOption, item === category && styles.categoryOptionActive]}
+                onPress={() => {
+                  setCategory(item);
+                  setCategoryMenuOpen(false);
+                }}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.categoryOptionText, item === category && styles.categoryOptionTextActive]}>
+                  {item}
+                </Text>
+                {item === category ? <Ionicons name="checkmark" size={18} color="#FF2D72" /> : null}
+              </TouchableOpacity>
+            ))}
+          </View>
+        ) : null}
+
+        {mode !== 'link' ? saveButton : null}
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -339,103 +432,172 @@ export default function CaptureScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#FDF7F2' },
-  content: { padding: 20, paddingBottom: 130 },
-  title: { fontSize: 28, fontWeight: '800', color: '#1C1C22' },
-  subtitle: { marginTop: 4, color: '#655C57', lineHeight: 20 },
+  content: { paddingHorizontal: 18, paddingBottom: 132 },
+  navTitle: {
+    color: '#111116',
+    fontSize: 18,
+    fontWeight: '800',
+    marginBottom: 32,
+    textAlign: 'center',
+  },
+  header: { marginBottom: 24 },
+  title: {
+    fontSize: 30,
+    fontWeight: '900',
+    color: '#111116',
+    letterSpacing: 0,
+  },
+  subtitle: {
+    marginTop: 8,
+    color: '#8E878C',
+    fontSize: 16,
+    lineHeight: 23,
+  },
   modeRow: {
-    marginTop: 18,
-    marginBottom: 18,
+    marginBottom: 24,
     flexDirection: 'row',
-    gap: 8,
+    gap: 12,
   },
   modeButton: {
     flex: 1,
-    minHeight: 70,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#E8D8CA',
-    backgroundColor: '#fff',
+    height: 74,
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderColor: '#EEE8EA',
+    backgroundColor: 'rgba(255,255,255,0.78)',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
+    gap: 7,
   },
   modeButtonActive: {
-    borderColor: '#FF2D8E',
-    backgroundColor: '#FFF0F7',
+    borderColor: '#FF2D72',
+    backgroundColor: 'rgba(255,255,255,0.95)',
   },
-  modeIcon: { fontSize: 22 },
-  modeLabel: { color: '#655C57', fontWeight: '700', fontSize: 12 },
-  modeLabelActive: { color: '#FF2D8E' },
-  fieldLabel: {
-    marginTop: 10,
-    marginBottom: 8,
-    color: '#8A817B',
-    fontSize: 12,
+  modeLabel: { color: '#111116', fontWeight: '800', fontSize: 12 },
+  modeLabelActive: { color: '#FF2D72' },
+  categoryLabel: {
+    color: '#111116',
+    fontSize: 16,
     fontWeight: '800',
-    textTransform: 'uppercase',
+    marginTop: 10,
+    marginBottom: 10,
   },
   input: {
-    minHeight: 50,
-    borderRadius: 14,
+    minHeight: 78,
+    borderRadius: 18,
     borderWidth: 1,
-    borderColor: '#E8D8CA',
-    backgroundColor: '#fff',
-    paddingHorizontal: 14,
+    borderColor: '#EEE8EA',
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    paddingHorizontal: 18,
     color: '#1C1C22',
+    fontSize: 17,
+    marginBottom: 14,
+  },
+  textareaWrap: {
+    marginBottom: 14,
   },
   textarea: {
-    minHeight: 220,
-    borderRadius: 14,
+    minHeight: 216,
+    borderRadius: 18,
     borderWidth: 1,
-    borderColor: '#E8D8CA',
-    backgroundColor: '#fff',
-    padding: 14,
+    borderColor: '#EEE8EA',
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    padding: 18,
     textAlignVertical: 'top',
     color: '#1C1C22',
+    fontSize: 17,
+    lineHeight: 24,
   },
   picker: {
-    minHeight: 170,
-    borderRadius: 16,
+    minHeight: 216,
+    borderRadius: 18,
     borderWidth: 1,
-    borderColor: '#E8D8CA',
-    backgroundColor: '#fff',
+    borderColor: '#EEE8EA',
+    backgroundColor: 'rgba(255,255,255,0.9)',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 18,
   },
-  pickerIcon: { fontSize: 34, marginBottom: 8 },
-  pickerTitle: { color: '#1C1C22', fontWeight: '800', textAlign: 'center' },
-  pickerSub: { marginTop: 4, color: '#8A817B', textAlign: 'center', fontSize: 12 },
+  pickerTitle: { marginTop: 10, color: '#1C1C22', fontWeight: '800', textAlign: 'center', fontSize: 16 },
+  pickerSub: { marginTop: 4, color: '#8E878C', textAlign: 'center', fontSize: 13 },
   xCard: {
-    marginTop: 4,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#E8D8CA',
-    backgroundColor: '#fff',
+    marginBottom: 14,
+    gap: 10,
+  },
+  xHeader: { color: '#8E878C', fontWeight: '800', fontSize: 12, textTransform: 'uppercase' },
+  importedCard: {
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.75)',
     padding: 12,
   },
-  xHeader: { color: '#1C1C22', fontWeight: '800', fontSize: 15 },
-  xHint: { marginTop: 4, marginBottom: 6, color: '#776B64', lineHeight: 18, fontSize: 12 },
-  xTextarea: { minHeight: 130 },
+  importedTitle: { color: '#8E878C', fontSize: 12, fontWeight: '800' },
+  importedRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
+  importedMeta: { color: '#FF2D72', fontWeight: '800', fontSize: 12 },
+  xTextarea: { minHeight: 150 },
+  xDateInput: { minHeight: 56 },
   fetchButton: {
-    height: 42,
-    borderRadius: 12,
-    backgroundColor: '#1C1C22',
+    height: 50,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#EEE8EA',
+    backgroundColor: 'rgba(255,255,255,0.78)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 8,
-    marginBottom: 6,
   },
-  fetchButtonText: { color: '#fff', fontWeight: '800', fontSize: 13 },
+  fetchButtonText: { color: '#FF2D72', fontWeight: '800', fontSize: 14 },
+  categoryPicker: {
+    minHeight: 78,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    paddingHorizontal: 22,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  categoryValue: {
+    color: '#FF2D72',
+    fontSize: 18,
+    fontWeight: '500',
+  },
+  categoryMenu: {
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.94)',
+    borderWidth: 1,
+    borderColor: '#EEE8EA',
+    overflow: 'hidden',
+    marginTop: -4,
+    marginBottom: 14,
+  },
+  categoryOption: {
+    minHeight: 48,
+    paddingHorizontal: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  categoryOptionActive: {
+    backgroundColor: '#FFF0F7',
+  },
+  categoryOptionText: {
+    color: '#514C50',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  categoryOptionTextActive: {
+    color: '#FF2D72',
+  },
   button: {
-    marginTop: 18,
-    height: 52,
-    borderRadius: 14,
+    marginTop: 10,
+    height: 74,
+    borderRadius: 18,
+    overflow: 'hidden',
+  },
+  buttonGradient: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FF2D8E',
   },
   buttonDisabled: { opacity: 0.5 },
-  buttonText: { color: '#fff', fontWeight: '800', fontSize: 15 },
-  emptyHint: { marginTop: 10, color: '#A09187', fontSize: 12, textAlign: 'center' },
+  buttonText: { color: '#fff', fontWeight: '800', fontSize: 17 },
 });

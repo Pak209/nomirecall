@@ -9,18 +9,20 @@ import { AuthAPI } from './api';
 import { useStore } from '../store/useStore';
 import { User } from '../types';
 
+const env = process.env as unknown as Record<string, string | undefined>;
+
 const REVENUECAT_IOS_API_KEY =
-  process.env.EXPO_PUBLIC_REVENUECAT_IOS_API_KEY ||
-  process.env.REVENUECAT_IOS_KEY ||
+  env.EXPO_PUBLIC_REVENUECAT_IOS_API_KEY ||
+  env.REVENUECAT_IOS_KEY ||
   '';
 
 const REVENUECAT_ANDROID_API_KEY =
-  process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY ||
-  process.env.REVENUECAT_ANDROID_KEY ||
+  env.EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY ||
+  env.REVENUECAT_ANDROID_KEY ||
   '';
 
 const ENTITLEMENT_ID =
-  process.env.EXPO_PUBLIC_REVENUECAT_ENTITLEMENT_ID ||
+  env.EXPO_PUBLIC_REVENUECAT_ENTITLEMENT_ID ||
   'brain';
 
 let configuredUserId: string | null = null;
@@ -44,7 +46,7 @@ export const PAYMENT_PLANS: PaymentPlan[] = [
     name: 'Brain',
     description: 'Higher monthly limits for capture, X discovery, and recall testing.',
     fallbackPrice: '$12/mo',
-    productId: process.env.EXPO_PUBLIC_REVENUECAT_BRAIN_PRODUCT_ID || 'brain_monthly',
+    productId: env.EXPO_PUBLIC_REVENUECAT_BRAIN_PRODUCT_ID || 'brain_monthly',
   },
   {
     id: 'brain_pro_monthly',
@@ -52,7 +54,7 @@ export const PAYMENT_PLANS: PaymentPlan[] = [
     name: 'Brain Pro',
     description: 'More room for heavy API testing while Nomi learns real usage costs.',
     fallbackPrice: '$29/mo',
-    productId: process.env.EXPO_PUBLIC_REVENUECAT_PRO_PRODUCT_ID || 'brain_pro_monthly',
+    productId: env.EXPO_PUBLIC_REVENUECAT_PRO_PRODUCT_ID || 'brain_pro_monthly',
   },
 ];
 
@@ -123,7 +125,7 @@ async function syncTier(tier: AppTier) {
 
 export async function purchasePlan(plan: PaymentPlan, user?: User | null) {
   if (!configurePayments(user)) {
-    throw new Error('Add EXPO_PUBLIC_REVENUECAT_IOS_API_KEY to .env and restart Expo to test purchases.');
+    throw new Error(`Add ${Platform.OS === 'ios' ? 'EXPO_PUBLIC_REVENUECAT_IOS_API_KEY' : 'EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY'} to .env and restart Expo to test purchases.`);
   }
   if (!plan.package) {
     throw new Error('RevenueCat offering is not returning this plan yet. Check product IDs and the current offering.');
@@ -137,7 +139,7 @@ export async function purchasePlan(plan: PaymentPlan, user?: User | null) {
 
 export async function restorePurchases(user?: User | null) {
   if (!configurePayments(user)) {
-    throw new Error('Add EXPO_PUBLIC_REVENUECAT_IOS_API_KEY to .env and restart Expo to restore purchases.');
+    throw new Error(`Add ${Platform.OS === 'ios' ? 'EXPO_PUBLIC_REVENUECAT_IOS_API_KEY' : 'EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY'} to .env and restart Expo to restore purchases.`);
   }
 
   const customerInfo = await Purchases.restorePurchases();

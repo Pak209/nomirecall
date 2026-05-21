@@ -142,7 +142,7 @@ export default function FeedScreen() {
   const feedItems = feedQuery.data?.items ?? [];
   const feedLoading = feedQuery.isFetching;
   const discoveryNotice = feedQuery.data?.needsApiKey
-    ? 'Add X_BEARER_TOKEN to the backend .env to load discovery posts.'
+    ? 'X discovery is temporarily unavailable. Your saved memories still work.'
     : feedQuery.data?.errors?.[0]?.message;
 
   const addToBrainMutation = useMutation({

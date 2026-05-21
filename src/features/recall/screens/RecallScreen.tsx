@@ -15,7 +15,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BrainAPI, MemoryAPI } from '../../../services/api';
+import { BrainAPI, BrainQuerySource, MemoryAPI } from '../../../services/api';
 import { RootStackParamList } from '../../../types';
 import { useToast } from '../../ui/shared/ToastProvider';
 
@@ -51,7 +51,7 @@ export default function RecallScreen() {
   const askMutation = useMutation({
     mutationFn: () => BrainAPI.query(question),
     onSuccess: (res) => {
-      setRelatedIds(res.sources || []);
+      setRelatedIds((res.sources || []).map((source) => source.memoryId));
       showToast('Nomi answered your question', 'success');
     },
     onError: (e: any) => showToast(e?.message || 'Nomi could not answer right now', 'error'),
@@ -128,7 +128,24 @@ export default function RecallScreen() {
         </TouchableOpacity>
       </View>
 
-      {askMutation.data?.answer ? <Text style={styles.answer}>{askMutation.data.answer}</Text> : null}
+      {askMutation.data?.answer ? (
+        <View style={styles.answerCard}>
+          <Text style={styles.answer}>{askMutation.data.answer}</Text>
+          <Text style={styles.answerMeta}>
+            Confidence: {askMutation.data.confidence} • {askMutation.data.retrievalMode}
+          </Text>
+          {askMutation.data.sources.length ? (
+            <View style={styles.sourceList}>
+              <Text style={styles.sourceHeader}>Sources</Text>
+              {askMutation.data.sources.map((source) => (
+                <CitationSource key={source.memoryId} source={source} />
+              ))}
+            </View>
+          ) : (
+            <Text style={styles.noSources}>No saved memories matched that question.</Text>
+          )}
+        </View>
+      ) : null}
 
       {memoriesQuery.isLoading ? (
         <View style={styles.center}><ActivityIndicator color="#FF2D8E" /></View>
@@ -215,6 +232,18 @@ export default function RecallScreen() {
   );
 }
 
+function CitationSource({ source }: { source: BrainQuerySource }) {
+  return (
+    <View style={styles.sourceRow}>
+      <Text style={styles.sourceTitle} numberOfLines={1}>{source.title || 'Untitled memory'}</Text>
+      {source.relevanceReason ? (
+        <Text style={styles.sourceReason} numberOfLines={1}>{source.relevanceReason}</Text>
+      ) : null}
+      <Text style={styles.sourceSnippet} numberOfLines={2}>{source.snippet}</Text>
+    </View>
+  );
+}
+
 function FilterSection({
   title,
   items,
@@ -273,7 +302,16 @@ const styles = StyleSheet.create({
   askInput: { flex: 1, minHeight: 36, color: '#1C1C22' },
   askButton: { height: 36, borderRadius: 10, backgroundColor: '#7B3FF2', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 14 },
   askText: { color: '#fff', fontWeight: '700' },
-  answer: { marginTop: 10, color: '#1C1C22', backgroundColor: '#FFF2DE', borderRadius: 12, padding: 10, lineHeight: 20 },
+  answerCard: { marginTop: 10, backgroundColor: '#FFF2DE', borderRadius: 12, padding: 10 },
+  answer: { color: '#1C1C22', lineHeight: 20 },
+  answerMeta: { color: '#776B64', fontSize: 11, fontWeight: '700', marginTop: 8, textTransform: 'capitalize' },
+  sourceList: { marginTop: 10, gap: 8 },
+  sourceHeader: { color: '#655C57', fontSize: 11, fontWeight: '900', textTransform: 'uppercase' },
+  sourceRow: { borderRadius: 10, borderWidth: 1, borderColor: '#E8D8CA', backgroundColor: '#fff', padding: 9 },
+  sourceTitle: { color: '#1C1C22', fontSize: 13, fontWeight: '800' },
+  sourceReason: { color: '#7B3FF2', fontSize: 11, fontWeight: '700', marginTop: 2 },
+  sourceSnippet: { color: '#655C57', fontSize: 12, lineHeight: 17, marginTop: 4 },
+  noSources: { color: '#776B64', fontSize: 12, marginTop: 8 },
   list: { paddingTop: 12, paddingBottom: 120, gap: 10 },
   memoryCard: { borderRadius: 14, borderWidth: 1, borderColor: '#E8D8CA', backgroundColor: '#fff', padding: 12 },
   memoryTitle: { color: '#1C1C22', fontWeight: '700' },

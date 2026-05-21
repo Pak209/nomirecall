@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   Alert,
   ScrollView,
+  Platform,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -129,7 +130,7 @@ export default function PaywallScreen() {
           <View style={styles.configNotice}>
             <Text style={styles.configTitle}>RevenueCat key needed</Text>
             <Text style={styles.configText}>
-              Add EXPO_PUBLIC_REVENUECAT_IOS_API_KEY to .env, restart Expo, and use an iOS dev/TestFlight build to test purchases.
+              Add {Platform.OS === 'ios' ? 'EXPO_PUBLIC_REVENUECAT_IOS_API_KEY' : 'EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY'} to .env, restart Expo, and use a store-capable build to test purchases.
             </Text>
           </View>
         ) : null}

@@ -99,6 +99,7 @@ export interface IngestPayload {
   postDate?: string;
   links?: MemoryLink[];
   media?: MemoryMedia[];
+  processWithAI?: boolean;
 }
 
 export interface IngestResult {
@@ -106,19 +107,74 @@ export interface IngestResult {
   source_id: string;
   title: string;
   message: string;
+  aiProcessing?: {
+    status: 'processed' | 'skipped' | 'failed';
+    memoryId: string;
+    error?: string;
+  };
 }
 
 export interface MemoryItem {
   id: string;
+  sourceType?: 'x_bookmark' | 'manual_note' | 'link' | 'image' | 'voice' | 'unknown';
+  sourceUrl?: string;
+  sourceId?: string;
   title: string;
+  rawText?: string;
+  cleanText?: string;
+  contentHash?: string;
+  summary?: string;
   source_type: string;
   createdAt?: string;
+  updatedAt?: string;
+  capturedAt?: string;
   category?: string;
   tags?: string[];
+  concepts?: string[];
+  entities?: string[];
   userId?: string;
   body?: string;
   source_url?: string;
   authorUsername?: string;
+  author?: {
+    id?: string;
+    username?: string;
+    displayName?: string;
+    avatarUrl?: string;
+  };
+  intent?: 'idea' | 'research' | 'build_later' | 'investing' | 'share' | 'personal' | 'unknown';
+  projectIds?: string[];
+  embedding?: number[];
+  confidenceScore?: number;
+  isArchived?: boolean;
+  isFavorite?: boolean;
+  ai?: {
+    summary?: string;
+    category?: string;
+    tags?: string[];
+    concepts?: string[];
+    entities?: string[];
+    claims?: string[];
+    actionItems?: string[];
+    keyTakeaways?: string[];
+    suggestedProjects?: string[];
+    importanceScore?: number;
+    modelUsed?: string;
+    processedAt?: string;
+    processingVersion?: string;
+    processingStatus?: 'pending' | 'processing' | 'processed' | 'failed' | 'skipped';
+    errorMessage?: string;
+    retryCount?: number;
+  };
+  sync?: {
+    provider?: 'x' | 'manual' | 'unknown';
+    importStatus?: 'pending' | 'imported' | 'failed' | 'retrying';
+    importedAt?: string;
+    lastSyncAttemptAt?: string;
+    errorMessage?: string;
+    retryCount?: number;
+    rawPayloadHash?: string;
+  };
   postDate?: string;
   links?: MemoryLink[];
   media?: MemoryMedia[];

@@ -1,6 +1,7 @@
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, waitFor } from '@testing-library/react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import NomiDashboardScreen from '../NomiDashboardScreen';
 
 jest.mock('@react-navigation/native', () => {
@@ -60,15 +61,20 @@ describe('NomiDashboardScreen', () => {
     });
 
     const screen = render(
-      <QueryClientProvider client={queryClient}>
-        <NomiDashboardScreen />
-      </QueryClientProvider>,
+      <SafeAreaProvider initialMetrics={{
+        frame: { x: 0, y: 0, width: 390, height: 844 },
+        insets: { top: 44, right: 0, bottom: 34, left: 0 },
+      }}>
+        <QueryClientProvider client={queryClient}>
+          <NomiDashboardScreen />
+        </QueryClientProvider>
+      </SafeAreaProvider>,
     );
 
     await waitFor(() => {
       expect(screen.getByText(/AI summary/)).toBeTruthy();
       expect(screen.getAllByText('Recent item').length).toBeGreaterThan(0);
-      expect(screen.getByText('Ideas')).toBeTruthy();
+      expect(screen.getByText('For You')).toBeTruthy();
     });
 
     screen.unmount();

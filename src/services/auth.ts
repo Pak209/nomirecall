@@ -1,5 +1,8 @@
 import * as AppleAuthentication from 'expo-apple-authentication';
 import * as SecureStore from 'expo-secure-store';
+import { Platform } from 'react-native';
+import auth from '@react-native-firebase/auth';
+import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 import { API_BASE, AuthAPI } from './api';
 import { useStore } from '../store/useStore';
 import { InterestTag, User } from '../types';
@@ -14,6 +17,9 @@ interface EmailAuthPayload {
   password: string;
   intent?: 'signin' | 'signup';
 }
+
+let googleConfigured = false;
+const env = process.env as unknown as Record<string, string | undefined>;
 
 async function postEmailAuth(path: string, payload: EmailAuthPayload): Promise<EmailAuthResponse> {
   let res: Response;
@@ -35,6 +41,16 @@ async function postEmailAuth(path: string, payload: EmailAuthPayload): Promise<E
   return res.json();
 }
 
+function makeAppUser(user: User, token: string, displayName?: string | null): User {
+  return {
+    ...user,
+    displayName: displayName || user.displayName || user.email,
+    token,
+    tier: user.tier ?? 'free',
+    onboardingCompleted: !!user.onboardingCompleted,
+  };
+}
+
 // ── Apple Sign In ─────────────────────────────────────────────────────────────
 export async function signInWithApple(): Promise<User> {
   const credential = await AppleAuthentication.signInAsync({
@@ -50,23 +66,59 @@ export async function signInWithApple(): Promise<User> {
 
   const { token, user } = await AuthAPI.signIn(idToken);
 
-  const appUser: User = {
-    id: user.id,
-    email: user.email,
-    displayName: credential.fullName?.givenName ?? user.email,
-    token,
-    tier: user.tier ?? 'free',
-    onboardingCompleted: !!user.onboardingCompleted,
-  };
+  const appUser = makeAppUser(user, token, credential.fullName?.givenName);
 
   await persistUser(appUser, token);
   return appUser;
 }
 
+// ── Google Sign In / Firebase Auth ───────────────────────────────────────────
+function configureGoogleSignIn() {
+  if (googleConfigured) return;
+  const webClientId = env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || '';
+  const iosClientId = env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID || undefined;
+
+  if (!webClientId) {
+    throw new Error('Add EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID from Firebase/Google Cloud, then restart Expo.');
+  }
+
+  GoogleSignin.configure({
+    webClientId,
+    iosClientId,
+    offlineAccess: false,
+  });
+  googleConfigured = true;
+}
+
+export async function signInWithGoogle(): Promise<User> {
+  try {
+    configureGoogleSignIn();
+    if (Platform.OS === 'android') {
+      await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+    }
+    const result = await GoogleSignin.signIn();
+    const idToken = result.idToken;
+    if (!idToken) throw new Error('Google did not return an ID token.');
+
+    const credential = auth.GoogleAuthProvider.credential(idToken);
+    const firebaseResult = await auth().signInWithCredential(credential);
+    const firebaseIdToken = await firebaseResult.user.getIdToken();
+    const { token, user } = await AuthAPI.signIn(firebaseIdToken);
+    const appUser = makeAppUser(user, token, firebaseResult.user.displayName);
+    await persistUser(appUser, token);
+    return appUser;
+  } catch (error: any) {
+    if (error?.code === statusCodes.SIGN_IN_CANCELLED) {
+      throw Object.assign(new Error('Google sign-in was cancelled.'), { code: 'ERR_REQUEST_CANCELED' });
+    }
+    throw error;
+  }
+}
+
 // ── Email / Password (dev / fallback) ─────────────────────────────────────────
 export async function signInWithEmail(email: string, password: string): Promise<User> {
   const { token, user } = await postEmailAuth('/auth/email', { email, password, intent: 'signin' });
-  const appUser: User = { ...user, token };
+  const appUser = makeAppUser(user, token);
   await persistUser(appUser, token);
   return appUser;
 }
@@ -74,14 +126,14 @@ export async function signInWithEmail(email: string, password: string): Promise<
 export async function signUpWithEmail(email: string, password: string): Promise<User> {
   try {
     const { token, user } = await postEmailAuth('/auth/email/signup', { email, password, intent: 'signup' });
-    const appUser: User = { ...user, token };
+    const appUser = makeAppUser(user, token);
     await persistUser(appUser, token);
     return appUser;
   } catch (error: any) {
     // Fallback for backends that multiplex sign-in/sign-up under /auth/email.
     if (typeof error?.message === 'string' && /404|not found/i.test(error.message)) {
       const { token, user } = await postEmailAuth('/auth/email', { email, password, intent: 'signup' });
-      const appUser: User = { ...user, token };
+      const appUser = makeAppUser(user, token);
       await persistUser(appUser, token);
       return appUser;
     }
@@ -95,6 +147,22 @@ export async function forgotPasswordWithEmail(email: string): Promise<{ ok: bool
 
 export async function resetPasswordWithToken(token: string, password: string): Promise<{ ok: boolean }> {
   return AuthAPI.resetPassword(token, password);
+}
+
+export async function deleteCurrentAccount(): Promise<void> {
+  const firebaseUser = auth().currentUser;
+  if (firebaseUser) {
+    await firebaseUser.delete();
+  }
+
+  await AuthAPI.deleteAccount();
+  await GoogleSignin.signOut().catch(() => undefined);
+  await auth().signOut().catch(() => undefined);
+  await Promise.all([
+    SecureStore.deleteItemAsync('auth_token'),
+    SecureStore.deleteItemAsync('user_data'),
+  ]);
+  useStore.getState().setUser(null);
 }
 
 export async function markOnboardingComplete(): Promise<User> {

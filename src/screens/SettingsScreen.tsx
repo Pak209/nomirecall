@@ -1,16 +1,19 @@
 import React from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
-  TouchableOpacity, Alert, Switch, Linking,
+  TouchableOpacity, Alert, Switch, Linking, ActivityIndicator, Share,
 } from 'react-native';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 import { useMutation } from '@tanstack/react-query';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Colors, Typography, Spacing, Radius, INTERESTS } from '../constants/theme';
 import { useStore } from '../store/useStore';
-import { InterestTag, RootStackParamList } from '../types';
-import { AuthAPI } from '../services/api';
+import { InterestTag, MemoryItem, RootStackParamList } from '../types';
+import { AuthAPI, MemoryAPI } from '../services/api';
+import { deleteCurrentAccount } from '../services/auth';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -41,12 +44,72 @@ function SectionHeader({ title }: { title: string }) {
   return <Text style={styles.sectionHeader}>{title}</Text>;
 }
 
+function markdownValue(value?: string) {
+  return String(value || '').replace(/"/g, '\\"');
+}
+
+function memoryToMarkdown(memory: MemoryItem) {
+  const body = memory.body || '';
+  const tags = memory.tags?.length ? memory.tags.map((tag) => `#${tag.replace(/^#/, '')}`).join(' ') : '';
+  return [
+    '---',
+    `title: "${markdownValue(memory.title)}"`,
+    `type: "${markdownValue(memory.source_type)}"`,
+    `category: "${markdownValue(memory.category || 'General')}"`,
+    memory.source_url ? `source: "${markdownValue(memory.source_url)}"` : '',
+    memory.authorUsername ? `author: "@${markdownValue(memory.authorUsername)}"` : '',
+    memory.postDate ? `postDate: "${markdownValue(memory.postDate)}"` : '',
+    '---',
+    '',
+    `# ${memory.title || 'Untitled memory'}`,
+    '',
+    body || '_No body saved._',
+    '',
+    tags,
+  ].filter(Boolean).join('\n');
+}
+
+function exportMarkdown(memories: MemoryItem[]) {
+  const exportedAt = new Date().toISOString();
+  return [
+    '# Nomi Obsidian Export',
+    '',
+    `Exported: ${exportedAt}`,
+    `Memories: ${memories.length}`,
+    '',
+    memories.map(memoryToMarkdown).join('\n\n---\n\n'),
+  ].join('\n');
+}
+
 export default function SettingsScreen() {
   const nav = useNavigation<Nav>();
   const insets = useSafeAreaInsets();
   const { user, activeTopics, setActiveTopics, logout, serverOnline } = useStore();
   const updateInterestsMutation = useMutation({
     mutationFn: (interests: InterestTag[]) => AuthAPI.updateInterests(interests),
+  });
+  const exportMutation = useMutation({
+    mutationFn: async () => {
+      const { memories } = await MemoryAPI.list();
+      const markdown = exportMarkdown(memories);
+      const fileUri = `${FileSystem.cacheDirectory}nomi-obsidian-export.md`;
+      await FileSystem.writeAsStringAsync(fileUri, markdown);
+
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(fileUri, {
+          dialogTitle: 'Export Nomi Markdown',
+          mimeType: 'text/markdown',
+          UTI: 'net.daringfireball.markdown',
+        });
+      } else {
+        await Share.share({ title: 'Nomi Obsidian Export', message: markdown });
+      }
+    },
+    onError: (e: any) => Alert.alert('Export failed', e?.message || 'Could not export Markdown.'),
+  });
+  const deleteAccountMutation = useMutation({
+    mutationFn: deleteCurrentAccount,
+    onError: (e: any) => Alert.alert('Account deletion failed', e?.message || 'Could not delete this account.'),
   });
 
   function toggleTopic(id: InterestTag) {
@@ -66,6 +129,13 @@ export default function SettingsScreen() {
     Alert.alert('Sign out', 'Are you sure?', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Sign out', style: 'destructive', onPress: logout },
+    ]);
+  }
+
+  function handleDeleteAccount() {
+    Alert.alert('Delete account?', 'This removes your Nomi account data and signs you out. This cannot be undone.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete account', style: 'destructive', onPress: () => deleteAccountMutation.mutate() },
     ]);
   }
 
@@ -130,6 +200,16 @@ export default function SettingsScreen() {
           })}
         </View>
 
+        {/* Export */}
+        <SectionHeader title="Export" />
+        <View style={styles.section}>
+          <SettingsRow
+            label="Obsidian Markdown"
+            onPress={() => exportMutation.mutate()}
+            right={exportMutation.isLoading ? <ActivityIndicator color={Colors.teal} /> : undefined}
+          />
+        </View>
+
         {/* Legal */}
         <SectionHeader title="Legal" />
         <View style={styles.section}>
@@ -147,6 +227,12 @@ export default function SettingsScreen() {
         <SectionHeader title="Account" />
         <View style={styles.section}>
           <SettingsRow label="Sign out" onPress={handleSignOut} danger />
+          <SettingsRow
+            label="Delete account"
+            onPress={handleDeleteAccount}
+            danger
+            right={deleteAccountMutation.isLoading ? <ActivityIndicator color={Colors.red} /> : undefined}
+          />
         </View>
 
         <Text style={styles.versionText}>Nomi v1.0.0</Text>

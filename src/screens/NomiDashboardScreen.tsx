@@ -1,81 +1,62 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  FlatList,
+  Image,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
-  useWindowDimensions,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { useQueries } from '@tanstack/react-query';
 import { useStore } from '../store/useStore';
-import { QuickCaptureCard, QuickCaptureAction } from '../components/nomi/QuickCaptureCard';
-import { SummaryCard } from '../components/nomi/SummaryCard';
-import { MemoryCard } from '../components/nomi/MemoryCard';
-import { RecentCaptureItem, RecentCaptureList } from '../components/nomi/RecentCaptureList';
-import { CategoryChip } from '../components/nomi/CategoryChip';
-import { DashboardAPI, DashboardCategory, DashboardMemory, DashboardSummary } from '../services/api';
+import { QuickCaptureAction } from '../components/nomi/QuickCaptureCard';
+import { CompactCaptureComposer } from '../components/nomi/CompactCaptureComposer';
+import { HomeFeedTab, HomeFeedTabs } from '../components/nomi/HomeFeedTabs';
+import { MemoryFeedCard } from '../components/nomi/MemoryFeedCard';
+import { FloatingCaptureButton } from '../components/nomi/FloatingCaptureButton';
+import { NomiSideDrawer } from '../components/nomi/NomiSideDrawer';
+import { CaptureActionSheet } from '../components/nomi/CaptureActionSheet';
+import { DashboardAPI, DashboardCategory, DashboardSummary } from '../services/api';
+import { MemoryFeedItem } from '../components/nomi/homeFeedUtils';
 
 type Nav = any;
 
 const QUICK_CAPTURE_ACTIONS: QuickCaptureAction[] = [
-  { id: 'note', label: 'Note', icon: '📝' },
-  { id: 'link', label: 'Link', icon: '🔗' },
-  { id: 'image', label: 'Image', icon: '🖼️' },
-  { id: 'voice', label: 'Voice', icon: '🎙️' },
+  { id: 'note', label: 'Note', icon: 'note' },
+  { id: 'link', label: 'Link', icon: 'link' },
+  { id: 'image', label: 'Image', icon: 'image' },
+  { id: 'voice', label: 'Voice', icon: 'voice' },
 ];
 
-function SectionHeader({ title, action, onActionPress }: { title: string; action?: string; onActionPress?: () => void }) {
-  return (
-    <View style={styles.sectionHeader}>
-      <Text style={styles.sectionTitle}>{title}</Text>
-      {action ? (
-        <TouchableOpacity onPress={onActionPress} disabled={!onActionPress}>
-          <Text style={styles.sectionAction}>{action}</Text>
-        </TouchableOpacity>
-      ) : null}
-    </View>
-  );
+const EMPTY_FEED_ITEMS: MemoryFeedItem[] = [];
+const EMPTY_CATEGORIES: DashboardCategory[] = [];
+
+function isProjectMemory(item: MemoryFeedItem) {
+  const label = `${item.category || ''} ${item.tag || ''} ${item.tags?.join(' ') || ''}`.toLowerCase();
+  return !!item.projectIds?.length || label.includes('project');
 }
 
-type TodayItem =
-  | { kind: 'summary'; id: string; data: DashboardSummary }
-  | { kind: 'memory'; id: string; data: DashboardMemory }
-  | { kind: 'capture'; id: string; data: RecentCaptureItem };
-
-function TodayPostCard({ item, width, onPress }: { item: RecentCaptureItem; width: number; onPress: () => void }) {
-  return (
-    <TouchableOpacity style={[styles.todayPostCard, { width }]} onPress={onPress} activeOpacity={0.88}>
-      <View style={styles.todayPostHeader}>
-        <Text style={styles.todayPostIcon}>{item.icon}</Text>
-        <View style={styles.todayPostTitleWrap}>
-          <Text style={styles.todayPostTitle} numberOfLines={2}>{item.title}</Text>
-          <Text style={styles.todayPostMeta} numberOfLines={1}>{item.meta}</Text>
-        </View>
-      </View>
-      {item.body ? <Text style={styles.todayPostBody} numberOfLines={5}>{item.body}</Text> : null}
-      <Text style={styles.todayPostTag}>{item.tag}</Text>
-    </TouchableOpacity>
-  );
+function isInboxMemory(item: MemoryFeedItem) {
+  return item.sync?.importStatus === 'pending' || item.ai?.processingStatus === 'pending';
 }
 
 export default function NomiDashboardScreen() {
   const nav = useNavigation<Nav>();
-  const { width: windowWidth } = useWindowDimensions();
-  const todayListRef = useRef<FlatList<TodayItem>>(null);
-  const todayIndexRef = useRef(0);
+  const insets = useSafeAreaInsets();
   const user = useStore((s) => s.user);
   const serverOnline = useStore((s) => s.serverOnline);
-  const firstName = user?.displayName?.split(' ')[0] || 'Alex';
   const [refreshing, setRefreshing] = useState(false);
+  const [activeTab, setActiveTab] = useState<HomeFeedTab>('for-you');
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [captureSheetOpen, setCaptureSheetOpen] = useState(false);
+
   const [
     summaryQuery,
-    memoryQuery,
     recentQuery,
     categoriesQuery,
   ] = useQueries({
@@ -83,11 +64,6 @@ export default function NomiDashboardScreen() {
       {
         queryKey: ['dashboard-summary'],
         queryFn: DashboardAPI.getSummary,
-        enabled: serverOnline,
-      },
-      {
-        queryKey: ['dashboard-memory'],
-        queryFn: DashboardAPI.getMemory,
         enabled: serverOnline,
       },
       {
@@ -104,154 +80,173 @@ export default function NomiDashboardScreen() {
   });
 
   const summary: DashboardSummary | null = summaryQuery.data ?? null;
-  const memory: DashboardMemory | null = memoryQuery.data ?? null;
-  const recent: RecentCaptureItem[] = recentQuery.data?.items ?? [];
-  const categories: DashboardCategory[] = categoriesQuery.data?.categories ?? [];
-  const loading = summaryQuery.isFetching || memoryQuery.isFetching || recentQuery.isFetching || categoriesQuery.isFetching;
-  const todayCardWidth = Math.max(280, windowWidth - 56);
-  const todayItems: TodayItem[] = useMemo(() => [
-    ...(summary ? [{ kind: 'summary' as const, id: 'summary', data: summary }] : []),
-    ...(memory ? [{ kind: 'memory' as const, id: 'memory', data: memory }] : []),
-    ...recent.map((item) => ({ kind: 'capture' as const, id: item.id, data: item })),
-  ], [memory, recent, summary]);
+  const recent: MemoryFeedItem[] = recentQuery.data?.items ?? EMPTY_FEED_ITEMS;
+  const categories: DashboardCategory[] = categoriesQuery.data?.categories ?? EMPTY_CATEGORIES;
+  const loading = summaryQuery.isFetching || recentQuery.isFetching || categoriesQuery.isFetching;
+  const memoryCount = summary?.stats?.totalCaptures ?? recent.length;
+  const projectCount = categories.find((category) => category.label.toLowerCase() === 'projects')?.count ?? 0;
+  const summaryFeedItem: MemoryFeedItem | null = useMemo(() => {
+    if (!summary) return null;
+    return {
+      id: 'nomi-daily-summary',
+      title: summary.title,
+      meta: summary.subtitle || 'Nomi · For You',
+      tag: 'recap',
+      icon: 'sparkles',
+      body: summary.body,
+      summary: summary.body,
+      source_type: 'nomi',
+      category: 'recap',
+    };
+  }, [summary]);
 
-  useEffect(() => {
-    if (todayItems.length <= 1) return undefined;
-    const timer = setInterval(() => {
-      const nextIndex = (todayIndexRef.current + 1) % todayItems.length;
-      todayIndexRef.current = nextIndex;
-      todayListRef.current?.scrollToIndex({ index: nextIndex, animated: true });
-    }, 5200);
-    return () => clearInterval(timer);
-  }, [todayItems.length]);
+  const feedItems = useMemo(() => {
+    if (activeTab === 'projects') return recent.filter(isProjectMemory);
+    if (activeTab === 'inbox') return recent.filter(isInboxMemory);
+    if (activeTab === 'for-you' && summaryFeedItem) return [summaryFeedItem, ...recent];
+    return recent;
+  }, [activeTab, recent, summaryFeedItem]);
 
   const refreshDashboard = useCallback(async () => {
     setRefreshing(true);
     await Promise.all([
       summaryQuery.refetch(),
-      memoryQuery.refetch(),
       recentQuery.refetch(),
       categoriesQuery.refetch(),
     ]);
     setRefreshing(false);
-  }, [summaryQuery, memoryQuery, recentQuery, categoriesQuery]);
+  }, [summaryQuery, recentQuery, categoriesQuery]);
+
+  function openCapture(action: QuickCaptureAction) {
+    setCaptureSheetOpen(false);
+    nav.navigate('Capture', { mode: action.id });
+  }
+
+  function handleDrawerNavigate(destination: string) {
+    if (destination === 'profile') nav.navigate('Profile');
+    if (destination === 'projects') nav.navigate('Recall');
+    if (destination === 'nomi-pro') nav.navigate('Paywall', { feature: 'Nomi Pro' });
+    if (destination === 'daily-brief' || destination === 'connected-ideas') nav.navigate('Recall');
+    if (destination === 'import-sources') nav.navigate('Capture', { mode: 'link' });
+  }
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <ScrollView
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-        refreshControl={(
-          <RefreshControl refreshing={refreshing} onRefresh={refreshDashboard} />
-        )}
-      >
-        <View style={styles.headerRow}>
-          <View>
-            <Text style={styles.greeting}>Good morning, {firstName} ☀️</Text>
-            <View style={styles.streakRow}>
-              <Text style={styles.streakMain}>🔥 Streak 7 days</Text>
-              <Text style={styles.streakSub}>Keep it going!</Text>
+    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
+      <View style={styles.root}>
+        <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.userAvatar}
+            onPress={() => setDrawerOpen(true)}
+            activeOpacity={0.82}
+            accessibilityRole="button"
+            accessibilityLabel="Open profile menu"
+          >
+            <Text style={styles.userInitial}>{(user?.displayName || user?.email || 'N').charAt(0).toUpperCase()}</Text>
+          </TouchableOpacity>
+
+          <Text style={styles.headerTitle}>Home</Text>
+
+          <View style={styles.headerActions}>
+            <TouchableOpacity style={styles.headerIconButton} onPress={() => nav.navigate('Recall')} activeOpacity={0.76} accessibilityRole="button" accessibilityLabel="Search memories">
+              <Ionicons name="search" size={27} color="#16151A" />
+            </TouchableOpacity>
+            <View style={styles.nomiOrb}>
+              <Image
+                source={require('../../assets/nomi-mascot.png')}
+                style={styles.nomiOrbImage}
+                resizeMode="contain"
+                accessibilityIgnoresInvertColors
+              />
+              <View style={styles.onlineDot} />
             </View>
-          </View>
-          <View style={styles.avatarWrap}>
-            <Text style={styles.avatarEmoji}>🧑🏽</Text>
-            <View style={styles.onlineDot} />
           </View>
         </View>
 
-        <QuickCaptureCard
-          title="Quick capture anything..."
+        <HomeFeedTabs activeTab={activeTab} onTabPress={setActiveTab} />
+
+        <ScrollView
+          contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 132 }]}
+          showsVerticalScrollIndicator={false}
+          refreshControl={(
+            <RefreshControl refreshing={refreshing} onRefresh={refreshDashboard} tintColor="#EF6359" />
+          )}
+        >
+          <CompactCaptureComposer actions={QUICK_CAPTURE_ACTIONS} onActionPress={openCapture} />
+
+          {loading && !feedItems.length ? (
+            <View style={styles.loadingBlock}>
+              <ActivityIndicator color="#EF6359" />
+            </View>
+          ) : null}
+
+          {feedItems.length ? (
+            <View style={styles.feedList}>
+              {feedItems.map((item) => (
+                <MemoryFeedCard
+                  key={item.id}
+                  memory={item}
+                  onPress={() => (item.id === 'nomi-daily-summary' ? nav.navigate('Recall') : nav.navigate('MemoryDetail', { memoryId: item.id }))}
+                  onAskPress={() => nav.navigate('Recall')}
+                  onConnectPress={() => nav.navigate('Recall')}
+                  onOpenPress={() => (item.id === 'nomi-daily-summary' ? nav.navigate('Recall') : nav.navigate('MemoryDetail', { memoryId: item.id }))}
+                />
+              ))}
+            </View>
+          ) : (
+            <EmptyFeedState activeTab={activeTab} />
+          )}
+        </ScrollView>
+
+        <FloatingCaptureButton bottomOffset={insets.bottom + 104} onPress={() => setCaptureSheetOpen(true)} />
+
+        <CaptureActionSheet
+          visible={captureSheetOpen}
           actions={QUICK_CAPTURE_ACTIONS}
-          onActionPress={(action) => nav.navigate('Capture', { mode: action.id })}
+          onClose={() => setCaptureSheetOpen(false)}
+          onActionPress={openCapture}
         />
 
-        <SectionHeader title="Today" action="See all" onActionPress={() => nav.navigate('Recall')} />
-        {todayItems.length ? (
-          <FlatList
-            ref={todayListRef}
-            horizontal
-            data={todayItems}
-            keyExtractor={(item) => `${item.kind}-${item.id}`}
-            showsHorizontalScrollIndicator={false}
-            snapToInterval={todayCardWidth + 12}
-            decelerationRate="fast"
-            contentContainerStyle={styles.todayCarousel}
-            onMomentumScrollEnd={(event) => {
-              todayIndexRef.current = Math.round(event.nativeEvent.contentOffset.x / (todayCardWidth + 12));
-            }}
-            onScrollToIndexFailed={() => {}}
-            renderItem={({ item }) => (
-              <View style={{ width: todayCardWidth, marginRight: 12 }}>
-                {item.kind === 'summary' ? (
-                  <SummaryCard
-                    title={item.data.title}
-                    subtitle={item.data.subtitle}
-                    body={item.data.body}
-                    ctaLabel={item.data.ctaLabel}
-                    onPress={() => nav.navigate('Recall')}
-                  />
-                ) : item.kind === 'memory' ? (
-                  <MemoryCard
-                    title={item.data.title}
-                    timestamp={item.data.timestamp}
-                    quote={item.data.quote}
-                    author={item.data.author}
-                    ctaLabel={item.data.ctaLabel}
-                    onPress={() => nav.navigate('Recall')}
-                  />
-                ) : (
-                  <TodayPostCard
-                    item={item.data}
-                    width={todayCardWidth}
-                    onPress={() => nav.navigate('MemoryDetail', { memoryId: item.data.id })}
-                  />
-                )}
-              </View>
-            )}
-          />
-        ) : (
-          <View style={styles.emptyToday}>
-            <Text style={styles.emptyTitle}>No captures yet</Text>
-            <Text style={styles.emptyBody}>Capture a note, link, or post and it will show up here.</Text>
-          </View>
-        )}
-
-        <SectionHeader title="Recent captures" action="See all" onActionPress={() => nav.navigate('Recall')} />
-        <RecentCaptureList
-          items={recent}
-          onItemPress={(item) => nav.navigate('MemoryDetail', { memoryId: item.id })}
+        <NomiSideDrawer
+          visible={drawerOpen}
+          user={user}
+          memoryCount={memoryCount}
+          projectCount={projectCount}
+          onClose={() => setDrawerOpen(false)}
+          onNavigate={handleDrawerNavigate}
         />
-
-        <SectionHeader title="Categories" />
-        {categories.length ? (
-          <View style={styles.categoriesRow}>
-            {categories.map((chip) => (
-              <CategoryChip
-                key={chip.id}
-                icon={chip.icon}
-                label={chip.label}
-                count={chip.count}
-                bgColor={chip.bgColor}
-              />
-            ))}
-          </View>
-        ) : (
-          <View style={styles.emptyCategory}>
-            <Text style={styles.emptyBody}>Categories will appear after your first capture.</Text>
-          </View>
-        )}
-
-        {loading && (
-          <View style={styles.loadingWrap}>
-            <ActivityIndicator color="#FF2D8E" />
-          </View>
-        )}
-
-        <TouchableOpacity style={styles.footerBrand} activeOpacity={0.85}>
-          <Text style={styles.footerBrandText}>Nomi — capture anything, remember everything.</Text>
-        </TouchableOpacity>
-      </ScrollView>
+      </View>
     </SafeAreaView>
+  );
+}
+
+function EmptyFeedState({ activeTab }: { activeTab: HomeFeedTab }) {
+  const copy = {
+    'for-you': {
+      title: 'Your memory feed is ready',
+      body: 'Save a note, link, image, or voice thought and Nomi will turn it into a calm personal feed.',
+    },
+    recent: {
+      title: 'No recent captures yet',
+      body: 'Your newest memories will land here as compact feed cards.',
+    },
+    projects: {
+      title: 'No project-linked memories',
+      body: 'When memories are connected to projects, they will appear here for faster review.',
+    },
+    inbox: {
+      title: 'Inbox is clear',
+      body: 'Unprocessed or newly imported captures will show here when Nomi needs your attention.',
+    },
+  }[activeTab];
+
+  return (
+    <View style={styles.emptyState}>
+      <View style={styles.emptyIcon}>
+        <Ionicons name={activeTab === 'inbox' ? 'file-tray-outline' : 'sparkles'} size={25} color="#EF6359" />
+      </View>
+      <Text style={styles.emptyTitle}>{copy.title}</Text>
+      <Text style={styles.emptyBody}>{copy.body}</Text>
+    </View>
   );
 }
 
@@ -260,181 +255,118 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FDF7F2',
   },
-  content: {
-    paddingHorizontal: 16,
-    paddingBottom: 140,
-    gap: 12,
+  root: {
+    flex: 1,
+    backgroundColor: '#FDF7F2',
   },
-  headerRow: {
-    marginTop: 6,
-    marginBottom: 4,
+  header: {
+    minHeight: 64,
+    paddingHorizontal: 18,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
   },
-  greeting: {
-    color: '#1C1C22',
-    fontSize: 30,
-    fontWeight: '800',
-    letterSpacing: -0.7,
+  userAvatar: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#EDE2DA',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  streakRow: {
-    marginTop: 8,
+  userInitial: {
+    color: '#201F24',
+    fontSize: 16,
+    fontWeight: '900',
+  },
+  headerTitle: {
+    position: 'absolute',
+    left: 88,
+    right: 88,
+    color: '#151419',
+    textAlign: 'center',
+    fontSize: 27,
+    fontWeight: '900',
+  },
+  headerActions: {
+    marginLeft: 'auto',
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 14,
   },
-  streakMain: {
-    color: '#FF6A3D',
-    fontSize: 13,
-    fontWeight: '700',
+  headerIconButton: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  streakSub: {
-    color: '#8A817B',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  avatarWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#FFE9DB',
+  nomiOrb: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: '#FFE7E3',
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
   },
-  avatarEmoji: {
-    fontSize: 21,
+  nomiOrbImage: {
+    width: 37,
+    height: 37,
   },
   onlineDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: '#2ECF70',
-    borderWidth: 2,
-    borderColor: '#fff',
     position: 'absolute',
-    right: -1,
-    bottom: -1,
+    right: 1,
+    bottom: 3,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#37C66B',
+    borderWidth: 2,
+    borderColor: '#FDF7F2',
   },
-  sectionHeader: {
-    marginTop: 8,
-    marginBottom: 2,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  content: {
+    paddingHorizontal: 16,
+    paddingTop: 18,
+    gap: 14,
+  },
+  loadingBlock: {
+    borderRadius: 18,
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 22,
     alignItems: 'center',
   },
-  sectionTitle: {
-    color: '#1C1C22',
-    fontSize: 16,
-    fontWeight: '800',
-  },
-  sectionAction: {
-    color: '#7B3FF2',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  todayCarousel: {
-    paddingRight: 4,
-  },
-  todayPostCard: {
-    minHeight: 214,
-    borderRadius: 20,
-    backgroundColor: '#fff',
-    padding: 16,
-    shadowColor: '#261A12',
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 2,
-  },
-  todayPostHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  feedList: {
     gap: 12,
+  },
+  emptyState: {
+    borderWidth: 1,
+    borderColor: '#EFE0D9',
+    borderRadius: 18,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    paddingHorizontal: 22,
+    paddingVertical: 26,
+  },
+  emptyIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#FFF0EB',
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 12,
   },
-  todayPostIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    backgroundColor: '#FFF3EA',
-    textAlign: 'center',
-    textAlignVertical: 'center',
-    fontSize: 18,
-    overflow: 'hidden',
-  },
-  todayPostTitleWrap: {
-    flex: 1,
-  },
-  todayPostTitle: {
-    color: '#1C1C22',
-    fontSize: 18,
-    fontWeight: '800',
-    lineHeight: 23,
-  },
-  todayPostMeta: {
-    color: '#8A817B',
-    marginTop: 3,
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  todayPostBody: {
-    color: '#342D2A',
-    fontSize: 15,
-    lineHeight: 22,
-  },
-  todayPostTag: {
-    alignSelf: 'flex-start',
-    marginTop: 14,
-    borderRadius: 999,
-    backgroundColor: '#F4EDFF',
-    color: '#7B3FF2',
-    overflow: 'hidden',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  emptyToday: {
-    borderRadius: 20,
-    backgroundColor: '#fff',
-    padding: 18,
-  },
-  emptyCategory: {
-    borderRadius: 18,
-    backgroundColor: '#fff',
-    padding: 16,
-  },
   emptyTitle: {
-    color: '#1C1C22',
-    fontSize: 16,
-    fontWeight: '800',
+    color: '#201F24',
+    fontSize: 17,
+    fontWeight: '900',
+    textAlign: 'center',
   },
   emptyBody: {
-    color: '#8A817B',
-    marginTop: 4,
-    lineHeight: 19,
-    fontSize: 13,
+    color: '#7F7777',
+    fontSize: 14,
+    lineHeight: 20,
     fontWeight: '600',
-  },
-  categoriesRow: {
-    flexDirection: 'row',
-    gap: 8,
-    flexWrap: 'nowrap',
-  },
-  footerBrand: {
-    marginTop: 8,
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  footerBrandText: {
-    color: '#9A8F87',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  loadingWrap: {
-    paddingVertical: 8,
-    alignItems: 'center',
+    textAlign: 'center',
+    marginTop: 7,
   },
 });

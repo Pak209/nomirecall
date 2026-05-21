@@ -3,7 +3,7 @@ import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View 
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useNavigation } from '@react-navigation/native';
 import { useMutation } from '@tanstack/react-query';
-import { signUpWithEmail } from '../../../services/auth';
+import { signInWithGoogle, signUpWithEmail } from '../../../services/auth';
 import { RootStackParamList } from '../../../types';
 import { useToast } from '../../ui/shared/ToastProvider';
 
@@ -20,6 +20,16 @@ export default function SignUpScreen() {
     onSuccess: () => showToast('Account created!', 'success'),
     onError: (e: any) => showToast(e?.message || 'Create account failed', 'error'),
   });
+  const googleMutation = useMutation({
+    mutationFn: signInWithGoogle,
+    onSuccess: () => showToast('Account ready!', 'success'),
+    onError: (e: any) => {
+      if (e?.code !== 'ERR_REQUEST_CANCELED') {
+        showToast(e?.message || 'Google sign up failed', 'error');
+      }
+    },
+  });
+  const loading = signUpMutation.isLoading || googleMutation.isLoading;
 
   function handleSubmit() {
     if (!email || !password) return showToast('Email and password are required', 'warning');
@@ -33,8 +43,11 @@ export default function SignUpScreen() {
       <TextInput style={styles.input} placeholder="Email" value={email} onChangeText={setEmail} autoCapitalize="none" />
       <TextInput style={styles.input} placeholder="Password" value={password} onChangeText={setPassword} secureTextEntry />
       <TextInput style={styles.input} placeholder="Confirm password" value={confirmPassword} onChangeText={setConfirmPassword} secureTextEntry />
-      <TouchableOpacity style={styles.primaryBtn} onPress={handleSubmit} disabled={signUpMutation.isLoading}>
+      <TouchableOpacity style={styles.primaryBtn} onPress={handleSubmit} disabled={loading}>
         {signUpMutation.isLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>Create account</Text>}
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.googleBtn} onPress={() => googleMutation.mutate()} disabled={loading}>
+        {googleMutation.isLoading ? <ActivityIndicator color="#1C1C22" /> : <Text style={styles.googleBtnText}>Continue with Google</Text>}
       </TouchableOpacity>
       <TouchableOpacity onPress={() => nav.navigate('SignIn')}>
         <Text style={styles.link}>Already have an account? Sign in</Text>
@@ -49,5 +62,7 @@ const styles = StyleSheet.create({
   input: { height: 50, borderRadius: 12, borderWidth: 1, borderColor: '#E8D8CA', backgroundColor: '#fff', paddingHorizontal: 14, marginBottom: 10 },
   primaryBtn: { height: 50, borderRadius: 12, backgroundColor: '#FF2D8E', alignItems: 'center', justifyContent: 'center', marginTop: 8 },
   primaryBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  googleBtn: { height: 50, borderRadius: 12, borderWidth: 1, borderColor: '#E8D8CA', backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', marginTop: 10 },
+  googleBtnText: { color: '#1C1C22', fontWeight: '700', fontSize: 15 },
   link: { marginTop: 12, color: '#7B3FF2', textAlign: 'center', fontWeight: '600' },
 });
