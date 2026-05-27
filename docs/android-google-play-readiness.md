@@ -47,16 +47,46 @@ npx eas credentials -p android
 
 ## RevenueCat / Google Play Billing
 
-1. Create the Android app in RevenueCat with package name `com.dkimoto.nomi`.
-2. Add the Android public SDK key to `.env`:
+Current app status:
+
+- `react-native-purchases` is installed and already used by the React Native paywall.
+- Android selects `EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY` automatically.
+- The Android paywall uses Google Play wording and can use Android-specific product IDs if they differ from iOS.
+- Settings > More > Nomi Pro opens the shared paywall.
+
+Setup steps:
+
+1. In Play Console, create the app with package name `com.dkimoto.nomi`.
+2. Upload an internal/closed-testing AAB before relying on subscription product availability.
+3. Create subscriptions in Play Console:
+   - Suggested subscription/product IDs:
+     - `brain_monthly`
+     - `brain_pro_monthly`
+   - Each subscription needs an active base plan and testing availability.
+4. Create the Android app in RevenueCat with package name `com.dkimoto.nomi`.
+5. Connect Google Play to RevenueCat:
+   - Enable the Google Play Android Developer API.
+   - Create/grant a Play service account.
+   - Upload/add the service account credentials in RevenueCat.
+   - Grant the account permission to view/manage orders/subscriptions as required by RevenueCat.
+6. Import or add the Play subscription products in RevenueCat.
+7. Attach the Android products to the same RevenueCat offering used by the app's current offering.
+8. Confirm these env values match RevenueCat/Play products:
    - `EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY=goog_...`
-3. Create subscriptions in Play Console and activate them for closed testing.
-4. Add the Play subscription product IDs to RevenueCat offerings.
-5. Confirm these env values match RevenueCat/Play products:
    - `EXPO_PUBLIC_REVENUECAT_ENTITLEMENT_ID`
    - `EXPO_PUBLIC_REVENUECAT_BRAIN_PRODUCT_ID`
    - `EXPO_PUBLIC_REVENUECAT_PRO_PRODUCT_ID`
-6. Add Google Play service account credentials to RevenueCat so RevenueCat can validate Play purchases.
+   - Optional Android-specific overrides:
+     - `EXPO_PUBLIC_REVENUECAT_ANDROID_BRAIN_PRODUCT_ID`
+     - `EXPO_PUBLIC_REVENUECAT_ANDROID_PRO_PRODUCT_ID`
+9. Add tester Gmail accounts to the Play testing track and license testing.
+10. Install from Play internal/closed testing, not only `expo run:android`, before expecting Google Play purchases to work.
+
+Useful checks:
+
+- Paywall shows "Setup" when RevenueCat returns no package for a plan.
+- Paywall shows "Live" and Google Play prices after the products are active and attached to the current RevenueCat offering.
+- Test purchases should activate the backend tier through `PATCH /api/auth/tier` after RevenueCat returns active entitlements.
 
 ## Android Permission Audit
 
@@ -67,6 +97,7 @@ Declared permissions:
 - `RECORD_AUDIO`: voice capture readiness.
 - `READ_MEDIA_IMAGES`: Android 13+ media picker/library access readiness.
 - `POST_NOTIFICATIONS`: notification prompts on Android 13+.
+- Blocked/removed as unnecessary or risky for release: `READ_EXTERNAL_STORAGE`, `WRITE_EXTERNAL_STORAGE`, `SYSTEM_ALERT_WINDOW`.
 
 Current implementation note: the RN quick capture screen currently uses document picking for images and text entry for voice memories, so camera/microphone permissions are readiness declarations for the existing product surface rather than proof that native camera/recorder capture is complete.
 

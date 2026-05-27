@@ -68,7 +68,7 @@ Date: 2026-05-14
   - Purchase activates `Nomi Pro`.
   - Restore purchases works.
   - Manage Apple Subscription opens Apple settings.
-- Confirm App Store screenshots use non-sensitive sample data.
+- Confirm App Store screenshots use non-sensitive sample data from `docs/review-demo-data-flow.md`.
 - Fill App Store Connect review credentials and final support/privacy URLs.
 
 ## Blockers
@@ -82,7 +82,6 @@ Date: 2026-05-14
 - Add a small automated UI smoke test for auth route, capture, recall, detail, and settings.
 - Add an ESLint config that matches the current TypeScript/React Native setup.
 - Add a release-mode archive CI command once signing and App Store Connect credentials are finalized.
-- Add a reviewer-only seeded test account workflow with safe sample memories.
 - Add screenshot automation for the required App Store device sizes.
 
 ## Code Change Notes

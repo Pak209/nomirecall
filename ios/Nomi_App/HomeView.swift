@@ -1,4 +1,5 @@
 import SwiftUI
+import AVKit
 
 struct HomeView: View {
     @EnvironmentObject private var appSession: AppSession
@@ -11,8 +12,10 @@ struct HomeView: View {
     @State private var isShowingDrawer = false
     @State private var isShowingCaptureOptions = false
     @State private var activeTab: HomeFeedTab = .forYou
+    @AppStorage("nomi.theme") private var theme = "light"
 
     var onQuickCapture: () -> Void = {}
+    var onDrawerDestination: (HomeDrawerDestination) -> Void = { _ in }
 
     private var recentMemories: [NomiMemory] {
         Array(memoryStore.memories.filter { !$0.isArchived }.prefix(24))
@@ -125,6 +128,7 @@ struct HomeView: View {
                 NomiHomeSideDrawer(
                     isPresented: $isShowingDrawer,
                     displayName: displayName,
+                    imageURL: appSession.profile?.photoURL,
                     handle: drawerHandle,
                     memoryCount: memoryStore.memories.count,
                     projectCount: memoryStore.memories.filter { !$0.projectIds.isEmpty }.count,
@@ -167,61 +171,63 @@ struct HomeView: View {
     }
 
     private var header: some View {
-        HStack(spacing: 14) {
-            Button {
-                withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
-                    isShowingDrawer = true
-                }
-            } label: {
-                NomiAvatarView(
-                    name: appSession.profile?.displayName ?? appSession.profile?.email,
-                    imageURL: appSession.profile?.photoURL,
-                    size: 42,
-                    fontSize: 15
-                )
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Open profile menu")
-
-            Spacer()
-
+        ZStack {
             Text("Home")
                 .font(.system(size: 29, weight: .black, design: .rounded))
                 .foregroundStyle(Color.nomiInk)
+                .frame(maxWidth: .infinity)
 
-            Spacer()
-
-            HStack(spacing: 12) {
+            HStack(spacing: 14) {
                 Button {
-                    isShowingAskNomi = true
-                } label: {
-                    Image(systemName: "magnifyingglass")
-                        .font(.system(size: 24, weight: .semibold))
-                        .foregroundStyle(Color.nomiInk)
-                        .frame(width: 34, height: 40)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Search memories")
-
-                Button {
-                    isShowingAskNomi = true
-                } label: {
-                    ZStack(alignment: .bottomTrailing) {
-                        Image("NomiMascot")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 36, height: 36)
-                            .padding(5)
-                            .background(avatarBackground, in: Circle())
-
-                        Circle()
-                            .fill(Color(red: 0.16, green: 0.84, blue: 0.45))
-                            .frame(width: 11, height: 11)
-                            .overlay(Circle().stroke(.white, lineWidth: 2.4))
+                    withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
+                        isShowingDrawer = true
                     }
+                } label: {
+                    NomiAvatarView(
+                        name: appSession.profile?.displayName ?? appSession.profile?.email,
+                        imageURL: appSession.profile?.photoURL,
+                        size: 42,
+                        fontSize: 15
+                    )
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Ask Nomi")
+                .accessibilityLabel("Open profile menu")
+
+                Spacer()
+
+                HStack(spacing: 12) {
+                    Button {
+                        toggleTheme()
+                    } label: {
+                        Image(systemName: theme == "dark" ? "sun.max.fill" : "moon.fill")
+                            .font(.system(size: 21, weight: .semibold))
+                            .foregroundStyle(Color.nomiInk)
+                            .frame(width: 34, height: 40)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(theme == "dark" ? "Switch to light mode" : "Switch to dark mode")
+
+                    Button {
+                        isShowingAskNomi = true
+                    } label: {
+                        ZStack(alignment: .bottomTrailing) {
+                            Image("NomiMascot")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 34, height: 34)
+                                .padding(5)
+                                .background(avatarBackground, in: Circle())
+
+                            Circle()
+                                .fill(Color(red: 0.16, green: 0.84, blue: 0.45))
+                                .frame(width: 11, height: 11)
+                                .overlay(Circle().stroke(Color.nomiCardStrong, lineWidth: 2.2))
+                        }
+                        .frame(width: 44, height: 44)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Ask Nomi")
+                }
             }
         }
         .padding(.horizontal, 18)
@@ -262,6 +268,14 @@ struct HomeView: View {
         switch item {
         case .dailyBrief:
             isShowingDailyBrief = true
+        default:
+            onDrawerDestination(item.destination)
+        }
+    }
+
+    private func toggleTheme() {
+        withAnimation(.easeInOut(duration: 0.18)) {
+            theme = theme == "dark" ? "light" : "dark"
         }
     }
 
@@ -481,20 +495,17 @@ private struct NativeMemoryFeedCard: View {
                     .foregroundStyle(Color.nomiMuted)
             }
 
-            if let summary = nomiSummary {
-                VStack(alignment: .leading, spacing: 5) {
-                    Label("Nomi Summary", systemImage: "sparkles")
-                        .font(.caption.weight(.black))
-                        .foregroundStyle(Color.nomiInk)
+            if !memory.media.isEmpty {
+                FeedMediaStrip(media: memory.media)
+                    .padding(.leading, 50)
+            }
 
-                    Text(summary)
-                        .font(.system(size: 13, weight: .semibold, design: .rounded))
-                        .foregroundStyle(Color.nomiMuted)
-                        .lineLimit(3)
+            if !memory.referencedPosts.isEmpty {
+                VStack(spacing: 8) {
+                    ForEach(Array(memory.referencedPosts.prefix(2))) { post in
+                        FeedReferencedPostCard(post: post)
+                    }
                 }
-                .padding(.vertical, 10)
-                .padding(.horizontal, 12)
-                .background(Color.nomiCoral.opacity(0.075), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                 .padding(.leading, 50)
             }
 
@@ -539,14 +550,8 @@ private struct NativeMemoryFeedCard: View {
     }
 
     private var previewText: String {
-        let values = [memory.title, memory.rawText, memory.cleanText ?? "", memory.content, memory.summary ?? ""]
+        let values = [memory.rawText, memory.cleanText ?? "", memory.content, memory.title, memory.summary ?? ""]
         return values.first { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty } ?? "Saved memory"
-    }
-
-    private var nomiSummary: String? {
-        let value = memory.summary ?? memory.ai?.summary
-        guard let value, !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
-        return value
     }
 
     private var tags: [String] {
@@ -564,6 +569,142 @@ private struct NativeMemoryFeedCard: View {
         if source.contains("image") { return "photo" }
         if source.contains("voice") { return "mic" }
         return "note.text"
+    }
+}
+
+private struct FeedMediaStrip: View {
+    let media: [NomiMemoryMedia]
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 10) {
+                ForEach(Array(media.prefix(4))) { item in
+                    FeedMediaTile(item: item)
+                }
+            }
+        }
+    }
+}
+
+private struct FeedMediaTile: View {
+    let item: NomiMemoryMedia
+
+    var body: some View {
+        Group {
+            if let videoURL = item.bestVideoURL ?? (item.type == "video" ? item.url : nil) {
+                FeedVideoPreview(url: videoURL)
+            } else if let imageURL = item.bestDisplayURL {
+                AsyncImage(url: imageURL) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFill()
+                    case .failure:
+                        fallbackTile(icon: "photo", title: item.type.capitalized)
+                    case .empty:
+                        ProgressView()
+                    @unknown default:
+                        fallbackTile(icon: "photo", title: item.type.capitalized)
+                    }
+                }
+                .frame(width: 178, height: 132)
+                .background(Color.nomiField, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            } else {
+                fallbackTile(icon: "photo", title: item.type.capitalized)
+            }
+        }
+    }
+
+    private func fallbackTile(icon: String, title: String) -> some View {
+        VStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.title3.bold())
+                .foregroundStyle(Color.nomiCoral)
+            Text(title.isEmpty ? "Media" : title)
+                .font(.caption.weight(.bold))
+                .foregroundStyle(Color.nomiInk)
+        }
+        .frame(width: 178, height: 132)
+        .background(Color.nomiField, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(Color.nomiStroke, lineWidth: 1)
+        )
+    }
+}
+
+private struct FeedVideoPreview: View {
+    let url: URL
+    @State private var player: AVPlayer?
+
+    var body: some View {
+        ZStack(alignment: .bottomTrailing) {
+            VideoPlayer(player: player)
+                .frame(width: 178, height: 132)
+                .background(Color.nomiField, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+
+            Image(systemName: "play.circle.fill")
+                .font(.title3.bold())
+                .foregroundStyle(.white)
+                .shadow(radius: 4)
+                .padding(8)
+        }
+        .onAppear {
+            let nextPlayer = AVPlayer(url: url)
+            nextPlayer.isMuted = true
+            player = nextPlayer
+            nextPlayer.play()
+        }
+        .onDisappear {
+            player?.pause()
+            player = nil
+        }
+    }
+}
+
+private struct FeedReferencedPostCard: View {
+    let post: NomiReferencedPost
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Image(systemName: "arrow.triangle.branch")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(Color.nomiMuted)
+
+                Text(sourceLine)
+                    .font(.caption.weight(.black))
+                    .foregroundStyle(Color.nomiMuted)
+                    .lineLimit(1)
+            }
+
+            if let text = post.text?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty {
+                Text(text)
+                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                    .foregroundStyle(Color.nomiInk)
+                    .lineLimit(3)
+            }
+
+            if !post.media.isEmpty {
+                FeedMediaStrip(media: post.media)
+            }
+        }
+        .padding(10)
+        .background(Color.nomiField, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(Color.nomiStroke, lineWidth: 1)
+        )
+    }
+
+    private var sourceLine: String {
+        if let username = post.username?.trimmingCharacters(in: .whitespacesAndNewlines), !username.isEmpty {
+            return "@\(username.replacingOccurrences(of: "@", with: ""))"
+        }
+        return "Related post"
     }
 }
 
@@ -651,31 +792,102 @@ private struct HomeEmptyFeedState: View {
     }
 }
 
-private enum NomiDrawerItem: CaseIterable, Identifiable {
+enum HomeDrawerDestination {
+    case profile
+    case nomiPro
     case dailyBrief
+    case projects
+    case connectedIdeas
+    case circle
+    case obsidianExport
+    case importSources
+    case settings
+    case help
+}
+
+private enum NomiDrawerItem: CaseIterable, Identifiable {
+    case profile
+    case nomiPro
+    case dailyBrief
+    case projects
+    case connectedIdeas
+    case circle
+    case obsidianExport
+    case importSources
+    case settings
+    case help
 
     var id: Self { self }
 
     var title: String {
         switch self {
+        case .profile: return "Profile"
+        case .nomiPro: return "Nomi Pro"
         case .dailyBrief: return "Daily Brief"
+        case .projects: return "Projects"
+        case .connectedIdeas: return "Connected Ideas"
+        case .circle: return "Circle"
+        case .obsidianExport: return "Obsidian Export"
+        case .importSources: return "Import Sources"
+        case .settings: return "Settings & Privacy"
+        case .help: return "Help"
         }
     }
 
     var icon: String {
         switch self {
+        case .profile: return "person"
+        case .nomiPro: return "diamond"
         case .dailyBrief: return "sun.max"
+        case .projects: return "folder"
+        case .connectedIdeas: return "point.3.connected.trianglepath.dotted"
+        case .circle: return "person.2"
+        case .obsidianExport: return "shippingbox"
+        case .importSources: return "square.and.arrow.down"
+        case .settings: return "gearshape"
+        case .help: return "questionmark.circle"
         }
     }
 
     var hasDividerBefore: Bool {
-        false
+        switch self {
+        case .projects, .settings: return true
+        default: return false
+        }
+    }
+
+    var accent: Color {
+        switch self {
+        case .nomiPro, .dailyBrief: return Color.nomiOrange
+        case .connectedIdeas, .circle, .obsidianExport: return Color.nomiPurple
+        default: return Color.nomiInk
+        }
+    }
+
+    var badge: String? {
+        self == .nomiPro ? "Pro" : nil
+    }
+
+    var destination: HomeDrawerDestination {
+        switch self {
+        case .profile: return .profile
+        case .nomiPro: return .nomiPro
+        case .dailyBrief: return .dailyBrief
+        case .projects: return .projects
+        case .connectedIdeas: return .connectedIdeas
+        case .circle: return .circle
+        case .obsidianExport: return .obsidianExport
+        case .importSources: return .importSources
+        case .settings: return .settings
+        case .help: return .help
+        }
     }
 }
 
 private struct NomiHomeSideDrawer: View {
     @Binding var isPresented: Bool
     let displayName: String
+    let imageURL: URL?
     let handle: String
     let memoryCount: Int
     let projectCount: Int
@@ -723,7 +935,7 @@ private struct NomiHomeSideDrawer: View {
     private var drawerContent: some View {
         VStack(alignment: .leading, spacing: 18) {
             HStack(spacing: 12) {
-                NomiAvatarView(name: displayName, imageURL: nil, size: 58, fontSize: 20)
+                NomiAvatarView(name: displayName, imageURL: imageURL, size: 58, fontSize: 20)
 
                 VStack(alignment: .leading, spacing: 5) {
                     Text(displayName)
@@ -775,7 +987,7 @@ private struct NomiHomeSideDrawer: View {
                         HStack(spacing: 16) {
                             Image(systemName: item.icon)
                                 .font(.system(size: 22, weight: .semibold))
-                                .foregroundStyle(Color.nomiOrange)
+                                .foregroundStyle(item.accent)
                                 .frame(width: 28)
 
                             Text(item.title)
@@ -784,9 +996,18 @@ private struct NomiHomeSideDrawer: View {
 
                             Spacer()
 
-                            Image(systemName: "chevron.right")
-                                .font(.caption.weight(.black))
-                                .foregroundStyle(Color.nomiMuted)
+                            if let badge = item.badge {
+                                Text(badge)
+                                    .font(.caption2.weight(.black))
+                                    .foregroundStyle(.white)
+                                    .padding(.vertical, 5)
+                                    .padding(.horizontal, 8)
+                                    .background(Color.nomiOrange, in: Capsule())
+                            } else {
+                                Image(systemName: "chevron.right")
+                                    .font(.caption.weight(.black))
+                                    .foregroundStyle(Color.nomiMuted)
+                            }
                         }
                         .frame(height: 52)
                     }
@@ -800,10 +1021,10 @@ private struct NomiHomeSideDrawer: View {
                 withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
                     isPresented = false
                 }
-                onMenuTap(.dailyBrief)
+                onMenuTap(.nomiPro)
             } label: {
                 HStack(spacing: 12) {
-                    Image(systemName: "sun.max.fill")
+                    Image(systemName: "diamond.fill")
                         .font(.title3.weight(.bold))
                         .foregroundStyle(.white)
                         .frame(width: 46, height: 46)
@@ -813,9 +1034,9 @@ private struct NomiHomeSideDrawer: View {
                         )
 
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Daily Brief")
+                        Text("Nomi Pro")
                             .font(.headline.weight(.black))
-                        Text("Generate a grounded recap from your saved memories.")
+                        Text("More recaps, smarter insights, and unlimited connections.")
                             .font(.caption.weight(.bold))
                             .lineLimit(2)
                     }
@@ -1196,7 +1417,7 @@ struct AskNomiSheet: View {
                     .fixedSize(horizontal: false, vertical: true)
 
                 if response.confidence.caseInsensitiveCompare("low") == .orderedSame {
-                    Label("Low confidence — based only on a few matching memories.", systemImage: "exclamationmark.triangle")
+                    Label(response.sources.count >= 4 ? "Partial match from \(response.sources.count) memories." : "Low confidence — based only on a few matching memories.", systemImage: "exclamationmark.triangle")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(Color.nomiOrange)
                         .fixedSize(horizontal: false, vertical: true)
@@ -1344,7 +1565,7 @@ struct AskNomiSheet: View {
         defer { isLoading = false }
 
         do {
-            response = try await backendService.askMemories(question: trimmed, projectId: project?.id, limit: 6)
+            response = try await backendService.askMemories(question: trimmed, projectId: project?.id, limit: 12, allowGlobalFallback: project != nil)
         } catch {
             errorMessage = error.localizedDescription
         }

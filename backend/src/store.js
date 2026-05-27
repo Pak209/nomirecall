@@ -315,19 +315,61 @@ class FirestoreStore {
   }
 
   async deleteUserData(userId) {
+    const directUser = await this.userCollection().doc(userId).get();
     const users = await this.userCollection().where('id', '==', userId).get();
+    const firebaseUsers = await this.userCollection().where('firebaseUid', '==', userId).get();
     const sources = await this.sourceCollection().where('userId', '==', userId).get();
     const xConnection = await this.xBookmarkConnectionCollection().doc(userId).get();
+    const xStates = await this.xOAuthStateCollection().where('userId', '==', userId).get();
     const xSyncState = await this.userCollection().doc(userId).collection('sync').doc('xBookmarks').get();
     const batch = this.db.batch();
 
-    users.docs.forEach((doc) => batch.delete(doc.ref));
+    const userRefs = new Map();
+    if (directUser.exists) userRefs.set(directUser.ref.path, directUser.ref);
+    users.docs.forEach((doc) => userRefs.set(doc.ref.path, doc.ref));
+    firebaseUsers.docs.forEach((doc) => userRefs.set(doc.ref.path, doc.ref));
+
     sources.docs.forEach((doc) => batch.delete(doc.ref));
     if (xConnection.exists) batch.delete(xConnection.ref);
     if (xSyncState.exists) batch.delete(xSyncState.ref);
+    xStates.docs.forEach((doc) => batch.delete(doc.ref));
 
-    if (!users.empty || !sources.empty || xConnection.exists || xSyncState.exists) {
+    if (!sources.empty || xConnection.exists || xSyncState.exists || !xStates.empty) {
       await batch.commit();
+    }
+
+    for (const ref of userRefs.values()) {
+      await this.deleteDocumentTree(ref);
+    }
+
+    await this.deleteStorageFiles(userId);
+  }
+
+  async deleteDocumentTree(ref) {
+    if (typeof this.db.recursiveDelete === 'function') {
+      await this.db.recursiveDelete(ref);
+      return;
+    }
+    const subcollections = await ref.listCollections();
+    for (const collection of subcollections) {
+      const snapshot = await collection.get();
+      for (const doc of snapshot.docs) {
+        await this.deleteDocumentTree(doc.ref);
+      }
+    }
+    await ref.delete();
+  }
+
+  async deleteStorageFiles(userId) {
+    if (!admin.apps.length) return;
+    try {
+      const bucket = admin.storage().bucket();
+      await bucket.deleteFiles({
+        prefix: `users/${userId}/`,
+        force: true,
+      });
+    } catch (error) {
+      if (!/bucket|storage/i.test(error.message || '')) throw error;
     }
   }
 
@@ -552,6 +594,7 @@ function initializeFirebaseAdmin() {
     return admin.initializeApp({
       credential: admin.credential.cert(credentials),
       projectId: projectId || credentials.project_id,
+      storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
     });
   }
 
@@ -560,11 +603,12 @@ function initializeFirebaseAdmin() {
     return admin.initializeApp({
       credential: admin.credential.cert(credentials),
       projectId: projectId || credentials.project_id,
+      storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
     });
   }
 
   if (projectId) {
-    return admin.initializeApp({ projectId });
+    return admin.initializeApp({ projectId, storageBucket: process.env.FIREBASE_STORAGE_BUCKET });
   }
 
   return null;

@@ -12,6 +12,8 @@ struct SettingsView: View {
     @EnvironmentObject private var purchaseStore: PurchaseStore
     @State private var isShowingPaywall = false
     @State private var isShowingCustomerCenter = false
+    @State private var isShowingMoreOptions = false
+    @State private var isEditingUsername = false
     @State private var isConfirmingAccountDeletion = false
     @State private var isDeletingAccount = false
     @State private var accountDeletionError: String?
@@ -26,6 +28,9 @@ struct SettingsView: View {
     @State private var selectedProfilePhoto: PhotosPickerItem?
     @State private var isUploadingProfilePhoto = false
     @State private var profilePhotoMessage: String?
+    @State private var usernameDraft = ""
+    @State private var usernameMessage: String?
+    @State private var isSavingUsername = false
     #if DEBUG
     @State private var isCopyingDebugToken = false
     @State private var debugTokenMessage: String?
@@ -45,16 +50,8 @@ struct SettingsView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
                         header
-                        accountCard
-                        intelligenceCard
-                        #if DEBUG
-                        developerDebugCard
-                        #endif
+                        profileOverviewCard
                         xBookmarksCard
-                        subscriptionCard
-                        statsCard
-                        legalCard
-                        dangerZoneCard
                     }
                     .padding(.horizontal, 18)
                     .padding(.top, 20)
@@ -67,6 +64,16 @@ struct SettingsView: View {
             }
             .sheet(isPresented: $isShowingCustomerCenter) {
                 CustomerCenterView()
+            }
+            .sheet(isPresented: $isShowingMoreOptions) {
+                moreOptionsSheet
+                    .presentationDetents([.medium, .large])
+                    .presentationDragIndicator(.visible)
+            }
+            .sheet(isPresented: $isEditingUsername) {
+                usernameEditorSheet
+                    .presentationDetents([.height(280)])
+                    .presentationDragIndicator(.visible)
             }
             .confirmationDialog(
                 "Delete your Nomi account?",
@@ -101,14 +108,16 @@ struct SettingsView: View {
                     .font(.system(size: 34, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.nomiInk)
 
-                Text("Manage your account and Nomi Pro")
+                Text("Manage your profile and connections")
                     .font(.subheadline)
                     .foregroundStyle(Color.nomiMuted)
             }
 
             Spacer()
 
-            Button {} label: {
+            Button {
+                isShowingMoreOptions = true
+            } label: {
                 Image(systemName: "ellipsis")
                     .font(.headline.weight(.bold))
                     .foregroundStyle(Color.nomiInk)
@@ -120,9 +129,98 @@ struct SettingsView: View {
                     )
             }
             .buttonStyle(.plain)
-            .accessibilityHidden(true)
+            .accessibilityLabel("Open settings options")
         }
         .padding(.top, 10)
+    }
+
+    private var profileOverviewCard: some View {
+        settingsCard(icon: "person", iconTint: Color.nomiCoral, title: "Profile", accessory: aiTierLabel) {
+            HStack(spacing: 12) {
+                ZStack(alignment: .bottomTrailing) {
+                    NomiAvatarView(
+                        name: appSession.profile?.displayName ?? appSession.profile?.email,
+                        imageURL: appSession.profile?.photoURL,
+                        size: 58,
+                        fontSize: 20
+                    )
+
+                    PhotosPicker(selection: $selectedProfilePhoto, matching: .images) {
+                        Image(systemName: isUploadingProfilePhoto ? "hourglass" : "camera.fill")
+                            .font(.caption2.weight(.black))
+                            .foregroundStyle(.white)
+                            .frame(width: 24, height: 24)
+                            .background(Color.nomiPink, in: Circle())
+                            .overlay(Circle().stroke(Color.nomiCardStrong, lineWidth: 2))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isUploadingProfilePhoto)
+                }
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(displayProfileName)
+                        .font(.headline.bold())
+                        .foregroundStyle(Color.nomiInk)
+                        .lineLimit(1)
+
+                    Text(profileHandle)
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(Color.nomiMuted)
+                        .lineLimit(1)
+
+                    Button {
+                        usernameDraft = appSession.profile?.username ?? ""
+                        usernameMessage = nil
+                        isEditingUsername = true
+                    } label: {
+                        Text(appSession.profile?.username?.isEmpty == false ? "Edit username" : "Choose username")
+                            .font(.caption2.weight(.bold))
+                            .foregroundStyle(Color.nomiPink)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                VStack(alignment: .trailing, spacing: 6) {
+                    inlineStat(value: "\(memoryStore.memories.count)", label: "Captures")
+                    inlineStat(value: "\(memoryStore.categories.count)", label: "Categories")
+                }
+                .frame(width: 78, alignment: .trailing)
+            }
+            .padding(10)
+            .background(Color.nomiField, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(Color.nomiStroke, lineWidth: 1)
+            )
+
+            VStack(spacing: 0) {
+                compactInfoRow(icon: "envelope", title: "Email", value: appSession.profile?.email ?? "Unknown")
+                Divider().padding(.leading, 28)
+                compactInfoRow(icon: "bolt.circle", title: "AI usage", value: aiUsageTodayLabel, valueColor: (currentAiUsage?.remaining ?? 1) == 0 ? Color.nomiOrange : Color.nomiMuted)
+                Divider().padding(.leading, 28)
+                compactInfoRow(icon: "gauge.with.dots.needle.33percent", title: "Limit", value: aiLimitLabel, valueColor: Color.nomiMuted)
+                Divider().padding(.leading, 28)
+                compactInfoRow(icon: "doc.text.magnifyingglass", title: "Last brief", value: lastBriefLabel, valueColor: Color.nomiMuted)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .background(Color.nomiField, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(Color.nomiStroke, lineWidth: 1)
+            )
+
+            signOutButton
+
+            if let profilePhotoMessage {
+                statusStrip(message: profilePhotoMessage, tint: Color.nomiOrange, icon: "info.circle")
+            }
+        }
+        .onChange(of: selectedProfilePhoto) { _, item in
+            guard let item else { return }
+            Task { await uploadProfilePhoto(item) }
+        }
     }
 
     private var accountCard: some View {
@@ -312,29 +410,11 @@ struct SettingsView: View {
                     )
 
                     compactInfoRow(
-                        icon: "checklist",
-                        title: "Last result",
-                        value: xBookmarkLastResultLabel,
-                        valueColor: xBookmarkStatus?.lastSyncStatus == "failed" ? Color.nomiOrange : Color.nomiMuted
-                    )
-
-                    compactInfoRow(
                         icon: "tray.and.arrow.down",
-                        title: "Imported",
+                        title: "Recent import",
                         value: "\(xBookmarkStatus?.lastImportedCount ?? 0) new · \(xBookmarkStatus?.lastDuplicateCount ?? 0) skipped",
                         valueColor: Color.nomiMuted
                     )
-
-                    if let aiUsage = xBookmarkStatus?.aiUsage {
-                        compactInfoRow(
-                            icon: "sparkles",
-                            title: "AI processing",
-                            value: aiUsage.remaining == 0
-                                ? "Daily limit reached"
-                                : "\(aiUsage.used ?? aiUsage.usedAfter ?? 0)/\(aiUsage.limit) used today",
-                            valueColor: aiUsage.remaining == 0 ? Color.nomiOrange : Color.nomiMuted
-                        )
-                    }
                 } else {
                     Text("Import new X bookmarks into private Nomi memories when you sync.")
                         .font(.caption)
@@ -366,44 +446,35 @@ struct SettingsView: View {
                     statusStrip(message: xBookmarkMessage, tint: xBookmarkMessageTint, icon: "info.circle")
                 }
 
-                if let lastSyncError = xBookmarkStatus?.lastSyncError, !lastSyncError.isEmpty {
+                if xBookmarkStatus?.lastSyncStatus == "failed", let lastSyncError = xBookmarkStatus?.lastSyncError, !lastSyncError.isEmpty {
                     statusStrip(message: lastSyncError, tint: Color.nomiOrange, icon: "exclamationmark.circle")
                 }
 
-                HStack(spacing: 10) {
-                    Image(systemName: "calendar.badge.clock")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(Color.nomiMuted)
-                        .frame(width: 18)
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Daily sync")
+                if xBookmarkStatus?.connected == true {
+                    HStack(spacing: 10) {
+                        Label("Daily sync", systemImage: "calendar.badge.clock")
                             .font(.subheadline)
                             .foregroundStyle(Color.nomiInk)
 
-                        Text(xBookmarkStatus?.dailySyncEnabled == true ? "Scheduled import enabled" : "Scheduled import paused")
-                            .font(.caption2.weight(.medium))
-                            .foregroundStyle(Color.nomiMuted)
+                        Spacer()
+
+                        Toggle("", isOn: Binding(
+                            get: { xBookmarkStatus?.dailySyncEnabled == true },
+                            set: { enabled in
+                                Task { await updateDailySync(enabled: enabled) }
+                            }
+                        ))
+                            .labelsHidden()
+                            .disabled(isUpdatingDailySync)
                     }
-
-                    Spacer()
-
-                    Toggle("", isOn: Binding(
-                        get: { xBookmarkStatus?.dailySyncEnabled == true },
-                        set: { enabled in
-                            Task { await updateDailySync(enabled: enabled) }
-                        }
-                    ))
-                        .labelsHidden()
-                        .disabled(isUpdatingDailySync || xBookmarkStatus?.connected != true)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 8)
+                    .background(Color.nomiField, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .stroke(Color.nomiStroke, lineWidth: 1)
+                    )
                 }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 8)
-                .background(Color.nomiField, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .stroke(Color.nomiStroke, lineWidth: 1)
-                )
             }
         }
     }
@@ -590,6 +661,75 @@ struct SettingsView: View {
         .disabled(isDeletingAccount)
     }
 
+    private var moreOptionsSheet: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    subscriptionCard
+                    legalCard
+                    dangerZoneCard
+                    #if DEBUG
+                    developerDebugCard
+                    #endif
+                    Text("Nomi v1.0.0")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Color.nomiMuted)
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 4)
+                }
+                .padding(18)
+            }
+            .background(NomiBackground())
+            .navigationTitle("More")
+            .navigationBarTitleDisplayMode(.inline)
+        }
+    }
+
+    private var usernameEditorSheet: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 14) {
+                Text("Choose a username")
+                    .font(.title3.bold())
+                    .foregroundStyle(Color.nomiInk)
+
+                TextField("username", text: $usernameDraft)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .nomiTextField()
+
+                if let usernameMessage {
+                    statusStrip(message: usernameMessage, tint: Color.nomiOrange, icon: "info.circle")
+                }
+
+                Button {
+                    Task { await saveUsername() }
+                } label: {
+                    if isSavingUsername {
+                        HStack(spacing: 8) {
+                            ProgressView()
+                            Text("Saving")
+                        }
+                        .frame(maxWidth: .infinity)
+                    } else {
+                        Text("Save username")
+                            .frame(maxWidth: .infinity)
+                    }
+                }
+                .buttonStyle(NomiPrimaryButtonStyle())
+                .disabled(isSavingUsername)
+
+                Spacer()
+            }
+            .padding(20)
+            .background(NomiBackground())
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { isEditingUsername = false }
+                }
+            }
+        }
+    }
+
     private func settingsCard<Content: View>(
         icon: String,
         iconTint: Color,
@@ -676,6 +816,22 @@ struct SettingsView: View {
                 .minimumScaleFactor(0.74)
         }
         .frame(maxWidth: .infinity)
+    }
+
+    private func inlineStat(value: String, label: String) -> some View {
+        HStack(spacing: 5) {
+            Text(label)
+                .font(.caption2.weight(.medium))
+                .foregroundStyle(Color.nomiMuted)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+
+            Text(value)
+                .font(.subheadline.bold())
+                .foregroundStyle(Color.nomiInk)
+                .monospacedDigit()
+                .lineLimit(1)
+        }
     }
 
     private func statusStrip(message: String, tint: Color, icon: String) -> some View {
@@ -803,6 +959,39 @@ struct SettingsView: View {
         guard let brief = intelligenceStore.todayBrief else { return "Not generated yet" }
         let status = brief.status ?? (brief.usedAi == true ? "generated" : "fallback")
         return "\(brief.dateKey) · \(status.replacingOccurrences(of: "_", with: " "))"
+    }
+
+    private var displayProfileName: String {
+        let value = appSession.profile?.username ?? appSession.profile?.displayName ?? "Nomi friend"
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? "Nomi friend" : trimmed
+    }
+
+    private var profileHandle: String {
+        if let username = appSession.profile?.username?.trimmingCharacters(in: .whitespacesAndNewlines), !username.isEmpty {
+            return "@\(username.replacingOccurrences(of: "@", with: ""))"
+        }
+        return appSession.profile?.email ?? "Choose your username"
+    }
+
+    private func saveUsername() async {
+        let cleaned = UserProfileService.normalizedUsername(usernameDraft)
+        guard cleaned.count >= 3 else {
+            usernameMessage = "Use at least 3 letters or numbers."
+            return
+        }
+
+        isSavingUsername = true
+        defer { isSavingUsername = false }
+
+        do {
+            try await appSession.updateUsername(cleaned)
+            usernameDraft = cleaned
+            usernameMessage = nil
+            isEditingUsername = false
+        } catch {
+            usernameMessage = FirebaseErrorFormatter.userFacingMessage(from: error, action: "Saving your username")
+        }
     }
 
     private func loadXBookmarkStatus() async {

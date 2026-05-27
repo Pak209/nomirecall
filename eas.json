@@ -33,6 +33,10 @@
       }
     },
     "production": {
+      "env": {
+        "API_BASE_URL": "https://nomirecall.onrender.com/api",
+        "EXPO_PUBLIC_API_BASE_URL": "https://nomirecall.onrender.com/api"
+      },
       "ios": {
         "distribution": "store"
       },

@@ -18,7 +18,6 @@ import { QuickCaptureAction } from '../components/nomi/QuickCaptureCard';
 import { CompactCaptureComposer } from '../components/nomi/CompactCaptureComposer';
 import { HomeFeedTab, HomeFeedTabs } from '../components/nomi/HomeFeedTabs';
 import { MemoryFeedCard } from '../components/nomi/MemoryFeedCard';
-import { FloatingCaptureButton } from '../components/nomi/FloatingCaptureButton';
 import { NomiSideDrawer } from '../components/nomi/NomiSideDrawer';
 import { CaptureActionSheet } from '../components/nomi/CaptureActionSheet';
 import { DashboardAPI, DashboardCategory, DashboardSummary } from '../services/api';
@@ -50,6 +49,9 @@ export default function NomiDashboardScreen() {
   const insets = useSafeAreaInsets();
   const user = useStore((s) => s.user);
   const serverOnline = useStore((s) => s.serverOnline);
+  const theme = useStore((s) => s.theme);
+  const toggleTheme = useStore((s) => s.toggleTheme);
+  const dark = theme === 'dark';
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<HomeFeedTab>('for-you');
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -131,8 +133,8 @@ export default function NomiDashboardScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
-      <View style={styles.root}>
+    <SafeAreaView style={[styles.safe, dark && styles.safeDark]} edges={['top', 'left', 'right']}>
+      <View style={[styles.root, dark && styles.rootDark]}>
         <View style={styles.header}>
           <TouchableOpacity
             style={styles.userAvatar}
@@ -141,14 +143,18 @@ export default function NomiDashboardScreen() {
             accessibilityRole="button"
             accessibilityLabel="Open profile menu"
           >
-            <Text style={styles.userInitial}>{(user?.displayName || user?.email || 'N').charAt(0).toUpperCase()}</Text>
+            {user?.photoURL ? (
+              <Image source={{ uri: user.photoURL }} style={styles.userAvatarImage} />
+            ) : (
+              <Text style={styles.userInitial}>{(user?.displayName || user?.email || 'N').charAt(0).toUpperCase()}</Text>
+            )}
           </TouchableOpacity>
 
-          <Text style={styles.headerTitle}>Home</Text>
+          <Text style={[styles.headerTitle, dark && styles.headerTitleDark]}>Home</Text>
 
           <View style={styles.headerActions}>
-            <TouchableOpacity style={styles.headerIconButton} onPress={() => nav.navigate('Recall')} activeOpacity={0.76} accessibilityRole="button" accessibilityLabel="Search memories">
-              <Ionicons name="search" size={27} color="#16151A" />
+            <TouchableOpacity style={styles.headerIconButton} onPress={toggleTheme} activeOpacity={0.76} accessibilityRole="button" accessibilityLabel={dark ? 'Switch to light mode' : 'Switch to dark mode'}>
+              <Ionicons name={dark ? 'sunny' : 'moon'} size={27} color={dark ? '#FFFFFF' : '#16151A'} />
             </TouchableOpacity>
             <View style={styles.nomiOrb}>
               <Image
@@ -157,15 +163,18 @@ export default function NomiDashboardScreen() {
                 resizeMode="contain"
                 accessibilityIgnoresInvertColors
               />
-              <View style={styles.onlineDot} />
+              <View style={[styles.onlineDot, dark && styles.onlineDotDark]} />
             </View>
           </View>
         </View>
 
-        <HomeFeedTabs activeTab={activeTab} onTabPress={setActiveTab} />
+        <View style={dark && styles.tabBandDark}>
+          <HomeFeedTabs activeTab={activeTab} onTabPress={setActiveTab} />
+        </View>
 
         <ScrollView
-          contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 132 }]}
+          style={[styles.feedScroller, { marginBottom: Math.max(insets.bottom, 8) + 100 }]}
+          contentContainerStyle={styles.content}
           showsVerticalScrollIndicator={false}
           refreshControl={(
             <RefreshControl refreshing={refreshing} onRefresh={refreshDashboard} tintColor="#EF6359" />
@@ -196,8 +205,6 @@ export default function NomiDashboardScreen() {
             <EmptyFeedState activeTab={activeTab} />
           )}
         </ScrollView>
-
-        <FloatingCaptureButton bottomOffset={insets.bottom + 104} onPress={() => setCaptureSheetOpen(true)} />
 
         <CaptureActionSheet
           visible={captureSheetOpen}
@@ -255,9 +262,15 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FDF7F2',
   },
+  safeDark: {
+    backgroundColor: '#05020A',
+  },
   root: {
     flex: 1,
     backgroundColor: '#FDF7F2',
+  },
+  rootDark: {
+    backgroundColor: '#05020A',
   },
   header: {
     minHeight: 64,
@@ -272,6 +285,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#EDE2DA',
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  userAvatarImage: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
   },
   userInitial: {
     color: '#201F24',
@@ -286,6 +305,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 27,
     fontWeight: '900',
+  },
+  headerTitleDark: {
+    color: '#FFFFFF',
   },
   headerActions: {
     marginLeft: 'auto',
@@ -323,10 +345,20 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#FDF7F2',
   },
+  onlineDotDark: {
+    borderColor: '#05020A',
+  },
+  tabBandDark: {
+    backgroundColor: '#05020A',
+  },
   content: {
     paddingHorizontal: 16,
     paddingTop: 18,
+    paddingBottom: 18,
     gap: 14,
+  },
+  feedScroller: {
+    flex: 1,
   },
   loadingBlock: {
     borderRadius: 18,

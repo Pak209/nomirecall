@@ -292,36 +292,40 @@ struct MemoryDetailView: View {
     }
 
     private var nomiTakeawayCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Label("Nomi Takeaway", systemImage: "sparkles")
-                .font(.title3.weight(.bold))
-                .foregroundStyle(Color.nomiPink)
+        Group {
+            if let takeaway = meaningfulTakeawayText {
+                VStack(alignment: .leading, spacing: 14) {
+                    Label("Nomi Takeaway", systemImage: "sparkles")
+                        .font(.title3.weight(.bold))
+                        .foregroundStyle(Color.nomiPink)
 
-            Text(takeawayText)
-                .font(.body)
-                .foregroundStyle(Color.nomiInk)
-                .lineSpacing(3)
-                .fixedSize(horizontal: false, vertical: true)
+                    Text(takeaway)
+                        .font(.body)
+                        .foregroundStyle(Color.nomiInk)
+                        .lineSpacing(3)
+                        .fixedSize(horizontal: false, vertical: true)
 
-            if !takeawayChips.isEmpty {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 10) {
-                        ForEach(takeawayChips, id: \.self) { chip in
-                            Text("#\(chip)")
-                                .font(.subheadline.weight(.bold))
-                                .foregroundStyle(Color.nomiPink)
-                                .padding(.vertical, 9)
-                                .padding(.horizontal, 15)
-                                .background(Color.nomiPink.opacity(0.06), in: Capsule())
-                                .overlay(Capsule().stroke(Color.nomiPink.opacity(0.20), lineWidth: 1))
+                    if !takeawayChips.isEmpty {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 10) {
+                                ForEach(takeawayChips, id: \.self) { chip in
+                                    Text("#\(chip)")
+                                        .font(.subheadline.weight(.bold))
+                                        .foregroundStyle(Color.nomiPink)
+                                        .padding(.vertical, 9)
+                                        .padding(.horizontal, 15)
+                                        .background(Color.nomiPink.opacity(0.06), in: Capsule())
+                                        .overlay(Capsule().stroke(Color.nomiPink.opacity(0.20), lineWidth: 1))
+                                }
+                            }
                         }
+                        .scrollClipDisabled()
                     }
                 }
-                .scrollClipDisabled()
+                .padding(16)
+                .recallCard(cornerRadius: 24)
             }
         }
-        .padding(16)
-        .recallCard(cornerRadius: 24)
     }
 
     private var recallQuickActions: some View {
@@ -445,24 +449,26 @@ struct MemoryDetailView: View {
                 .accessibilityLabel(draft.isFavorite ? "Unfavorite memory" : "Favorite memory")
             }
 
-            VStack(alignment: .leading, spacing: 7) {
-                Label("Nomi Takeaway", systemImage: "sparkles")
-                    .font(.subheadline.bold())
-                    .foregroundStyle(Color.nomiPink)
+            if let takeaway = meaningfulTakeawayText {
+                VStack(alignment: .leading, spacing: 7) {
+                    Label("Nomi Takeaway", systemImage: "sparkles")
+                        .font(.subheadline.bold())
+                        .foregroundStyle(Color.nomiPink)
 
-                Text(takeawayText)
-                    .font(.subheadline)
-                    .foregroundStyle(Color.nomiInk)
-                    .lineLimit(3)
-                    .fixedSize(horizontal: false, vertical: true)
+                    Text(takeaway)
+                        .font(.subheadline)
+                        .foregroundStyle(Color.nomiInk)
+                        .lineLimit(3)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.nomiField, in: RoundedRectangle(cornerRadius: 13, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 13, style: .continuous)
+                        .stroke(Color.nomiPink.opacity(0.22), lineWidth: 1)
+                )
             }
-            .padding(12)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.nomiField, in: RoundedRectangle(cornerRadius: 13, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 13, style: .continuous)
-                    .stroke(Color.nomiPink.opacity(0.22), lineWidth: 1)
-            )
 
             HStack(spacing: 14) {
                 Label("Saved \(NomiFormatters.shortDate.string(from: draft.createdAt))", systemImage: "calendar")
@@ -968,24 +974,43 @@ struct MemoryDetailView: View {
         return draft.displayType
     }
 
-    private var takeawayText: String {
-        let trimmedSummary = summaryText.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !trimmedSummary.isEmpty {
-            return trimmedSummary
+    private var meaningfulTakeawayText: String? {
+        let candidates = [
+            summaryText,
+            draft.summary ?? "",
+            draft.ai?.summary ?? ""
+        ]
+
+        return candidates
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .first { !$0.isEmpty && isDistinctTakeaway($0) }
+    }
+
+    private func isDistinctTakeaway(_ value: String) -> Bool {
+        let candidate = normalizedTakeawayComparison(value)
+        guard candidate.count >= 24 else { return false }
+
+        let sourceValues = [
+            draft.title,
+            draft.rawText,
+            draft.cleanText ?? "",
+            draft.content
+        ].map(normalizedTakeawayComparison)
+            .filter { !$0.isEmpty }
+
+        return !sourceValues.contains { source in
+            candidate == source ||
+                source.hasPrefix(candidate) ||
+                candidate.hasPrefix(source)
         }
+    }
 
-        if let summary = draft.summary?.trimmingCharacters(in: .whitespacesAndNewlines), !summary.isEmpty {
-            return summary
-        }
-
-        let trimmedTitle = draft.title.trimmingCharacters(in: .whitespacesAndNewlines)
-        let trimmedContent = draft.content.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        if !trimmedTitle.isEmpty && trimmedTitle.lowercased() != "untitled memory" {
-            return trimmedTitle
-        }
-
-        return String(trimmedContent.prefix(180))
+    private func normalizedTakeawayComparison(_ value: String) -> String {
+        value
+            .lowercased()
+            .filter { $0.isLetter || $0.isNumber }
+            .map(String.init)
+            .joined()
     }
 
     private var originalText: String {

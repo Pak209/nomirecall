@@ -544,7 +544,7 @@ struct RecallView: View {
         defer { isAskingNomi = false }
 
         do {
-            askResponse = try await backendService.askMemories(question: question, limit: 6)
+            askResponse = try await backendService.askMemories(question: question, limit: 12)
         } catch {
             askErrorMessage = error.localizedDescription
         }

@@ -570,7 +570,7 @@ final class XBackendService {
         return try await send(request)
     }
 
-    func askMemories(question: String, projectId: String? = nil, limit: Int? = 6, allowGlobalFallback: Bool? = nil) async throws -> BrainQueryResponse {
+    func askMemories(question: String, projectId: String? = nil, limit: Int? = 12, allowGlobalFallback: Bool? = nil) async throws -> BrainQueryResponse {
         var request = try await authorizedRequest(path: "brain/query")
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")

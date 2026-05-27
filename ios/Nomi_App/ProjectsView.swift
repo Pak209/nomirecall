@@ -2,7 +2,9 @@ import SwiftUI
 
 struct ProjectsView: View {
     @EnvironmentObject private var intelligenceStore: IntelligenceStore
+    @Environment(\.dismiss) private var dismiss
     @State private var isCreating = false
+    var showsCloseButton = false
 
     var body: some View {
         NavigationStack {
@@ -37,6 +39,17 @@ struct ProjectsView: View {
             .navigationTitle("Projects")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                if showsCloseButton {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button {
+                            dismiss()
+                        } label: {
+                            Image(systemName: "xmark")
+                                .font(.headline.weight(.bold))
+                        }
+                    }
+                }
+
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         isCreating = true

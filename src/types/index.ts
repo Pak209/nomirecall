@@ -2,7 +2,9 @@
 export interface User {
   id: string;
   email: string;
+  username?: string;
   displayName?: string;
+  photoURL?: string | null;
   token: string;
   tier: 'free' | 'brain' | 'pro';
   onboardingCompleted?: boolean;
@@ -223,6 +225,8 @@ export type RootStackParamList = {
 export type MainTabParamList = {
   Home: undefined;
   Capture: { mode?: 'note' | 'link' | 'image' | 'voice' } | undefined;
+  Ideas: undefined;
+  Ask: undefined;
   Recall: undefined;
   Profile: undefined;
   Search: undefined;

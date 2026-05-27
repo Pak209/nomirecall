@@ -41,6 +41,10 @@ function planPrice(plan: PaymentPlan) {
   return plan.package?.product.priceString || plan.fallbackPrice;
 }
 
+function billingPlatformName() {
+  return Platform.OS === 'android' ? 'Google Play' : 'Apple';
+}
+
 export default function PaywallScreen() {
   const nav = useNavigation();
   const insets = useSafeAreaInsets();
@@ -122,7 +126,7 @@ export default function PaywallScreen() {
         <View style={styles.hero}>
           <Text style={styles.heroTitle}>Help cover the API fuel</Text>
           <Text style={styles.heroSub}>
-            Test subscriptions before launch while keeping X discovery and AI recall costs under control.
+            Test subscriptions with {billingPlatformName()} billing while keeping X discovery and AI recall costs under control.
           </Text>
         </View>
 
@@ -130,7 +134,7 @@ export default function PaywallScreen() {
           <View style={styles.configNotice}>
             <Text style={styles.configTitle}>RevenueCat key needed</Text>
             <Text style={styles.configText}>
-              Add {Platform.OS === 'ios' ? 'EXPO_PUBLIC_REVENUECAT_IOS_API_KEY' : 'EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY'} to .env, restart Expo, and use a store-capable build to test purchases.
+              Add {Platform.OS === 'ios' ? 'EXPO_PUBLIC_REVENUECAT_IOS_API_KEY' : 'EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY'} to .env, restart Expo, and use a {billingPlatformName()} capable build to test purchases.
             </Text>
           </View>
         ) : null}
@@ -181,7 +185,7 @@ export default function PaywallScreen() {
         })}
 
         <Text style={styles.legalNote}>
-          Apple handles payment and renewal. Sandbox/TestFlight purchases will use Apple test accounts.
+          {billingPlatformName()} handles payment and renewal. Test purchases require a store-installed build and a tester account.
         </Text>
       </ScrollView>
 

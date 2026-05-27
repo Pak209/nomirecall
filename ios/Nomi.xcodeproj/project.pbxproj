@@ -25,6 +25,10 @@
 		3990FD57A831B2BF5EA5BAB0 /* NomiShareInbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0409D49EAF065C6BE22C7F52 /* NomiShareInbox.swift */; };
 		39DDAB4E51087852A3BAB439 /* EmptyStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B82B60EAD008E692668BEC5 /* EmptyStateView.swift */; };
 		3AB9C8589E7E498BA22AA103 /* MarkdownExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3AB9C8579E7E498BA22AA103 /* MarkdownExporter.swift */; };
+		3B21C8A80111111111111801 /* GalaxyNode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B21C8B80111111111111801 /* GalaxyNode.swift */; };
+		3B21C8A90111111111111802 /* GalaxyGraphModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B21C8B90111111111111802 /* GalaxyGraphModel.swift */; };
+		3B21C8AA0111111111111803 /* KnowledgeGalaxyCanvasView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B21C8BA0111111111111803 /* KnowledgeGalaxyCanvasView.swift */; };
+		3B21C8AB0111111111111804 /* KnowledgeGalaxyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B21C8BB0111111111111804 /* KnowledgeGalaxyView.swift */; };
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
 		3E4D598EFC2170139FFAE4D4 /* MemoryCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A9ACFB55BB89EA80BF087C3 /* MemoryCardView.swift */; };
 		3F01A0011111111111111001 /* IntelligenceStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F01B0011111111111111001 /* IntelligenceStore.swift */; };
@@ -113,6 +117,10 @@
 		34E40BE9845930A8DD4A3446 /* ContentView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		3832AB5D187347568CA63290 /* FirebaseBootstrap.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FirebaseBootstrap.swift; sourceTree = "<group>"; };
 		3AB9C8579E7E498BA22AA103 /* MarkdownExporter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MarkdownExporter.swift; sourceTree = "<group>"; };
+		3B21C8B80111111111111801 /* GalaxyNode.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GalaxyNode.swift; sourceTree = "<group>"; };
+		3B21C8B90111111111111802 /* GalaxyGraphModel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GalaxyGraphModel.swift; sourceTree = "<group>"; };
+		3B21C8BA0111111111111803 /* KnowledgeGalaxyCanvasView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KnowledgeGalaxyCanvasView.swift; sourceTree = "<group>"; };
+		3B21C8BB0111111111111804 /* KnowledgeGalaxyView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KnowledgeGalaxyView.swift; sourceTree = "<group>"; };
 		3F01B0011111111111111001 /* IntelligenceStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = IntelligenceStore.swift; sourceTree = "<group>"; };
 		3F01B0021111111111111002 /* DailyBriefView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DailyBriefView.swift; sourceTree = "<group>"; };
 		3F01B0031111111111111003 /* ProjectsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ProjectsView.swift; sourceTree = "<group>"; };
@@ -239,6 +247,10 @@
 				9964D226D6037015D6FAC2D5 /* AuthStackView.swift */,
 				46C2070B326AEB9DA6291044 /* MeetNomiView.swift */,
 				5F554E7A931049171E9289AA /* MainTabsView.swift */,
+				3B21C8B80111111111111801 /* GalaxyNode.swift */,
+				3B21C8B90111111111111802 /* GalaxyGraphModel.swift */,
+				3B21C8BA0111111111111803 /* KnowledgeGalaxyCanvasView.swift */,
+				3B21C8BB0111111111111804 /* KnowledgeGalaxyView.swift */,
 				FEB475CC9A4C2CE315818FF0 /* NomiControls.swift */,
 				564C1BF454C02C57B7687386 /* GoogleService-Info.plist */,
 				AC0408D7AC75EE860D8CEF4B /* SplashView.swift */,
@@ -647,6 +659,10 @@
 				8E3A229B2B03F8D040556D10 /* AuthStackView.swift in Sources */,
 				FE79B36067D12257D5D6FB08 /* MeetNomiView.swift in Sources */,
 				AD938C3BA7CC0CF74F2DF915 /* MainTabsView.swift in Sources */,
+				3B21C8A80111111111111801 /* GalaxyNode.swift in Sources */,
+				3B21C8A90111111111111802 /* GalaxyGraphModel.swift in Sources */,
+				3B21C8AA0111111111111803 /* KnowledgeGalaxyCanvasView.swift in Sources */,
+				3B21C8AB0111111111111804 /* KnowledgeGalaxyView.swift in Sources */,
 				BF0CA75C04DE1BACC9DC792B /* NomiControls.swift in Sources */,
 				F4F52B5ED25CB9B555F9E40A /* SplashView.swift in Sources */,
 				A4100BF1057A4BE121D63588 /* MemoryStore.swift in Sources */,

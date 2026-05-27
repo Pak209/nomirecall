@@ -25,6 +25,13 @@ const ENTITLEMENT_ID =
   env.EXPO_PUBLIC_REVENUECAT_ENTITLEMENT_ID ||
   'brain';
 
+function platformProductId(androidKey: string, sharedKey: string, fallback: string) {
+  if (Platform.OS === 'android') {
+    return env[androidKey] || env[sharedKey] || fallback;
+  }
+  return env[sharedKey] || fallback;
+}
+
 let configuredUserId: string | null = null;
 
 export type AppTier = 'free' | 'brain' | 'pro';
@@ -46,7 +53,11 @@ export const PAYMENT_PLANS: PaymentPlan[] = [
     name: 'Brain',
     description: 'Higher monthly limits for capture, X discovery, and recall testing.',
     fallbackPrice: '$12/mo',
-    productId: env.EXPO_PUBLIC_REVENUECAT_BRAIN_PRODUCT_ID || 'brain_monthly',
+    productId: platformProductId(
+      'EXPO_PUBLIC_REVENUECAT_ANDROID_BRAIN_PRODUCT_ID',
+      'EXPO_PUBLIC_REVENUECAT_BRAIN_PRODUCT_ID',
+      'brain_monthly',
+    ),
   },
   {
     id: 'brain_pro_monthly',
@@ -54,7 +65,11 @@ export const PAYMENT_PLANS: PaymentPlan[] = [
     name: 'Brain Pro',
     description: 'More room for heavy API testing while Nomi learns real usage costs.',
     fallbackPrice: '$29/mo',
-    productId: env.EXPO_PUBLIC_REVENUECAT_PRO_PRODUCT_ID || 'brain_pro_monthly',
+    productId: platformProductId(
+      'EXPO_PUBLIC_REVENUECAT_ANDROID_PRO_PRODUCT_ID',
+      'EXPO_PUBLIC_REVENUECAT_PRO_PRODUCT_ID',
+      'brain_pro_monthly',
+    ),
   },
 ];
 
@@ -62,13 +77,24 @@ function revenueCatKey() {
   return Platform.OS === 'ios' ? REVENUECAT_IOS_API_KEY : REVENUECAT_ANDROID_API_KEY;
 }
 
+function isPlaceholderRevenueCatKey(key: string) {
+  const trimmed = key.trim();
+  if (!trimmed) return true;
+  return (
+    /x{8,}/i.test(trimmed) ||
+    trimmed.includes('YOUR_') ||
+    trimmed.includes('REPLACE_') ||
+    trimmed.endsWith('_KEY')
+  );
+}
+
 export function paymentsConfigured() {
-  return !!revenueCatKey();
+  return !isPlaceholderRevenueCatKey(revenueCatKey());
 }
 
 export function configurePayments(user?: User | null) {
   const apiKey = revenueCatKey();
-  if (!apiKey) return false;
+  if (isPlaceholderRevenueCatKey(apiKey)) return false;
   const appUserID = user?.id;
   if (configuredUserId === appUserID) return true;
   Purchases.setLogLevel(__DEV__ ? LOG_LEVEL.DEBUG : LOG_LEVEL.WARN);

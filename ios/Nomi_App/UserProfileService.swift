@@ -7,6 +7,7 @@ import UIKit
 struct UserProfile: Identifiable, Codable, Equatable {
     let id: String
     var email: String?
+    var username: String?
     var displayName: String?
     var photoURL: URL?
     var onboardingCompleted: Bool
@@ -28,6 +29,7 @@ final class UserProfileService {
             return UserProfile(
                 id: user.uid,
                 email: snapshot.get("email") as? String ?? user.email,
+                username: snapshot.get("username") as? String,
                 displayName: snapshot.get("displayName") as? String ?? user.displayName,
                 photoURL: Self.profileImageURL(from: snapshot),
                 onboardingCompleted: snapshot.get("onboardingCompleted") as? Bool ?? false,
@@ -39,6 +41,7 @@ final class UserProfileService {
         let profile = UserProfile(
             id: user.uid,
             email: user.email,
+            username: nil,
             displayName: user.displayName,
             photoURL: user.photoURL,
             onboardingCompleted: false,
@@ -79,6 +82,7 @@ final class UserProfileService {
         return UserProfile(
                 id: userId,
                 email: snapshot.get("email") as? String,
+                username: snapshot.get("username") as? String,
                 displayName: snapshot.get("displayName") as? String,
                 photoURL: Self.profileImageURL(from: snapshot),
                 onboardingCompleted: snapshot.get("onboardingCompleted") as? Bool ?? true,
@@ -113,6 +117,31 @@ final class UserProfileService {
         return UserProfile(
             id: userId,
             email: snapshot.get("email") as? String,
+            username: snapshot.get("username") as? String,
+            displayName: snapshot.get("displayName") as? String,
+            photoURL: Self.profileImageURL(from: snapshot),
+            onboardingCompleted: snapshot.get("onboardingCompleted") as? Bool ?? true,
+            createdAt: (snapshot.get("createdAt") as? Timestamp)?.dateValue(),
+            updatedAt: (snapshot.get("updatedAt") as? Timestamp)?.dateValue()
+        )
+    }
+
+    func updateUsername(userId: String, username: String) async throws -> UserProfile {
+        guard FirebaseAppReady.isConfigured else { throw AuthServiceError.firebaseNotConfigured }
+
+        let cleaned = Self.normalizedUsername(username)
+        let reference = userReference(userId: userId)
+        try await reference.setData([
+            "username": cleaned,
+            "displayName": cleaned,
+            "updatedAt": FieldValue.serverTimestamp()
+        ], merge: true)
+
+        let snapshot = try await reference.getDocument()
+        return UserProfile(
+            id: userId,
+            email: snapshot.get("email") as? String,
+            username: snapshot.get("username") as? String,
             displayName: snapshot.get("displayName") as? String,
             photoURL: Self.profileImageURL(from: snapshot),
             onboardingCompleted: snapshot.get("onboardingCompleted") as? Bool ?? true,
@@ -131,6 +160,14 @@ final class UserProfileService {
             ?? snapshot.get("avatarUrl") as? String
         guard let raw, !raw.isEmpty else { return nil }
         return URL(string: raw)
+    }
+
+    static func normalizedUsername(_ username: String) -> String {
+        let trimmed = username
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "@", with: "")
+            .lowercased()
+        return String(trimmed.filter { $0.isLetter || $0.isNumber || $0 == "_" || $0 == "." })
     }
 
     private static func downloadURLWithRetry(for reference: StorageReference, attempts: Int = 4) async throws -> URL {

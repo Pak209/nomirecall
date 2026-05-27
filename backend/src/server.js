@@ -83,6 +83,7 @@ const EMAIL_AUTH_SCHEMA = z.object({
   email: z.string().email().transform((v) => v.toLowerCase()),
   password: z.string().min(8, 'Password must be at least 8 characters'),
   intent: z.enum(['signin', 'signup']).optional(),
+  username: z.string().trim().max(32).optional(),
 });
 
 const ID_TOKEN_SCHEMA = z.object({
@@ -95,6 +96,12 @@ const INTERESTS_SCHEMA = z.object({
 
 const TIER_SCHEMA = z.object({
   tier: z.string().min(1),
+});
+
+const PROFILE_SCHEMA = z.object({
+  username: z.string().trim().max(32).optional(),
+  displayName: z.string().trim().max(80).optional(),
+  photoURL: z.string().trim().max(2048).optional(),
 });
 
 const ONBOARDING_SCHEMA = z.object({
@@ -1510,11 +1517,21 @@ function publicUser(user) {
   return {
     id: user.id,
     email: user.email,
+    username: user.username || null,
     displayName: user.displayName || user.email,
+    photoURL: user.photoURL || null,
     tier: user.tier || 'free',
     interests: user.interests || [],
     onboardingCompleted: !!user.onboardingCompleted,
   };
+}
+
+function normalizeUsername(username = '') {
+  return String(username)
+    .trim()
+    .replace(/@/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9_.]/g, '');
 }
 
 function hashToken(token) {
@@ -1597,16 +1614,20 @@ async function handleEmailAuth(req, res, forcedIntent) {
   if (!data) return;
   const intent = forcedIntent || data.intent || 'signin';
   const existing = await store.getUserByEmail(data.email);
+  const firebaseProfile = await firebaseProfileForUser({ email: data.email });
 
   if (intent === 'signup') {
     if (existing) {
       return res.status(409).json({ error: 'Email already exists' });
     }
     const passwordHash = await bcrypt.hash(data.password, 10);
+    const username = normalizeUsername(data.username);
     const user = {
       id: crypto.randomUUID(),
       email: data.email,
-      displayName: data.email.split('@')[0],
+      username: firebaseProfile?.username || username || null,
+      displayName: firebaseProfile?.displayName || username || data.email.split('@')[0],
+      photoURL: firebaseProfile?.photoURL || firebaseProfile?.profileImageUrl || firebaseProfile?.avatarUrl || null,
       passwordHash,
       tier: 'free',
       interests: [],
@@ -1625,7 +1646,15 @@ async function handleEmailAuth(req, res, forcedIntent) {
   if (!ok) {
     return res.status(401).json({ error: 'Invalid credentials' });
   }
-  return res.json({ token: issueToken(existing), user: publicUser(existing) });
+
+  const merged = firebaseProfile ? {
+    ...existing,
+    username: firebaseProfile.username || existing.username,
+    displayName: firebaseProfile.displayName || existing.displayName,
+    photoURL: firebaseProfile.photoURL || firebaseProfile.profileImageUrl || firebaseProfile.avatarUrl || existing.photoURL || null,
+  } : existing;
+  if (firebaseProfile) await store.upsertUser(merged);
+  return res.json({ token: issueToken(merged), user: publicUser(merged) });
 }
 
 async function userFromFirebaseIdToken(idToken) {
@@ -1637,19 +1666,45 @@ async function userFromFirebaseIdToken(idToken) {
   }
 }
 
+async function firebaseProfileForUser({ uid, email } = {}) {
+  if (!admin.apps.length) return null;
+  const db = admin.firestore();
+
+  if (uid) {
+    const snapshot = await db.collection('users').doc(uid).get().catch(() => null);
+    if (snapshot?.exists) return snapshot.data();
+  }
+
+  if (email) {
+    const snapshot = await db.collection('users')
+      .where('email', '==', String(email).toLowerCase())
+      .limit(1)
+      .get()
+      .catch(() => null);
+    if (snapshot && !snapshot.empty) return snapshot.docs[0].data();
+  }
+
+  return null;
+}
+
 async function upsertFirebaseUser(decoded, interests = []) {
   const email = String(decoded.email || `${decoded.uid}@firebase.local`).toLowerCase();
   const existing = await store.getUserByEmail(email);
+  const firebaseProfile = await firebaseProfileForUser({ uid: decoded.uid, email });
+  const legacyBackendId = existing?.id && existing.id !== decoded.uid ? existing.id : undefined;
   const user = {
     ...(existing || {}),
-    id: existing?.id || decoded.uid,
+    id: decoded.uid,
     email,
-    displayName: existing?.displayName || decoded.name || decoded.email?.split('@')[0] || 'Nomi User',
+    username: firebaseProfile?.username || existing?.username || null,
+    displayName: firebaseProfile?.displayName || existing?.displayName || decoded.name || decoded.email?.split('@')[0] || 'Nomi User',
+    photoURL: firebaseProfile?.photoURL || firebaseProfile?.profileImageUrl || firebaseProfile?.avatarUrl || existing?.photoURL || decoded.picture || null,
     passwordHash: existing?.passwordHash || '',
     tier: existing?.tier || 'free',
     interests: existing?.interests?.length ? existing.interests : interests,
     onboardingCompleted: !!existing?.onboardingCompleted,
     firebaseUid: decoded.uid,
+    legacyBackendId,
     authProvider: decoded.firebase?.sign_in_provider || 'firebase',
     createdAt: existing?.createdAt || new Date().toISOString(),
   };
@@ -1822,11 +1877,54 @@ app.patch('/api/auth/tier', auth, async (req, res) => {
   return res.json({ ok: true });
 });
 
+app.get('/api/auth/me', auth, async (req, res) => {
+  const user = await store.getUserById(req.userId);
+  if (!user) return res.status(404).json({ error: 'User not found' });
+
+  const firebaseProfile = await firebaseProfileForUser({ uid: user.firebaseUid || user.id, email: user.email });
+  const merged = firebaseProfile ? {
+    ...user,
+    username: firebaseProfile.username || user.username,
+    displayName: firebaseProfile.displayName || user.displayName,
+    photoURL: firebaseProfile.photoURL || firebaseProfile.profileImageUrl || firebaseProfile.avatarUrl || user.photoURL || null,
+  } : user;
+
+  if (firebaseProfile) await store.upsertUser(merged);
+  return res.json({ user: publicUser(merged) });
+});
+
+app.patch('/api/auth/profile', auth, async (req, res) => {
+  const data = parseBody(PROFILE_SCHEMA, req, res);
+  if (!data) return;
+  const user = await store.getUserById(req.userId);
+  if (!user) return res.status(404).json({ error: 'User not found' });
+
+  const username = normalizeUsername(data.username);
+  if (data.username !== undefined && username.length < 3) {
+    return res.status(400).json({ error: 'Username must be at least 3 characters.' });
+  }
+
+  const updated = {
+    ...user,
+    username: username || user.username,
+    displayName: data.displayName || username || user.displayName,
+    photoURL: data.photoURL || user.photoURL || null,
+    updatedAt: new Date().toISOString(),
+  };
+  await store.upsertUser(updated);
+  return res.json({ user: publicUser(updated) });
+});
+
 app.delete('/api/auth/account', auth, async (req, res) => {
   if (!store.deleteUserData) {
     return res.status(501).json({ error: 'Account deletion is not available for this store.' });
   }
   await store.deleteUserData(req.userId);
+  if (admin.apps.length) {
+    await admin.auth().deleteUser(req.userId).catch((error) => {
+      if (error?.code !== 'auth/user-not-found') throw error;
+    });
+  }
   return res.json({ ok: true });
 });
 

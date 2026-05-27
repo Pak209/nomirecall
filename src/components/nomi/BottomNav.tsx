@@ -1,17 +1,27 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 
 interface BottomNavItemProps {
-  icon: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  secondaryIcon?: keyof typeof Ionicons.glyphMap;
   label: string;
   focused: boolean;
 }
 
-export function BottomNavItem({ icon, label, focused }: BottomNavItemProps) {
+export function BottomNavItem({ icon, secondaryIcon, label, focused }: BottomNavItemProps) {
+  const color = focused ? '#EF6359' : '#8F8A84';
   return (
     <View style={styles.itemWrap}>
-      <Text style={[styles.icon, focused && styles.active]}>{icon}</Text>
+      <View style={styles.iconWrap}>
+        <Ionicons name={icon} size={18} color={color} />
+        {secondaryIcon ? (
+          <View style={styles.secondaryIcon}>
+            <Ionicons name={secondaryIcon} size={10} color={color} />
+          </View>
+        ) : null}
+      </View>
       <Text style={[styles.label, focused && styles.active]}>{label}</Text>
     </View>
   );
@@ -25,7 +35,7 @@ export function BottomNavAddButton() {
       end={{ x: 1, y: 1 }}
       style={styles.addButton}
     >
-      <Text style={styles.addIcon}>＋</Text>
+      <Ionicons name="add" size={34} color="#fff" />
     </LinearGradient>
   );
 }
@@ -36,9 +46,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     minWidth: 54,
   },
-  icon: {
-    fontSize: 18,
-    color: '#8F8A84',
+  iconWrap: {
+    width: 24,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  secondaryIcon: {
+    position: 'absolute',
+    right: -2,
+    top: -3,
   },
   label: {
     fontSize: 10,
@@ -47,7 +64,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   active: {
-    color: '#FF2D8E',
+    color: '#EF6359',
   },
   addButton: {
     width: 54,
@@ -61,11 +78,5 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 6 },
     elevation: 6,
-  },
-  addIcon: {
-    color: '#fff',
-    fontSize: 28,
-    lineHeight: 30,
-    fontWeight: '400',
   },
 });

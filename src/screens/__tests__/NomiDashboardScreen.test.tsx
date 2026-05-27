@@ -72,7 +72,7 @@ describe('NomiDashboardScreen', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText(/AI summary/)).toBeTruthy();
+      expect(screen.getByText('You captured 2 ideas and 1 links.')).toBeTruthy();
       expect(screen.getAllByText('Recent item').length).toBeGreaterThan(0);
       expect(screen.getByText('For You')).toBeTruthy();
     });

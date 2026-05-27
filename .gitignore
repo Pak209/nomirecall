@@ -11,6 +11,7 @@ android/
 *.mobileprovision
 *.orig.*
 web-build/
+obsidian-graph-test-vault/
 .env
 .env.local
 GoogleService-Info.plist

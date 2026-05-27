@@ -71,10 +71,10 @@ export function getMemorySummary(memory: MemoryFeedItem): string {
 
 export function getMemoryPreviewText(memory: MemoryFeedItem): string {
   return (
-    memory.title ||
     memory.rawText ||
     memory.cleanText ||
     memory.body ||
+    memory.title ||
     memory.summary ||
     memory.ai?.summary ||
     'Saved memory'

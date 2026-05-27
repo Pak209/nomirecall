@@ -75,6 +75,8 @@ Suggested screenshot set:
 
 Do not include real user data, real credentials, private notes, or secret URLs in screenshots.
 
+For repeatable screenshot data, use the review-safe flow in `docs/review-demo-data-flow.md`. It seeds fictional memories tagged `review-demo` and can rebuild the same Obsidian sample vault at any time.
+
 ## Review Notes
 
 ### Test Account Credentials
@@ -155,4 +157,4 @@ Confirm App Privacy labels in App Store Connect match actual collection, storage
 - [ ] Final App Store subscription product names/prices
 - [ ] Final RevenueCat entitlement/offering/product IDs
 - [ ] Final privacy labels
-- [ ] Final screenshot set using non-sensitive sample data
+- [ ] Final screenshot set using non-sensitive sample data from the review demo flow

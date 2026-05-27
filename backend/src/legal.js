@@ -74,7 +74,7 @@ function privacyPolicyPage() {
       <li>To authenticate your account and route you through onboarding and the main app.</li>
       <li>To save, display, edit, recall, search, export, and delete your memories.</li>
       <li>To import public X post information when you paste a supported X link or use discovery features.</li>
-      <li>To check purchase status and unlock subscription features through RevenueCat and Apple.</li>
+      <li>To check purchase status and unlock subscription features through RevenueCat, Apple, and Google Play.</li>
       <li>To troubleshoot errors, protect the service, and improve product reliability.</li>
     </ul>
 
@@ -82,19 +82,19 @@ function privacyPolicyPage() {
     <p>Nomi Recall uses Firebase for authentication, Firestore database records, and Storage files. RevenueCat is used for subscription and entitlement management. The Nomi backend may process links or public X post URLs you submit so the app can fetch post text, author, date, links, and media metadata where available.</p>
 
     <h2>X Import and Backend Processing</h2>
-    <p>When you import or discover X posts, the URL and related request data may be sent to the Nomi backend. The backend may call the X API and store returned public post details in your account if you save the memory. Nomi does not control X, YouTube, Reddit, Safari, Obsidian, Apple, Firebase, or RevenueCat privacy practices.</p>
+    <p>When you import or discover X posts, the URL and related request data may be sent to the Nomi backend. The backend may call the X API and store returned public post details in your account if you save the memory. Nomi does not control X, YouTube, Reddit, Safari, Obsidian, Apple, Google Play, Firebase, or RevenueCat privacy practices.</p>
 
     <h2>Purchases</h2>
-    <p>Purchases are processed by Apple. RevenueCat helps Nomi understand whether your account has an active entitlement. Nomi does not receive your full payment card details. Deleting your Nomi account does not automatically cancel Apple billing; subscriptions must be managed from your Apple account.</p>
+    <p>Purchases are processed by Apple or Google Play, depending on where you installed the app. RevenueCat helps Nomi understand whether your account has an active entitlement. Nomi does not receive your full payment card details. Deleting your Nomi account does not automatically cancel store billing; subscriptions must be managed through Apple Subscriptions or Google Play subscriptions.</p>
 
     <h2>Account Deletion</h2>
-    <p>You can request account deletion from Settings in the app. Account deletion removes your Nomi profile, saved memories, and uploaded files that are associated with your Firebase user ID. Some records may remain temporarily in backups, logs, App Store purchase history, RevenueCat systems, or other service provider records as required for security, fraud prevention, accounting, or legal obligations.</p>
+    <p>You can request account deletion from Settings in the app. Account deletion removes your Nomi profile, saved memories, uploaded files, X connection records, and AI metadata associated with your Firebase user ID. Some records may remain temporarily in backups, logs, app store purchase history, RevenueCat systems, or other service provider records as required for security, fraud prevention, accounting, or legal obligations.</p>
 
     <h2>Data Sharing</h2>
-    <p>We do not sell your saved memories. We share data with service providers only as needed to operate Nomi Recall, including Firebase, RevenueCat, Apple, and backend infrastructure providers.</p>
+    <p>We do not sell your saved memories. We share data with service providers only as needed to operate Nomi Recall, including Firebase, RevenueCat, Apple, Google Play, and backend infrastructure providers.</p>
 
     <h2>Contact</h2>
-    <p>For privacy questions, contact the app owner through the support contact listed in App Store Connect.</p>
+    <p>For privacy questions, contact the app owner through the support contact listed in the app store listing.</p>
   `);
 }
 
@@ -115,7 +115,7 @@ function termsPage() {
     <p>Nomi Recall can help import public content from X links and may later support other share sources. Imported content may be limited by third-party APIs, availability, rate limits, terms, or permissions. You are responsible for respecting third-party rights and platform rules when saving or exporting content.</p>
 
     <h2>Subscriptions and Purchases</h2>
-    <p>Nomi Pro purchases are processed by Apple and managed through RevenueCat. Subscription availability, pricing, free trials, renewals, refunds, and cancellation are handled by Apple. Deleting your Nomi account does not cancel Apple billing; you must cancel subscriptions from your Apple account.</p>
+    <p>Nomi Pro purchases are processed by Apple or Google Play and managed through RevenueCat. Subscription availability, pricing, free trials, renewals, refunds, and cancellation are handled by the store where you purchased. Deleting your Nomi account does not cancel store billing; you must cancel subscriptions from Apple Subscriptions or Google Play subscriptions.</p>
 
     <h2>Obsidian and Export Features</h2>
     <p>Nomi Recall may export Markdown files for use in Obsidian, Files, iCloud Drive, AirDrop, or other destinations. You are responsible for where exported files are saved and who can access them after export.</p>
@@ -124,10 +124,10 @@ function termsPage() {
     <p>Nomi Recall is provided as-is while it is being developed. Features may change, fail, or become unavailable. Backend processing, Firebase services, RevenueCat, Apple services, X API access, and network connectivity can affect app behavior.</p>
 
     <h2>Account Deletion</h2>
-    <p>You may delete your account from Settings. Deletion is intended to remove your profile, memories, and uploaded user files associated with your Firebase user ID, but it does not cancel Apple subscriptions or remove records Apple, RevenueCat, Firebase, hosting providers, or other service providers are required to retain.</p>
+    <p>You may delete your account from Settings. Deletion is intended to remove your profile, memories, uploaded user files, X connection records, and AI metadata associated with your Firebase user ID, but it does not cancel store subscriptions or remove records Apple, Google Play, RevenueCat, Firebase, hosting providers, or other service providers are required to retain.</p>
 
     <h2>Contact</h2>
-    <p>For support or terms questions, use the support contact listed in App Store Connect.</p>
+    <p>For support or terms questions, use the support contact listed in the app store listing.</p>
   `);
 }
 

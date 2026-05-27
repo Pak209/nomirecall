@@ -1,5 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useStore } from '../../store/useStore';
 
 export type HomeFeedTab = 'for-you' | 'recent' | 'projects' | 'inbox';
 
@@ -16,8 +17,10 @@ interface HomeFeedTabsProps {
 }
 
 export function HomeFeedTabs({ activeTab, onTabPress }: HomeFeedTabsProps) {
+  const dark = useStore((state) => state.theme === 'dark');
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, dark && styles.containerDark]}>
       {TABS.map((tab) => {
         const active = activeTab === tab.id;
         return (
@@ -29,7 +32,7 @@ export function HomeFeedTabs({ activeTab, onTabPress }: HomeFeedTabsProps) {
             accessibilityRole="tab"
             accessibilityState={{ selected: active }}
           >
-            <Text style={[styles.tabText, active && styles.tabTextActive]}>{tab.label}</Text>
+            <Text style={[styles.tabText, dark && styles.tabTextDark, active && styles.tabTextActive]}>{tab.label}</Text>
             <View style={[styles.indicator, active && styles.indicatorActive]} />
           </TouchableOpacity>
         );
@@ -45,6 +48,9 @@ const styles = StyleSheet.create({
     borderBottomColor: '#EFE4DC',
     marginHorizontal: -4,
   },
+  containerDark: {
+    borderBottomColor: '#272A36',
+  },
   tabButton: {
     flex: 1,
     alignItems: 'center',
@@ -56,6 +62,9 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     paddingBottom: 12,
+  },
+  tabTextDark: {
+    color: '#C9C5D0',
   },
   tabTextActive: {
     color: '#EF6359',

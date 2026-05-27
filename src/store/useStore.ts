@@ -24,6 +24,7 @@ interface AppState {
   // UI
   serverOnline: boolean;
   ingestModalVisible: boolean;
+  theme: 'light' | 'dark';
 
   // Actions
   setUser: (user: User | null) => void;
@@ -40,6 +41,7 @@ interface AppState {
   setBrainLoading: (v: boolean) => void;
   setServerOnline: (v: boolean) => void;
   setIngestModalVisible: (v: boolean) => void;
+  toggleTheme: () => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -58,6 +60,7 @@ export const useStore = create<AppState>((set, get) => ({
   brainLoading: false,
   serverOnline: false,
   ingestModalVisible: false,
+  theme: 'light',
 
   setUser: (user) => set({
     user,
@@ -89,6 +92,11 @@ export const useStore = create<AppState>((set, get) => ({
   setBrainLoading: (v) => set({ brainLoading: v }),
   setServerOnline: (v) => set({ serverOnline: v }),
   setIngestModalVisible: (v) => set({ ingestModalVisible: v }),
+  toggleTheme: async () => {
+    const next = get().theme === 'dark' ? 'light' : 'dark';
+    await SecureStore.setItemAsync('nomi_theme', next);
+    set({ theme: next });
+  },
 
   logout: async () => {
     await SecureStore.deleteItemAsync('auth_token');

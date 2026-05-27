@@ -1,18 +1,40 @@
 import * as SecureStore from 'expo-secure-store';
+import { CancelledError, isCancelledError } from '@tanstack/query-core';
 import {
   FeedItem, WikiPage, Claim, BrainStats,
   IngestPayload, IngestResult, InterestTag, MemoryItem, MemoryLink, MemoryMedia,
 } from '../types';
+import { useStore } from '../store/useStore';
 
 const env = process.env as unknown as Record<string, string | undefined>;
 const rawApiBase = env.EXPO_PUBLIC_API_BASE_URL ?? env.API_BASE_URL;
+const PRODUCTION_API_BASE = 'https://nomirecall.onrender.com/api';
+const DEVELOPMENT_API_BASE = 'http://localhost:3000/api';
+
 export const API_BASE = !rawApiBase || rawApiBase.includes('YOUR_RAILWAY_OR_NGROK_URL')
-  ? 'http://localhost:3000/api'
+  ? (__DEV__ ? DEVELOPMENT_API_BASE : PRODUCTION_API_BASE)
   : rawApiBase;
 
 const API_TIMEOUT_MS = 15_000;
 const HEALTH_TIMEOUT_MS = 6_000;
 const COLD_START_MESSAGE = 'Nomi is waking up the backend. Please try again in a few seconds.';
+const AUTH_EXPIRED_MESSAGE = 'Your session expired. Please sign in again.';
+
+export class ApiError extends Error {
+  status?: number;
+  code?: string;
+
+  constructor(message: string, options: { status?: number; code?: string } = {}) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = options.status;
+    this.code = options.code;
+  }
+}
+
+export function isAuthExpiredError(error: unknown): boolean {
+  return (error instanceof ApiError && error.code === 'AUTH_EXPIRED') || isCancelledError(error);
+}
 
 export interface DashboardSummary {
   title: string;
@@ -116,10 +138,22 @@ async function request<T>(
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
     const message = err.error?.message || err.error || err.detail || `Request failed: ${res.status}`;
-    throw new Error(message);
+    if (res.status === 401 && /invalid token|missing bearer token/i.test(message)) {
+      await clearLocalAuthSession();
+      throw new CancelledError({ silent: true });
+    }
+    throw new ApiError(message, { status: res.status });
   }
 
   return res.json();
+}
+
+async function clearLocalAuthSession() {
+  await Promise.all([
+    SecureStore.deleteItemAsync('auth_token'),
+    SecureStore.deleteItemAsync('user_data'),
+  ]);
+  useStore.getState().setUser(null);
 }
 
 // ── Auth ───────────────────────────────────────────────────────────────────────
@@ -154,6 +188,15 @@ export const AuthAPI = {
       method: 'PATCH',
       body: JSON.stringify({ tier }),
     });
+  },
+  async updateProfile(payload: { username?: string; displayName?: string; photoURL?: string | null }): Promise<{ user: any }> {
+    return request('/auth/profile', {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+  },
+  async me(): Promise<{ user: any }> {
+    return request('/auth/me');
   },
   async deleteAccount(): Promise<{ ok: boolean }> {
     return request('/auth/account', {
@@ -458,6 +501,9 @@ export interface XBookmarkSyncResult {
 }
 
 export const XBookmarkAPI = {
+  async connect(): Promise<{ configured: boolean; authorizationUrl?: string | null }> {
+    return request('/x/bookmarks/connect');
+  },
   async status(): Promise<XBookmarkStatus> {
     return request('/x/bookmarks/status');
   },
@@ -476,6 +522,11 @@ export const XBookmarkAPI = {
     return request('/x/bookmarks/daily-sync', {
       method: 'POST',
       body: JSON.stringify({ enabled }),
+    });
+  },
+  async disconnect(): Promise<{ ok: boolean }> {
+    return request('/x/bookmarks/connection', {
+      method: 'DELETE',
     });
   },
   async runManualBookmarkSync(processWithAI = false): Promise<XBookmarkSyncResult> {

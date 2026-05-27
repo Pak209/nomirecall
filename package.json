@@ -24,6 +24,7 @@
     "build:android:production": "eas build --profile production --platform android",
     "submit:android": "eas submit --profile production --platform android",
     "obsidian:test-vault": "node scripts/export-obsidian-graph-test.mjs",
+    "demo:seed-review": "node scripts/seed-review-demo-memories.mjs",
     "check:android:firebase": "node scripts/check-android-firebase-config.mjs",
     "postinstall": "node scripts/patch-expo-ios-compat.js",
     "lint": "eslint . --ext .ts,.tsx",

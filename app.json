@@ -28,7 +28,7 @@
     },
     "android": {
       "package": "com.dkimoto.nomi",
-      "versionCode": 1,
+      "versionCode": 4,
       "googleServicesFile": "./google-services.json",
       "permissions": [
         "android.permission.INTERNET",
@@ -36,6 +36,11 @@
         "android.permission.RECORD_AUDIO",
         "android.permission.POST_NOTIFICATIONS",
         "android.permission.READ_MEDIA_IMAGES"
+      ],
+      "blockedPermissions": [
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.SYSTEM_ALERT_WINDOW"
       ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/icon.png",
@@ -71,6 +76,11 @@
         }
       ]
     ],
-    "scheme": "secondbrain"
+    "scheme": "secondbrain",
+    "extra": {
+      "eas": {
+        "projectId": "a742150b-6596-48ae-b663-d3077aab41ed"
+      }
+    }
   }
 }

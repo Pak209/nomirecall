@@ -5,6 +5,11 @@ struct MainTabsView: View {
     @StateObject private var intelligenceStore = IntelligenceStore()
     @State private var selectedTab: NomiTab = .home
     @State private var isShowingQuickCapture = false
+    @State private var isShowingAskNomi = false
+    @State private var isShowingDailyBrief = false
+    @State private var isShowingPaywall = false
+    @State private var isShowingProjects = false
+    @State private var isShowingCircle = false
     @State private var pendingSharePayload: NomiSharePayload?
     @Environment(\.scenePhase) private var scenePhase
 
@@ -15,11 +20,21 @@ struct MainTabsView: View {
                 case .home:
                     HomeView {
                         isShowingQuickCapture = true
+                    } onDrawerDestination: { destination in
+                        handleHomeDrawerDestination(destination)
                     }
                 case .ideas:
                     ConnectedIdeasGraphView()
-                case .circle:
-                    FriendCircleView()
+                case .ask:
+                    HomeView {
+                        isShowingQuickCapture = true
+                    } onDrawerDestination: { destination in
+                        handleHomeDrawerDestination(destination)
+                    }
+                    .onAppear {
+                        isShowingAskNomi = true
+                        selectedTab = .home
+                    }
                 case .recall:
                     RecallView()
                 case .profile:
@@ -52,6 +67,46 @@ struct MainTabsView: View {
             QuickCaptureView(pendingSharePayload: $pendingSharePayload)
                 .environmentObject(memoryStore)
         }
+        .sheet(isPresented: $isShowingAskNomi) {
+            AskNomiSheet()
+                .environmentObject(memoryStore)
+        }
+        .sheet(isPresented: $isShowingDailyBrief) {
+            DailyBriefView()
+                .environmentObject(memoryStore)
+                .environmentObject(intelligenceStore)
+        }
+        .sheet(isPresented: $isShowingPaywall) {
+            NomiPaywallView()
+        }
+        .sheet(isPresented: $isShowingProjects) {
+            ProjectsView(showsCloseButton: true)
+                .environmentObject(intelligenceStore)
+        }
+        .sheet(isPresented: $isShowingCircle) {
+            FriendCircleView()
+        }
+    }
+
+    private func handleHomeDrawerDestination(_ destination: HomeDrawerDestination) {
+        switch destination {
+        case .profile, .settings:
+            selectedTab = .profile
+        case .nomiPro:
+            isShowingPaywall = true
+        case .dailyBrief:
+            isShowingDailyBrief = true
+        case .projects:
+            isShowingProjects = true
+        case .connectedIdeas:
+            selectedTab = .ideas
+        case .circle:
+            isShowingCircle = true
+        case .obsidianExport, .importSources:
+            selectedTab = .profile
+        case .help:
+            selectedTab = .profile
+        }
     }
 
     private func consumeSharedCaptureIfNeeded() {
@@ -64,7 +119,7 @@ struct MainTabsView: View {
 private enum NomiTab: CaseIterable {
     case home
     case ideas
-    case circle
+    case ask
     case recall
     case profile
 
@@ -72,7 +127,7 @@ private enum NomiTab: CaseIterable {
         switch self {
         case .home: "Home"
         case .ideas: "Ideas"
-        case .circle: "Circle"
+        case .ask: "Ask"
         case .recall: "Recall"
         case .profile: "Profile"
         }
@@ -82,7 +137,7 @@ private enum NomiTab: CaseIterable {
         switch self {
         case .home: "house.fill"
         case .ideas: "point.3.connected.trianglepath.dotted"
-        case .circle: "person.2.fill"
+        case .ask: "sparkles"
         case .recall: "clock.arrow.circlepath"
         case .profile: "person"
         }
@@ -97,7 +152,7 @@ private struct NomiTabBar: View {
         HStack(alignment: .center, spacing: 0) {
             tabButton(.home)
             tabButton(.ideas)
-            tabButton(.circle)
+            tabButton(.ask)
             tabButton(.recall)
             tabButton(.profile)
         }
@@ -214,7 +269,7 @@ struct FriendCircleView: View {
     }
 }
 
-struct ConnectedIdeasGraphView: View {
+private struct LegacyConnectedIdeasGraphView: View {
     @EnvironmentObject private var memoryStore: MemoryStore
     @Environment(\.dismiss) private var dismiss
 

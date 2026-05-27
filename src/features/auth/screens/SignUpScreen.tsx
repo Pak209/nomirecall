@@ -13,10 +13,12 @@ export default function SignUpScreen() {
   const nav = useNavigation<Nav>();
   const { showToast } = useToast();
   const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const normalizedUsername = normalizeUsername(username);
   const signUpMutation = useMutation({
-    mutationFn: () => signUpWithEmail(email, password),
+    mutationFn: () => signUpWithEmail(email, password, normalizedUsername || undefined),
     onSuccess: () => showToast('Account created!', 'success'),
     onError: (e: any) => showToast(e?.message || 'Create account failed', 'error'),
   });
@@ -33,6 +35,7 @@ export default function SignUpScreen() {
 
   function handleSubmit() {
     if (!email || !password) return showToast('Email and password are required', 'warning');
+    if (username.trim() && normalizedUsername.length < 3) return showToast('Username must be at least 3 characters', 'warning');
     if (password !== confirmPassword) return showToast('Passwords must match', 'warning');
     signUpMutation.mutate();
   }
@@ -41,6 +44,7 @@ export default function SignUpScreen() {
     <View style={styles.root}>
       <Text style={styles.title}>Create account</Text>
       <TextInput style={styles.input} placeholder="Email" value={email} onChangeText={setEmail} autoCapitalize="none" />
+      <TextInput style={styles.input} placeholder="Username (optional)" value={username} onChangeText={setUsername} autoCapitalize="none" autoCorrect={false} />
       <TextInput style={styles.input} placeholder="Password" value={password} onChangeText={setPassword} secureTextEntry />
       <TextInput style={styles.input} placeholder="Confirm password" value={confirmPassword} onChangeText={setConfirmPassword} secureTextEntry />
       <TouchableOpacity style={styles.primaryBtn} onPress={handleSubmit} disabled={loading}>
@@ -54,6 +58,10 @@ export default function SignUpScreen() {
       </TouchableOpacity>
     </View>
   );
+}
+
+function normalizeUsername(value: string) {
+  return value.trim().replace(/@/g, '').toLowerCase().replace(/[^a-z0-9_.]/g, '');
 }
 
 const styles = StyleSheet.create({

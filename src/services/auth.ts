@@ -16,6 +16,7 @@ interface EmailAuthPayload {
   email: string;
   password: string;
   intent?: 'signin' | 'signup';
+  username?: string;
 }
 
 let googleConfigured = false;
@@ -117,28 +118,67 @@ export async function signInWithGoogle(): Promise<User> {
 
 // ── Email / Password (dev / fallback) ─────────────────────────────────────────
 export async function signInWithEmail(email: string, password: string): Promise<User> {
-  const { token, user } = await postEmailAuth('/auth/email', { email, password, intent: 'signin' });
-  const appUser = makeAppUser(user, token);
-  await persistUser(appUser, token);
-  return appUser;
-}
-
-export async function signUpWithEmail(email: string, password: string): Promise<User> {
+  const normalizedEmail = email.trim();
   try {
-    const { token, user } = await postEmailAuth('/auth/email/signup', { email, password, intent: 'signup' });
+    const credential = await auth().signInWithEmailAndPassword(normalizedEmail, password);
+    const idToken = await credential.user.getIdToken();
+    const { token, user } = await AuthAPI.signIn(idToken);
+    const appUser = makeAppUser(user, token, credential.user.displayName);
+    await persistUser(appUser, token);
+    return appUser;
+  } catch (firebaseError) {
+    const { token, user } = await postEmailAuth('/auth/email', { email: normalizedEmail, password, intent: 'signin' });
     const appUser = makeAppUser(user, token);
     await persistUser(appUser, token);
     return appUser;
-  } catch (error: any) {
-    // Fallback for backends that multiplex sign-in/sign-up under /auth/email.
-    if (typeof error?.message === 'string' && /404|not found/i.test(error.message)) {
-      const { token, user } = await postEmailAuth('/auth/email', { email, password, intent: 'signup' });
+  }
+}
+
+export async function signUpWithEmail(email: string, password: string, username?: string): Promise<User> {
+  const normalizedEmail = email.trim();
+  try {
+    const credential = await auth().createUserWithEmailAndPassword(normalizedEmail, password);
+    if (username) {
+      await credential.user.updateProfile({ displayName: username }).catch(() => undefined);
+    }
+    const idToken = await credential.user.getIdToken(true);
+    const { token, user } = await AuthAPI.signUp(idToken, []);
+    let appUser = makeAppUser(user, token, username || credential.user.displayName);
+    await persistUser(appUser, token);
+    if (username) {
+      appUser = await updateCurrentUserProfile({ username, displayName: username });
+    }
+    return appUser;
+  } catch (firebaseError) {
+    try {
+      const payload: EmailAuthPayload = { email: normalizedEmail, password, intent: 'signup' };
+      if (username) payload.username = username;
+      const { token, user } = await postEmailAuth('/auth/email/signup', payload);
       const appUser = makeAppUser(user, token);
       await persistUser(appUser, token);
       return appUser;
+    } catch (error: any) {
+      // Fallback for backends that multiplex sign-in/sign-up under /auth/email.
+      if (typeof error?.message === 'string' && /404|not found/i.test(error.message)) {
+        const payload: EmailAuthPayload = { email: normalizedEmail, password, intent: 'signup' };
+        if (username) payload.username = username;
+        const { token, user } = await postEmailAuth('/auth/email', payload);
+        const appUser = makeAppUser(user, token);
+        await persistUser(appUser, token);
+        return appUser;
+      }
+      throw error;
     }
-    throw error;
   }
+}
+
+export async function updateCurrentUserProfile(payload: { username?: string; displayName?: string; photoURL?: string | null }): Promise<User> {
+  const current = useStore.getState().user;
+  if (!current?.token) throw new Error('Sign in before updating your profile.');
+  const { user } = await AuthAPI.updateProfile(payload);
+  const appUser = makeAppUser({ ...current, ...user }, current.token);
+  await persistUser(appUser, current.token);
+  return appUser;
 }
 
 export async function forgotPasswordWithEmail(email: string): Promise<{ ok: boolean; message: string; debugResetToken?: string }> {
@@ -150,12 +190,11 @@ export async function resetPasswordWithToken(token: string, password: string): P
 }
 
 export async function deleteCurrentAccount(): Promise<void> {
+  await AuthAPI.deleteAccount();
   const firebaseUser = auth().currentUser;
   if (firebaseUser) {
-    await firebaseUser.delete();
+    await firebaseUser.delete().catch(() => undefined);
   }
-
-  await AuthAPI.deleteAccount();
   await GoogleSignin.signOut().catch(() => undefined);
   await auth().signOut().catch(() => undefined);
   await Promise.all([
@@ -198,10 +237,22 @@ export async function restoreSession(): Promise<User | null> {
       SecureStore.getItemAsync('auth_token'),
       SecureStore.getItemAsync('user_data'),
     ]);
+    const theme = await SecureStore.getItemAsync('nomi_theme');
+    if (theme === 'dark' || theme === 'light') {
+      useStore.setState({ theme });
+    }
     if (!token || !raw) return null;
-    const user: User = JSON.parse(raw);
-    useStore.getState().setUser(user);
-    return user;
+    const cachedUser: User = JSON.parse(raw);
+    useStore.getState().setUser(cachedUser);
+
+    try {
+      const { user } = await AuthAPI.me();
+      const appUser = makeAppUser({ ...cachedUser, ...user }, token);
+      await persistUser(appUser, token);
+      return appUser;
+    } catch {
+      return useStore.getState().user;
+    }
   } catch {
     return null;
   }

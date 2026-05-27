@@ -2,6 +2,7 @@ import React from 'react';
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { QuickCaptureAction } from './QuickCaptureCard';
+import { useStore } from '../../store/useStore';
 
 interface CompactCaptureComposerProps {
   actions: QuickCaptureAction[];
@@ -16,10 +17,12 @@ const ACTION_ICONS: Record<QuickCaptureAction['id'], keyof typeof Ionicons.glyph
 };
 
 export function CompactCaptureComposer({ actions, onActionPress }: CompactCaptureComposerProps) {
+  const dark = useStore((state) => state.theme === 'dark');
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, dark && styles.containerDark]}>
       <View style={styles.promptRow}>
-        <View style={styles.nomiAvatar}>
+        <View style={[styles.nomiAvatar, dark && styles.nomiAvatarDark]}>
           <Image
             source={require('../../../assets/nomi-mascot.png')}
             style={styles.nomiImage}
@@ -27,20 +30,20 @@ export function CompactCaptureComposer({ actions, onActionPress }: CompactCaptur
             accessibilityIgnoresInvertColors
           />
         </View>
-        <Text style={styles.placeholder}>What do you want to remember?</Text>
+        <Text style={[styles.placeholder, dark && styles.placeholderDark]}>What do you want to remember?</Text>
       </View>
       <View style={styles.actionsRow}>
         {actions.map((action) => (
           <TouchableOpacity
             key={action.id}
-            style={styles.actionButton}
+            style={[styles.actionButton, dark && styles.actionButtonDark]}
             onPress={() => onActionPress?.(action)}
             activeOpacity={0.84}
             accessibilityRole="button"
             accessibilityLabel={`Capture ${action.label}`}
           >
             <Ionicons name={ACTION_ICONS[action.id]} size={18} color="#EF6359" />
-            <Text style={styles.actionLabel}>{action.label}</Text>
+            <Text style={[styles.actionLabel, dark && styles.actionLabelDark]}>{action.label}</Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -62,6 +65,12 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 6 },
     elevation: 1,
   },
+  containerDark: {
+    borderColor: '#332B35',
+    backgroundColor: '#181922',
+    shadowColor: '#000',
+    shadowOpacity: 0.18,
+  },
   promptRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -76,6 +85,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     overflow: 'hidden',
   },
+  nomiAvatarDark: {
+    backgroundColor: '#302631',
+  },
   nomiImage: {
     width: 34,
     height: 34,
@@ -85,6 +97,9 @@ const styles = StyleSheet.create({
     color: '#A9A0A2',
     fontSize: 15,
     fontWeight: '600',
+  },
+  placeholderDark: {
+    color: '#B4AFBA',
   },
   actionsRow: {
     flexDirection: 'row',
@@ -102,9 +117,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
   },
+  actionButtonDark: {
+    borderColor: '#3B3440',
+    backgroundColor: '#20212C',
+  },
   actionLabel: {
     color: '#242329',
     fontSize: 13,
     fontWeight: '800',
+  },
+  actionLabelDark: {
+    color: '#F7F4F8',
   },
 });

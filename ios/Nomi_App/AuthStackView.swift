@@ -8,6 +8,7 @@ struct AuthStackView: View {
 
     @State private var mode: Mode = .signIn
     @State private var email = ""
+    @State private var username = ""
     @State private var password = ""
     @State private var rememberMe = false
     @State private var hasRememberedCredentials = false
@@ -18,6 +19,7 @@ struct AuthStackView: View {
     @State private var errorMessage: String?
 
     private let authService = AuthService()
+    private let userProfileService = UserProfileService()
     private let credentialStore = BiometricCredentialStore()
 
     var body: some View {
@@ -57,6 +59,14 @@ struct AuthStackView: View {
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
                             .nomiTextField()
+
+                        if mode == .signUp {
+                            TextField("Username (optional)", text: $username)
+                                .textContentType(.username)
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                                .nomiTextField()
+                        }
 
                         SecureField("Password", text: $password)
                             .textContentType(mode == .signUp ? .newPassword : .password)
@@ -179,7 +189,11 @@ struct AuthStackView: View {
                     _ = try await authService.signIn(email: email, password: password)
                     updateSavedCredentialsAfterEmailAuth()
                 case .signUp:
-                    _ = try await authService.signUp(email: email, password: password)
+                    let user = try await authService.signUp(email: email, password: password)
+                    let cleanedUsername = UserProfileService.normalizedUsername(username)
+                    if !cleanedUsername.isEmpty {
+                        _ = try await userProfileService.updateUsername(userId: user.uid, username: cleanedUsername)
+                    }
                 }
             } catch {
                 errorMessage = error.localizedDescription
