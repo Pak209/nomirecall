@@ -36,7 +36,7 @@ memory,notes,recall,second brain,links,ideas,knowledge,productivity,markdown,obs
 
 Notes:
 - The app includes in-app legal links generated from the backend at `/privacy` and `/terms`.
-- Current production backend base in code/docs: `https://nomirecall.onrender.com/api`. Public legal URLs verified: `https://nomirecall.onrender.com/privacy` and `https://nomirecall.onrender.com/terms`. Deploy the backend support route before using `https://nomirecall.onrender.com/support` in App Store Connect.
+- Current production backend base in code/docs: `https://nomirecall.onrender.com/api`. Public legal/support URLs verified: `https://nomirecall.onrender.com/privacy`, `https://nomirecall.onrender.com/terms`, and `https://nomirecall.onrender.com/support`.
 
 ## Category Recommendation
 
@@ -150,7 +150,7 @@ Confirm App Privacy labels in App Store Connect match actual collection, storage
 
 ## Manual Fill-In Before Submission
 
-- [ ] Support URL deployed and verified
+- [x] Support URL deployed and verified
 - [x] Privacy Policy URL
 - [ ] Optional Marketing URL
 - [ ] Review test account credentials
