@@ -91,7 +91,7 @@ struct HomeView: View {
                         }
                         .padding(.horizontal, 16)
                         .padding(.top, 16)
-                        .padding(.bottom, 126)
+                        .padding(.bottom, 214)
                     }
                 }
                 .refreshable {
@@ -121,7 +121,7 @@ struct HomeView: View {
                         }
                         .buttonStyle(.plain)
                         .padding(.trailing, 22)
-                        .padding(.bottom, 98)
+                        .padding(.bottom, 136)
                     }
                 }
 
