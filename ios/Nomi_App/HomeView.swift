@@ -189,6 +189,9 @@ struct HomeView: View {
                         size: 42,
                         fontSize: 15
                     )
+                    .padding(3)
+                    .background(headerIconSurface, in: Circle())
+                    .overlay(Circle().stroke(headerIconStroke, lineWidth: 1))
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Open profile menu")
@@ -203,6 +206,8 @@ struct HomeView: View {
                             .font(.system(size: 21, weight: .semibold))
                             .foregroundStyle(Color.nomiInk)
                             .frame(width: 34, height: 40)
+                            .background(headerIconSurface, in: Circle())
+                            .overlay(Circle().stroke(headerIconStroke, lineWidth: 1))
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel(theme == "dark" ? "Switch to light mode" : "Switch to dark mode")
@@ -291,6 +296,18 @@ struct HomeView: View {
         colorScheme == .dark
             ? Color(red: 0.18, green: 0.16, blue: 0.23)
             : Color(red: 1.0, green: 0.80, blue: 0.76)
+    }
+
+    private var headerIconSurface: Color {
+        colorScheme == .dark
+            ? Color(red: 0.11, green: 0.10, blue: 0.15)
+            : Color.white
+    }
+
+    private var headerIconStroke: Color {
+        colorScheme == .dark
+            ? Color.white.opacity(0.14)
+            : Color.black.opacity(0.07)
     }
 
     private func loadMemories() async {
@@ -885,6 +902,7 @@ private enum NomiDrawerItem: CaseIterable, Identifiable {
 }
 
 private struct NomiHomeSideDrawer: View {
+    @Environment(\.colorScheme) private var colorScheme
     @Binding var isPresented: Bool
     let displayName: String
     let imageURL: URL?
@@ -912,7 +930,7 @@ private struct NomiHomeSideDrawer: View {
                 drawerContent
                     .frame(width: drawerWidth)
                     .frame(maxHeight: .infinity)
-                    .background(Color.nomiCardStrong)
+                    .background(drawerSurface)
                     .clipShape(UnevenRoundedRectangle(bottomTrailingRadius: 26, topTrailingRadius: 26))
                     .shadow(color: .black.opacity(0.20), radius: 22, x: 10, y: 0)
                     .offset(x: isPresented ? 0 : -drawerWidth - 24)
@@ -956,7 +974,7 @@ private struct NomiHomeSideDrawer: View {
                     .scaledToFit()
                     .frame(width: 44, height: 44)
                     .padding(5)
-                    .background(Color.nomiPink.opacity(0.12), in: Circle())
+                    .background(drawerIconSurface, in: Circle())
             }
             .padding(.top, 58)
 
@@ -968,8 +986,8 @@ private struct NomiHomeSideDrawer: View {
                 drawerStat(projectCount, "Projects")
             }
             .frame(height: 70)
-            .background(Color.nomiCoral.opacity(0.065), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).stroke(Color.nomiCoral.opacity(0.13), lineWidth: 1))
+            .background(drawerPanelSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).stroke(drawerPanelStroke, lineWidth: 1))
 
             VStack(spacing: 0) {
                 ForEach(NomiDrawerItem.allCases) { item in
@@ -1046,7 +1064,7 @@ private struct NomiHomeSideDrawer: View {
                 }
                 .foregroundStyle(Color.nomiPink)
                 .padding(14)
-                .background(Color.nomiPink.opacity(0.10), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                .background(drawerPanelSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(Color.nomiPink.opacity(0.18), lineWidth: 1))
             }
             .buttonStyle(.plain)
@@ -1065,6 +1083,30 @@ private struct NomiHomeSideDrawer: View {
                 .foregroundStyle(Color.nomiMuted)
         }
         .frame(maxWidth: .infinity)
+    }
+
+    private var drawerSurface: Color {
+        colorScheme == .dark
+            ? Color(red: 0.08, green: 0.075, blue: 0.105)
+            : Color(red: 1.0, green: 0.965, blue: 0.945)
+    }
+
+    private var drawerPanelSurface: Color {
+        colorScheme == .dark
+            ? Color(red: 0.13, green: 0.105, blue: 0.14)
+            : Color(red: 1.0, green: 0.91, blue: 0.88)
+    }
+
+    private var drawerPanelStroke: Color {
+        colorScheme == .dark
+            ? Color.white.opacity(0.12)
+            : Color(red: 0.88, green: 0.36, blue: 0.30).opacity(0.22)
+    }
+
+    private var drawerIconSurface: Color {
+        colorScheme == .dark
+            ? Color(red: 0.18, green: 0.12, blue: 0.18)
+            : Color(red: 1.0, green: 0.86, blue: 0.88)
     }
 }
 
