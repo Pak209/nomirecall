@@ -18,6 +18,12 @@ test('legal pages are public html routes', async () => {
   assert.match(privacy.text, /RevenueCat/);
   assert.match(privacy.text, /X post/);
 
+  const support = await request(app).get('/support');
+  assert.equal(support.status, 200);
+  assert.match(support.headers['content-type'], /html/);
+  assert.match(support.text, /Nomi Recall Support/);
+  assert.match(support.text, /support@nomirecall\.app/);
+
   const terms = await request(app).get('/terms');
   assert.equal(terms.status, 200);
   assert.match(terms.headers['content-type'], /html/);

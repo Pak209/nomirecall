@@ -4,17 +4,17 @@
 
 - Workspace: `ios/Nomi.xcworkspace`
 - Scheme: `Nomi_App`
-- App display name: `Nomi`
+- App display name: `Nomi Recall`
 - Bundle identifier: `com.dkimoto.nomi.recall`
 - Version: `1.0`
-- Build number: `1`
+- Build number: `17`
 - Deployment target: iOS 17.0
-- Signing: Automatic signing is enabled, but a Development Team still needs to be selected in Xcode.
+- Signing: Automatic signing is enabled with Development Team `5YJJCSFSQM`.
 
 ## Before First Archive
 
-1. In Apple Developer, create or confirm the App ID for `com.dkimoto.nomi.recall`.
-2. In Xcode, select the `Nomi_App` target and choose your Apple Developer Team.
+1. In Apple Developer/App Store Connect, confirm the App ID for `com.dkimoto.nomi.recall`.
+2. In Xcode, confirm the `Nomi_App` target uses Development Team `5YJJCSFSQM`.
 3. In App Store Connect, create the app record:
    - Platform: iOS
    - Name: Nomi Recall
@@ -42,6 +42,13 @@
 5. In Organizer, Distribute App.
 6. Choose App Store Connect.
 7. Upload for TestFlight processing.
+
+Latest local archive/export check:
+
+- Archive path: `build/Nomi.xcarchive`
+- App Store export: `build/app-store-export/Nomi Recall.ipa`
+- Export signing: Cloud Managed Apple Distribution, team `5YJJCSFSQM`
+- Exported bundle/build: `com.dkimoto.nomi.recall` / `17`
 
 ## Command Line Archive
 
@@ -74,5 +81,5 @@ Add after the core app is stable. Use an App Group so the extension can write a 
 Recommended App Group:
 
 ```text
-group.com.dkimoto.nomi
+group.com.dkimoto.nomi.recall
 ```

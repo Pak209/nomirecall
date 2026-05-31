@@ -33,7 +33,7 @@ This is the best lane for testing native iOS-only features before TestFlight, in
 
 ## TestFlight
 
-1. Confirm the App Store Connect app uses bundle id `com.dkimoto.nomi`.
+1. Confirm the App Store Connect app uses bundle id `com.dkimoto.nomi.recall`.
 2. Increment `expo.ios.buildNumber` in `app.json`.
 3. Create the store build:
    ```sh

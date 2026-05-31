@@ -13,8 +13,8 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.dkimoto.nomi",
-      "buildNumber": "1",
+      "bundleIdentifier": "com.dkimoto.nomi.recall",
+      "buildNumber": "17",
       "infoPlist": {
         "NSCameraUsageDescription": "Nomi uses the camera so you can capture images into your memory.",
         "NSMicrophoneUsageDescription": "Nomi uses the microphone so you can capture voice notes.",

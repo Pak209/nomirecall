@@ -131,7 +131,26 @@ function termsPage() {
   `);
 }
 
+function supportPage() {
+  return pageShell('Support', `
+    <h1>Nomi Recall Support</h1>
+    <p class="updated">Last updated: ${UPDATED_AT}</p>
+
+    <p>Need help with Nomi Recall, account access, subscriptions, imports, exports, or account deletion? Contact support and include the email address you use for Nomi Recall plus a short description of what happened.</p>
+
+    <h2>Contact</h2>
+    <p>Email: <a href="mailto:support@nomirecall.app?subject=Nomi%20Recall%20Support">support@nomirecall.app</a></p>
+
+    <h2>Account and Billing</h2>
+    <p>You can delete your Nomi account from Settings in the app. Nomi Pro subscriptions are managed by Apple or Google Play, so deleting your Nomi account does not cancel store billing. Use Apple Subscriptions or Google Play subscriptions to manage cancellation, renewal, refunds, and billing questions.</p>
+
+    <h2>Legal</h2>
+    <p>Read the <a href="/privacy">Privacy Policy</a> and <a href="/terms">Terms of Use</a>.</p>
+  `);
+}
+
 module.exports = {
   privacyPolicyPage,
+  supportPage,
   termsPage,
 };

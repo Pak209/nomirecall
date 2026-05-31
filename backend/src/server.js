@@ -7,7 +7,7 @@ const dotenv = require('dotenv');
 const admin = require('firebase-admin');
 const { z } = require('zod');
 const { createStore, newSource } = require('./store');
-const { privacyPolicyPage, termsPage } = require('./legal');
+const { privacyPolicyPage, supportPage, termsPage } = require('./legal');
 const { aiConfig } = require('./ai/aiConfig');
 const { createAIProvider } = require('./ai/aiProvider');
 const {
@@ -73,6 +73,10 @@ app.use(express.json());
 
 app.get('/privacy', (_req, res) => {
   res.type('html').send(privacyPolicyPage());
+});
+
+app.get('/support', (_req, res) => {
+  res.type('html').send(supportPage());
 });
 
 app.get('/terms', (_req, res) => {

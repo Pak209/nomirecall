@@ -30,13 +30,13 @@ memory,notes,recall,second brain,links,ideas,knowledge,productivity,markdown,obs
 
 ## URLs
 
-- Support URL: [FILL IN SUPPORT URL]
+- Support URL: https://nomirecall.onrender.com/support
 - Marketing URL: [OPTIONAL: FILL IN MARKETING URL OR LEAVE BLANK IN APP STORE CONNECT]
-- Privacy Policy URL: [FILL IN PRIVACY POLICY URL]
+- Privacy Policy URL: https://nomirecall.onrender.com/privacy
 
 Notes:
 - The app includes in-app legal links generated from the backend at `/privacy` and `/terms`.
-- Current production backend base in code/docs: `https://nomirecall.onrender.com/api`. Confirm the public privacy URL before submission.
+- Current production backend base in code/docs: `https://nomirecall.onrender.com/api`. Public legal URLs verified: `https://nomirecall.onrender.com/privacy` and `https://nomirecall.onrender.com/terms`. Deploy the backend support route before using `https://nomirecall.onrender.com/support` in App Store Connect.
 
 ## Category Recommendation
 
@@ -150,8 +150,8 @@ Confirm App Privacy labels in App Store Connect match actual collection, storage
 
 ## Manual Fill-In Before Submission
 
-- [ ] Support URL
-- [ ] Privacy Policy URL
+- [ ] Support URL deployed and verified
+- [x] Privacy Policy URL
 - [ ] Optional Marketing URL
 - [ ] Review test account credentials
 - [ ] Final App Store subscription product names/prices

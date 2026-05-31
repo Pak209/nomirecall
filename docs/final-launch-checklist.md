@@ -4,6 +4,9 @@ Date: 2026-05-14
 
 ## Passed
 
+- iOS App Store bundle identifier is resolved:
+  - Final bundle ID: `com.dkimoto.nomi.recall`.
+  - `app.json`, App Store Connect prep docs, and the `Nomi_App` target agree on the final ID.
 - Account deletion path exists and is discoverable in Settings:
   - Settings > Danger Zone > Delete Account
   - Confirmation dialog appears before deletion.
@@ -36,6 +39,14 @@ Date: 2026-05-14
   - Secret scan only matched placeholder/template references.
 - App Store submission doc exists:
   - `docs/app-store-submission.md`.
+- App Store archive/export path works locally:
+  - Release archive succeeded for `Nomi_App` with bundle ID `com.dkimoto.nomi.recall`.
+  - App Store Connect export succeeded and produced `build/app-store-export/Nomi Recall.ipa`.
+  - Exported app and share extension use build number `17` and Cloud Managed Apple Distribution signing.
+- Production backend public checks pass:
+  - `https://nomirecall.onrender.com/api/health` returns `ok: true` with `persistence: firestore`.
+  - `https://nomirecall.onrender.com/privacy` returns HTTP 200.
+  - `https://nomirecall.onrender.com/terms` returns HTTP 200.
 - Validation passed:
   - `npm run typecheck`
   - `npm run test:backend`
