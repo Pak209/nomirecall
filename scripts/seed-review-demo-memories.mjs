@@ -6,6 +6,7 @@ import {
 const apiBase = normalizeApiBase(process.env.NOMI_API_BASE || process.argv[2] || "http://localhost:3000/api");
 const email = process.env.NOMI_DEMO_EMAIL || "review-demo@example.com";
 const password = process.env.NOMI_DEMO_PASSWORD || "review-demo-password";
+const authToken = process.env.NOMI_DEMO_AUTH_TOKEN || "";
 
 function normalizeApiBase(value) {
   return String(value || "").replace(/\/+$/, "");
@@ -30,6 +31,13 @@ async function request(path, options = {}) {
 }
 
 async function signInOrCreateDemoUser() {
+  if (authToken) {
+    return {
+      token: authToken,
+      user: { email },
+    };
+  }
+
   try {
     return await request("/auth/email/signup", {
       method: "POST",

@@ -58,6 +58,15 @@ npm run demo:seed-review
 
 The seeder signs in or creates the account, deletes existing memories tagged `review-demo`, then recreates the sample set through `/api/ingest`.
 
+For native iOS/TestFlight reviewer accounts, pass a Firebase ID token so the memories are written under the Firebase Auth UID used by the app:
+
+```sh
+NOMI_API_BASE="https://your-staging-host.example/api" \
+NOMI_DEMO_EMAIL="review-demo@example.com" \
+NOMI_DEMO_AUTH_TOKEN="firebase-id-token" \
+npm run demo:seed-review
+```
+
 ## Review Safety Rules
 
 - Do not replace the fake sample memories with real notes, real private URLs, real customer data, credentials, or secret backend URLs.

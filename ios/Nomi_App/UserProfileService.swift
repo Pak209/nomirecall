@@ -74,6 +74,7 @@ final class UserProfileService {
 
         let reference = userReference(userId: userId)
         try await reference.setData([
+            "id": userId,
             "onboardingCompleted": true,
             "updatedAt": FieldValue.serverTimestamp()
         ], merge: true)

@@ -13,7 +13,7 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if owns(userId);
       allow create: if owns(userId)
-        && request.resource.data.id == userId;
+        && (!('id' in request.resource.data) || request.resource.data.id == userId);
       allow update: if owns(userId)
         && (!('id' in request.resource.data) || request.resource.data.id == userId);
       allow delete: if owns(userId);
