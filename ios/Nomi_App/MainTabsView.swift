@@ -11,7 +11,6 @@ struct MainTabsView: View {
     @State private var isShowingProjects = false
     @State private var isShowingCircle = false
     @State private var pendingSharePayload: NomiSharePayload?
-    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
@@ -45,14 +44,6 @@ struct MainTabsView: View {
             .environmentObject(memoryStore)
             .environmentObject(intelligenceStore)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-            VStack(spacing: 0) {
-                Spacer()
-                tabBarBackdrop
-                    .frame(height: 110)
-                    .ignoresSafeArea(.container, edges: .bottom)
-            }
-            .allowsHitTesting(false)
 
             NomiTabBar(selectedTab: $selectedTab)
                 .padding(.horizontal, 16)
@@ -122,12 +113,6 @@ struct MainTabsView: View {
         guard let payload = NomiShareInbox.consumePendingPayload() else { return }
         pendingSharePayload = payload
         isShowingQuickCapture = true
-    }
-
-    private var tabBarBackdrop: Color {
-        colorScheme == .dark
-            ? Color(red: 0.015, green: 0.017, blue: 0.025)
-            : Color(red: 0.99, green: 0.95, blue: 0.97)
     }
 }
 
@@ -200,9 +185,7 @@ private struct NomiTabBar: View {
     }
 
     private var tabBarFill: Color {
-        colorScheme == .dark
-            ? Color(red: 0.09, green: 0.08, blue: 0.12)
-            : Color.white
+        colorScheme == .dark ? .white.opacity(0.105) : .white.opacity(0.94)
     }
 
     private var tabBarStroke: Color {
