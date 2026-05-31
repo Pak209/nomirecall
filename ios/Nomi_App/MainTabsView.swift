@@ -45,14 +45,11 @@ struct MainTabsView: View {
             .environmentObject(memoryStore)
             .environmentObject(intelligenceStore)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .safeAreaInset(edge: .bottom) {
-                Color.clear.frame(height: 116)
-            }
 
             VStack(spacing: 0) {
                 Spacer()
                 tabBarBackdrop
-                    .frame(height: 156)
+                    .frame(height: 110)
                     .ignoresSafeArea(.container, edges: .bottom)
             }
             .allowsHitTesting(false)
