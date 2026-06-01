@@ -2,6 +2,7 @@ import SwiftUI
 
 struct MemoryCardView: View {
     let memory: NomiMemory
+    @AppStorage("nomi.postTextSize") private var postTextSizeRaw = NomiPostTextSize.standard.rawValue
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -43,9 +44,9 @@ struct MemoryCardView: View {
 
             if !memory.previewText.isEmpty {
                 Text(memory.previewText)
-                    .font(.body)
+                    .font(.system(size: postTextSize.feedPreviewSize))
                     .foregroundStyle(.primary)
-                    .lineLimit(4)
+                    .lineLimit(postTextSize.feedPreviewLineLimit)
             }
 
             if !memory.media.isEmpty || !memory.links.isEmpty || !memory.referencedPosts.isEmpty {
@@ -94,5 +95,9 @@ struct MemoryCardView: View {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .stroke(Color.nomiStroke, lineWidth: 1)
         )
+    }
+
+    private var postTextSize: NomiPostTextSize {
+        NomiPostTextSize.value(for: postTextSizeRaw)
     }
 }

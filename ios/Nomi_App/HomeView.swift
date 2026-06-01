@@ -483,6 +483,7 @@ private struct NativeMemoryFeedCard: View {
     let memory: NomiMemory
     let onAsk: () -> Void
     let onConnect: () -> Void
+    @AppStorage("nomi.postTextSize") private var postTextSizeRaw = NomiPostTextSize.standard.rawValue
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -500,16 +501,14 @@ private struct NativeMemoryFeedCard: View {
                         .lineLimit(1)
 
                     Text(previewText)
-                        .font(.system(size: 16, weight: .semibold, design: .rounded))
+                        .font(.system(size: postTextSize.feedPreviewSize, weight: .semibold, design: .rounded))
                         .foregroundStyle(Color.nomiInk)
-                        .lineLimit(4)
+                        .lineLimit(postTextSize.feedPreviewLineLimit)
                 }
 
                 Spacer(minLength: 4)
 
-                Image(systemName: "ellipsis")
-                    .font(.subheadline.weight(.bold))
-                    .foregroundStyle(Color.nomiMuted)
+                postOptionsMenu
             }
 
             if !memory.media.isEmpty {
@@ -586,6 +585,27 @@ private struct NativeMemoryFeedCard: View {
         if source.contains("image") { return "photo" }
         if source.contains("voice") { return "mic" }
         return "note.text"
+    }
+
+    private var postTextSize: NomiPostTextSize {
+        NomiPostTextSize.value(for: postTextSizeRaw)
+    }
+
+    private var postOptionsMenu: some View {
+        Menu {
+            Picker("Post text size", selection: $postTextSizeRaw) {
+                ForEach(NomiPostTextSize.allCases) { size in
+                    Text(size.title).tag(size.rawValue)
+                }
+            }
+        } label: {
+            Image(systemName: "ellipsis")
+                .font(.subheadline.weight(.bold))
+                .foregroundStyle(Color.nomiMuted)
+                .frame(width: 32, height: 32)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Post options")
     }
 }
 
@@ -684,6 +704,7 @@ private struct FeedVideoPreview: View {
 
 private struct FeedReferencedPostCard: View {
     let post: NomiReferencedPost
+    @AppStorage("nomi.postTextSize") private var postTextSizeRaw = NomiPostTextSize.standard.rawValue
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -700,7 +721,7 @@ private struct FeedReferencedPostCard: View {
 
             if let text = post.text?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty {
                 Text(text)
-                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                    .font(.system(size: referencedPostTextSize, weight: .semibold, design: .rounded))
                     .foregroundStyle(Color.nomiInk)
                     .lineLimit(3)
             }
@@ -722,6 +743,10 @@ private struct FeedReferencedPostCard: View {
             return "@\(username.replacingOccurrences(of: "@", with: ""))"
         }
         return "Related post"
+    }
+
+    private var referencedPostTextSize: CGFloat {
+        max(12, NomiPostTextSize.value(for: postTextSizeRaw).feedPreviewSize - 2)
     }
 }
 

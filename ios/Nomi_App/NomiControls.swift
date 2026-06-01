@@ -38,6 +38,42 @@ extension Color {
     })
 }
 
+enum NomiPostTextSize: String, CaseIterable, Identifiable {
+    case compact
+    case standard
+    case comfortable
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .compact: "Compact"
+        case .standard: "Standard"
+        case .comfortable: "Comfortable"
+        }
+    }
+
+    var feedPreviewSize: CGFloat {
+        switch self {
+        case .compact: 14
+        case .standard: 16
+        case .comfortable: 18
+        }
+    }
+
+    var feedPreviewLineLimit: Int {
+        switch self {
+        case .compact: 3
+        case .standard: 4
+        case .comfortable: 5
+        }
+    }
+
+    static func value(for rawValue: String) -> NomiPostTextSize {
+        NomiPostTextSize(rawValue: rawValue) ?? .standard
+    }
+}
+
 struct NomiPrimaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
