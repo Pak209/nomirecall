@@ -91,7 +91,7 @@ struct HomeView: View {
                         }
                         .padding(.horizontal, 16)
                         .padding(.top, 16)
-                        .padding(.bottom, 126)
+                        .padding(.bottom, 220)
                     }
                 }
                 .refreshable {
@@ -1279,6 +1279,7 @@ struct AskNomiSheet: View {
     @EnvironmentObject private var appSession: AppSession
     @EnvironmentObject private var memoryStore: MemoryStore
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
 
     let project: NomiProject?
 
@@ -1357,7 +1358,7 @@ struct AskNomiSheet: View {
                     .font(.headline.weight(.bold))
                     .foregroundStyle(Color.nomiMuted)
                     .frame(width: 40, height: 40)
-                    .background(Color.nomiCardStrong, in: Circle())
+                    .background(askControlFill, in: Circle())
                     .overlay(Circle().stroke(Color.nomiStroke, lineWidth: 1))
             }
             .buttonStyle(.plain)
@@ -1372,7 +1373,7 @@ struct AskNomiSheet: View {
                 .foregroundStyle(Color.nomiInk)
                 .tint(Color.nomiPink)
                 .padding(14)
-                .background(Color.nomiField, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .background(askFieldFill, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
                         .stroke(Color.nomiStroke, lineWidth: 1)
@@ -1400,7 +1401,7 @@ struct AskNomiSheet: View {
             .buttonStyle(.plain)
         }
         .padding(14)
-        .background(Color.nomiCardStrong, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .background(askCardFill, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .stroke(Color.nomiStroke, lineWidth: 1)
@@ -1415,7 +1416,7 @@ struct AskNomiSheet: View {
                 .foregroundStyle(Color.nomiCoral)
                 .padding(14)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.nomiCardStrong, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .background(askCardFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         } else if let response {
             answerCard(response)
         } else {
@@ -1423,7 +1424,7 @@ struct AskNomiSheet: View {
                 title: "Ask from your library",
                 message: "Nomi will answer only from memories you have saved."
             )
-            .background(Color.nomiCardStrong, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .background(askCardFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         }
     }
 
@@ -1441,7 +1442,7 @@ struct AskNomiSheet: View {
                     .foregroundStyle(response.confidence.caseInsensitiveCompare("low") == .orderedSame ? Color.nomiOrange : Color.nomiPink)
                     .padding(.vertical, 6)
                     .padding(.horizontal, 9)
-                    .background(Color.nomiField, in: Capsule())
+                    .background(askFieldFill, in: Capsule())
             }
 
             if response.sources.isEmpty {
@@ -1478,7 +1479,7 @@ struct AskNomiSheet: View {
             }
         }
         .padding(14)
-        .background(Color.nomiCardStrong, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .background(askCardFill, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .stroke(Color.nomiStroke, lineWidth: 1)
@@ -1491,7 +1492,7 @@ struct AskNomiSheet: View {
             .foregroundStyle(Color.nomiMuted)
             .padding(.vertical, 5)
             .padding(.horizontal, 8)
-            .background(Color.nomiField, in: Capsule())
+            .background(askFieldFill, in: Capsule())
             .overlay(Capsule().stroke(Color.nomiStroke, lineWidth: 1))
     }
 
@@ -1566,7 +1567,7 @@ struct AskNomiSheet: View {
             }
         }
         .padding(11)
-        .background(Color.nomiField, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(askFieldFill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .stroke(Color.nomiStroke, lineWidth: 1)
@@ -1596,6 +1597,24 @@ struct AskNomiSheet: View {
             get: { sourceOpenErrorMessage != nil },
             set: { if !$0 { sourceOpenErrorMessage = nil } }
         )
+    }
+
+    private var askCardFill: Color {
+        colorScheme == .dark
+            ? Color(red: 0.10, green: 0.09, blue: 0.13)
+            : Color.white
+    }
+
+    private var askFieldFill: Color {
+        colorScheme == .dark
+            ? Color(red: 0.15, green: 0.13, blue: 0.18)
+            : Color(red: 1.0, green: 0.96, blue: 0.97)
+    }
+
+    private var askControlFill: Color {
+        colorScheme == .dark
+            ? Color(red: 0.14, green: 0.12, blue: 0.17)
+            : Color.white
     }
 
     private func askNomi() async {

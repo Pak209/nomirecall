@@ -3,6 +3,7 @@ import SwiftUI
 
 struct NomiPaywallView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
     @EnvironmentObject private var purchaseStore: PurchaseStore
 
     private var monthlyPackage: Package? {
@@ -93,7 +94,11 @@ struct NomiPaywallView: View {
         }
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.white.opacity(0.92))
+        .background(panelFill)
+        .overlay(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .stroke(panelStroke, lineWidth: 1)
+        )
         .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
     }
 
@@ -184,7 +189,11 @@ struct NomiPaywallView: View {
         }
         .padding(18)
         .frame(maxWidth: .infinity)
-        .background(.white.opacity(0.94))
+        .background(panelFill)
+        .overlay(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .stroke(panelStroke, lineWidth: 1)
+        )
         .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
     }
 
@@ -196,9 +205,23 @@ struct NomiPaywallView: View {
             .fixedSize(horizontal: false, vertical: true)
             .padding(.horizontal, 8)
     }
+
+    private var panelFill: Color {
+        colorScheme == .dark
+            ? Color(red: 0.10, green: 0.09, blue: 0.13)
+            : Color.white
+    }
+
+    private var panelStroke: Color {
+        colorScheme == .dark
+            ? Color.white.opacity(0.12)
+            : Color.black.opacity(0.06)
+    }
 }
 
 private struct PaywallBenefitRow: View {
+    @Environment(\.colorScheme) private var colorScheme
+
     let systemImage: String
     let title: String
     let detail: String
@@ -209,7 +232,7 @@ private struct PaywallBenefitRow: View {
                 .font(.headline)
                 .foregroundStyle(.pink)
                 .frame(width: 28, height: 28)
-                .background(.pink.opacity(0.1))
+                .background(iconFill)
                 .clipShape(Circle())
 
             VStack(alignment: .leading, spacing: 3) {
@@ -221,5 +244,11 @@ private struct PaywallBenefitRow: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
+    }
+
+    private var iconFill: Color {
+        colorScheme == .dark
+            ? Color.nomiPink.opacity(0.20)
+            : Color.nomiPink.opacity(0.10)
     }
 }

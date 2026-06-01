@@ -481,7 +481,7 @@ struct RecallView: View {
                             .buttonStyle(.plain)
                         }
                     }
-                    .padding(.bottom, 112)
+                    .padding(.bottom, 220)
                 }
             }
         }

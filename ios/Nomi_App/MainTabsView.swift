@@ -15,35 +15,10 @@ struct MainTabsView: View {
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            Group {
-                switch selectedTab {
-                case .home:
-                    HomeView {
-                        isShowingQuickCapture = true
-                    } onDrawerDestination: { destination in
-                        handleHomeDrawerDestination(destination)
-                    }
-                case .ideas:
-                    ConnectedIdeasGraphView()
-                case .ask:
-                    HomeView {
-                        isShowingQuickCapture = true
-                    } onDrawerDestination: { destination in
-                        handleHomeDrawerDestination(destination)
-                    }
-                    .onAppear {
-                        isShowingAskNomi = true
-                        selectedTab = .home
-                    }
-                case .recall:
-                    RecallView()
-                case .profile:
-                    SettingsView()
-                }
-            }
-            .environmentObject(memoryStore)
-            .environmentObject(intelligenceStore)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            tabContent
+                .environmentObject(memoryStore)
+                .environmentObject(intelligenceStore)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             NomiTabBar(selectedTab: $selectedTab)
                 .padding(.horizontal, 16)
@@ -85,6 +60,34 @@ struct MainTabsView: View {
         }
         .sheet(isPresented: $isShowingCircle) {
             FriendCircleView()
+        }
+    }
+
+    @ViewBuilder
+    private var tabContent: some View {
+        switch selectedTab {
+        case .home:
+            HomeView {
+                isShowingQuickCapture = true
+            } onDrawerDestination: { destination in
+                handleHomeDrawerDestination(destination)
+            }
+        case .ideas:
+            ConnectedIdeasGraphView()
+        case .ask:
+            HomeView {
+                isShowingQuickCapture = true
+            } onDrawerDestination: { destination in
+                handleHomeDrawerDestination(destination)
+            }
+            .onAppear {
+                isShowingAskNomi = true
+                selectedTab = .home
+            }
+        case .recall:
+            RecallView()
+        case .profile:
+            SettingsView()
         }
     }
 
@@ -185,7 +188,9 @@ private struct NomiTabBar: View {
     }
 
     private var tabBarFill: Color {
-        colorScheme == .dark ? .white.opacity(0.105) : .white.opacity(0.94)
+        colorScheme == .dark
+            ? Color(red: 0.12, green: 0.11, blue: 0.15)
+            : Color.white
     }
 
     private var tabBarStroke: Color {
