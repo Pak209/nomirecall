@@ -205,10 +205,12 @@ final class MemoryStore: ObservableObject {
         type: String,
         links: [NomiMemoryLink] = [],
         media: [NomiMemoryMedia] = [],
-        referencedPosts: [NomiReferencedPost] = []
+        referencedPosts: [NomiReferencedPost] = [],
+        tiktok: TikTokMemoryMetadata? = nil,
+        processWithAI: Bool = true
     ) async -> Bool {
         do {
-            _ = try await memoryService.createMemory(
+            let memoryId = try await memoryService.createMemory(
                 userId: userId,
                 title: title.trimmedFallback("Untitled memory"),
                 content: content.trimmedFallback("No content captured."),
@@ -220,8 +222,14 @@ final class MemoryStore: ObservableObject {
                 type: type,
                 links: links,
                 media: media,
-                referencedPosts: referencedPosts
+                referencedPosts: referencedPosts,
+                tiktok: tiktok
             )
+            if processWithAI {
+                Task {
+                    _ = try? await backendService.processMemoryAI(memoryId: memoryId)
+                }
+            }
             successMessage = "Memory saved."
             await load(userId: userId)
             return true

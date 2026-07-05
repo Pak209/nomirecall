@@ -94,7 +94,7 @@ export interface IngestPayload {
   raw_text?: string;
   url?: string;
   title?: string;
-  type?: 'text' | 'url' | 'tweet' | 'note' | 'image' | 'voice';
+  type?: 'text' | 'url' | 'tweet' | 'note' | 'image' | 'voice' | 'tiktok_video';
   category?: string;
   tags?: string[];
   authorUsername?: string;
@@ -118,9 +118,19 @@ export interface IngestResult {
 
 export interface MemoryItem {
   id: string;
-  sourceType?: 'x_bookmark' | 'manual_note' | 'link' | 'image' | 'voice' | 'unknown';
+  source?: 'tiktok' | string;
+  sourceType?: 'x_bookmark' | 'manual_note' | 'link' | 'image' | 'voice' | 'video' | 'unknown';
   sourceUrl?: string;
   sourceId?: string;
+  originalUrl?: string;
+  canonicalUrl?: string;
+  platformVideoId?: string;
+  authorName?: string;
+  authorUrl?: string;
+  thumbnailUrl?: string;
+  embedHtml?: string;
+  playerUrl?: string;
+  transcriptStatus?: string;
   title: string;
   rawText?: string;
   cleanText?: string;

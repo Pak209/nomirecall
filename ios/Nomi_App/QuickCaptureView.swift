@@ -14,11 +14,15 @@ struct QuickCaptureView: View {
     @State private var tagText = ""
     @State private var isSaving = false
     @State private var isImportingXPost = false
+    @State private var isLoadingTikTokPreview = false
     @State private var xSourceUsername: String?
     @State private var xSourceDate: Date?
     @State private var xLinks: [NomiMemoryLink] = []
     @State private var xMedia: [NomiMemoryMedia] = []
     @State private var xReferencedPosts: [NomiReferencedPost] = []
+    @State private var tiktokPreview: TikTokPreview?
+    @State private var tiktokPreviewURL = ""
+    @State private var tiktokPreviewTask: Task<Void, Never>?
     @State private var alertTitle = "Could not save"
 
     private let categories = ["General", "Work", "Personal", "AI & Tech", "Finance", "Health", "Ideas"]
@@ -58,6 +62,15 @@ struct QuickCaptureView: View {
             .onAppear(perform: applyPendingSharePayload)
             .onChange(of: pendingSharePayload) { _, _ in
                 applyPendingSharePayload()
+            }
+            .onChange(of: link) { _, _ in
+                scheduleTikTokPreview()
+            }
+            .onChange(of: selectedType) { _, _ in
+                scheduleTikTokPreview()
+            }
+            .onDisappear {
+                tiktokPreviewTask?.cancel()
             }
         }
     }
@@ -111,7 +124,9 @@ struct QuickCaptureView: View {
                     .keyboardType(.URL)
                     .nomiTextField()
 
-                if isXPostLink {
+                if isTikTokLink {
+                    tiktokPreviewSection
+                } else if isXPostLink {
                     Button {
                         Task { await importXPost() }
                     } label: {
@@ -132,7 +147,9 @@ struct QuickCaptureView: View {
                     }
                 }
 
-                saveButton
+                if !isTikTokLink {
+                    saveButton
+                }
             }
 
             TextEditor(text: $content)
@@ -208,6 +225,10 @@ struct QuickCaptureView: View {
         Self.xPostURL(from: link) != nil
     }
 
+    private var isTikTokLink: Bool {
+        Self.tiktokURL(from: link) != nil
+    }
+
     private var errorBinding: Binding<Bool> {
         Binding(
             get: { memoryStore.errorMessage != nil },
@@ -245,6 +266,92 @@ struct QuickCaptureView: View {
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
+    private var tiktokPreviewSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if isLoadingTikTokPreview {
+                HStack(spacing: 10) {
+                    ProgressView()
+                    Text("Loading TikTok preview...")
+                        .font(.subheadline.weight(.semibold))
+                }
+                .foregroundStyle(.secondary)
+            } else if let tiktokPreview {
+                tiktokPreviewCard(tiktokPreview)
+            } else {
+                Button {
+                    Task { await loadTikTokPreview() }
+                } label: {
+                    Label("Load TikTok preview", systemImage: "play.rectangle")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(NomiSecondaryButtonStyle())
+                .disabled(link.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+        }
+    }
+
+    private func tiktokPreviewCard(_ preview: TikTokPreview) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if let thumbnailURL = preview.thumbnailUrl {
+                AsyncImage(url: thumbnailURL) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFill()
+                    default:
+                        ZStack {
+                            Color.black.opacity(0.06)
+                            Image(systemName: "play.rectangle.fill")
+                                .font(.system(size: 38, weight: .semibold))
+                                .foregroundStyle(.pink)
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 210)
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text(preview.authorName ?? "TikTok creator")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.pink)
+                Text(preview.title ?? "TikTok video")
+                    .font(.headline.weight(.bold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(3)
+                if preview.unavailable == true {
+                    Text("Preview metadata is unavailable, but Nomi can still save the TikTok URL.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Button {
+                Task { await saveTikTokVideoMemory(preview) }
+            } label: {
+                HStack {
+                    if isSaving {
+                        ProgressView()
+                            .tint(.white)
+                    }
+                    Text(isSaving ? "Saving..." : "Save Video Memory")
+                }
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(NomiPrimaryButtonStyle())
+            .disabled(isSaving)
+        }
+        .padding(12)
+        .background(.white.opacity(0.92))
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(Color.black.opacity(0.08), lineWidth: 1)
+        )
+    }
+
     private func save() async {
         guard let userId = appSession.user?.uid else { return }
 
@@ -268,17 +375,68 @@ struct QuickCaptureView: View {
         )
 
         if saved {
-            title = ""
-            content = ""
-            link = ""
-            tagText = ""
-            xSourceUsername = nil
-            xSourceDate = nil
-            xLinks = []
-            xMedia = []
-            xReferencedPosts = []
-            selectedType = .note
+            resetDraft()
         }
+    }
+
+    private func saveTikTokVideoMemory(_ preview: TikTokPreview) async {
+        guard let userId = appSession.user?.uid else { return }
+
+        isSaving = true
+        alertTitle = "Could not save TikTok"
+        defer { isSaving = false }
+
+        let metadata = TikTokMemoryMetadata(
+            source: preview.source ?? "tiktok",
+            sourceType: preview.sourceType ?? "video",
+            originalUrl: preview.originalUrl ?? sourceURL,
+            canonicalUrl: preview.canonicalUrl ?? sourceURL,
+            platformVideoId: preview.platformVideoId,
+            authorName: preview.authorName,
+            authorUrl: preview.authorUrl,
+            thumbnailUrl: preview.thumbnailUrl,
+            embedHtml: preview.embedHtml,
+            playerUrl: preview.playerUrl,
+            transcriptStatus: preview.transcriptStatus ?? "unavailable"
+        )
+        let text = [
+            preview.title.map { "TikTok caption: \($0)" },
+            preview.authorName.map { "Creator: \($0)" },
+            (preview.canonicalUrl ?? preview.originalUrl ?? sourceURL).map { "TikTok URL: \($0.absoluteString)" },
+            content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : content.trimmingCharacters(in: .whitespacesAndNewlines)
+        ].compactMap { $0 }.joined(separator: "\n")
+
+        let saved = await memoryStore.create(
+            userId: userId,
+            title: title.trimmedFallback(preview.title ?? "TikTok video"),
+            content: text.trimmedFallback(link),
+            category: preview.category ?? category,
+            tags: preview.tags ?? ["tiktok", "video"],
+            sourceURL: preview.canonicalUrl ?? preview.originalUrl ?? sourceURL,
+            sourceUsername: preview.authorName,
+            sourceDate: nil,
+            type: "tiktok_video",
+            tiktok: metadata
+        )
+
+        if saved {
+            resetDraft()
+        }
+    }
+
+    private func resetDraft() {
+        title = ""
+        content = ""
+        link = ""
+        tagText = ""
+        xSourceUsername = nil
+        xSourceDate = nil
+        xLinks = []
+        xMedia = []
+        xReferencedPosts = []
+        tiktokPreview = nil
+        tiktokPreviewURL = ""
+        selectedType = .note
     }
 
     private func importXPost() async {
@@ -303,6 +461,54 @@ struct QuickCaptureView: View {
             xReferencedPosts = (post.referencedPosts ?? []).map(NomiReferencedPost.init)
         } catch {
             memoryStore.errorMessage = error.localizedDescription
+        }
+    }
+
+    private func scheduleTikTokPreview() {
+        tiktokPreviewTask?.cancel()
+        guard selectedType == .link, let url = Self.tiktokURL(from: link) else {
+            tiktokPreview = nil
+            tiktokPreviewURL = ""
+            isLoadingTikTokPreview = false
+            return
+        }
+
+        let urlString = url.absoluteString
+        if tiktokPreviewURL == urlString, tiktokPreview != nil { return }
+        tiktokPreviewTask = Task {
+            try? await Task.sleep(nanoseconds: 550_000_000)
+            guard !Task.isCancelled else { return }
+            await loadTikTokPreview()
+        }
+    }
+
+    private func loadTikTokPreview() async {
+        guard let previewURL = Self.tiktokURL(from: link)?.absoluteString else { return }
+        if tiktokPreviewURL == previewURL, tiktokPreview != nil { return }
+
+        isLoadingTikTokPreview = true
+        alertTitle = "Could not preview TikTok"
+        defer { isLoadingTikTokPreview = false }
+
+        do {
+            let response = try await xBackendService.previewTikTok(url: previewURL)
+            tiktokPreview = response.tiktok
+            tiktokPreviewURL = previewURL
+            title = title.trimmedFallback(response.tiktok.title ?? "TikTok video")
+            category = response.tiktok.category ?? category
+            if let tags = response.tiktok.tags, !tags.isEmpty {
+                tagText = tags.joined(separator: ", ")
+            }
+            link = response.tiktok.canonicalUrl?.absoluteString ?? response.tiktok.originalUrl?.absoluteString ?? previewURL
+        } catch {
+            guard let fallbackURL = Self.tiktokURL(from: link) else {
+                tiktokPreview = nil
+                tiktokPreviewURL = ""
+                memoryStore.errorMessage = error.localizedDescription
+                return
+            }
+            tiktokPreview = Self.fallbackTikTokPreview(url: fallbackURL)
+            tiktokPreviewURL = fallbackURL.absoluteString
         }
     }
 
@@ -361,6 +567,45 @@ struct QuickCaptureView: View {
         return url
     }
 
+    private static func tiktokURL(from value: String) -> URL? {
+        guard let url = normalizedWebURL(from: value),
+              let host = url.host?.lowercased(),
+              isTikTokHost(host) else {
+            return nil
+        }
+        return url
+    }
+
+    private static func isTikTokHost(_ host: String) -> Bool {
+        host == "tiktok.com" ||
+            host.hasSuffix(".tiktok.com") ||
+            host == "vm.tiktok.com" ||
+            host == "vt.tiktok.com"
+    }
+
+    private static func fallbackTikTokPreview(url: URL) -> TikTokPreview {
+        TikTokPreview(
+            source: "tiktok",
+            sourceType: "video",
+            originalUrl: url,
+            canonicalUrl: url,
+            platformVideoId: nil,
+            title: "TikTok video",
+            authorName: nil,
+            authorUrl: nil,
+            thumbnailUrl: nil,
+            providerName: "TikTok",
+            providerUrl: URL(string: "https://www.tiktok.com"),
+            embedHtml: nil,
+            playerUrl: nil,
+            transcriptStatus: "unavailable",
+            category: "General",
+            tags: ["tiktok", "video"],
+            memoryText: "TikTok URL: \(url.absoluteString)",
+            unavailable: true
+        )
+    }
+
     private static func isXHost(_ host: String) -> Bool {
         host == "x.com" ||
             host.hasSuffix(".x.com") ||
@@ -407,6 +652,13 @@ private extension NomiReferencedPost {
             links: (post.links ?? []).map(NomiMemoryLink.init),
             media: (post.media ?? []).map(NomiMemoryMedia.init)
         )
+    }
+}
+
+private extension String {
+    func trimmedFallback(_ fallback: String) -> String {
+        let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? fallback : trimmed
     }
 }
 

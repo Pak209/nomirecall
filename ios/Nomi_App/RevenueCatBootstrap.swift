@@ -26,11 +26,8 @@ enum RevenueCatBootstrap {
             return
         }
 
-        #if DEBUG
+        // TEMP DEBUG: Keep RevenueCat verbose while diagnosing TestFlight subscription loading.
         Purchases.logLevel = .debug
-        #else
-        Purchases.logLevel = .warn
-        #endif
         Purchases.configure(withAPIKey: trimmedKey)
     }
 }

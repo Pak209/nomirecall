@@ -59,6 +59,12 @@ const {
   suggestMemoriesForProject,
   updateProject,
 } = require('./projects');
+const {
+  enrichTikTokUrl,
+  extractTikTokVideoId,
+  fallbackTikTokMetadata,
+  isTikTokUrl,
+} = require('./tiktok');
 
 dotenv.config();
 
@@ -116,7 +122,7 @@ const INGEST_SCHEMA = z.object({
   raw_text: z.string().optional(),
   url: z.string().optional(),
   title: z.string().optional(),
-  type: z.enum(['text', 'url', 'tweet', 'note', 'image', 'voice']).optional(),
+  type: z.enum(['text', 'url', 'tweet', 'note', 'image', 'voice', 'tiktok_video']).optional(),
   category: z.string().min(1).optional(),
   tags: z.array(z.string().min(1)).max(12).optional(),
   authorUsername: z.string().min(1).optional(),
@@ -167,6 +173,10 @@ const DEBUG_QUERY_TRACE_SCHEMA = z.object({
 
 const X_POST_PREVIEW_SCHEMA = z.object({
   url: z.string().min(1, 'X post URL is required'),
+});
+
+const TIKTOK_PREVIEW_SCHEMA = z.object({
+  url: z.string().min(1, 'TikTok URL is required'),
 });
 
 const X_DISCOVER_QUERY_SCHEMA = z.object({
@@ -367,6 +377,7 @@ function memorySourceType(sourceType = '', importSource = '') {
 
   const normalized = String(sourceType || '').toLowerCase();
   if (normalized === 'tweet') return 'x_bookmark';
+  if (normalized === 'tiktok_video' || normalized === 'tiktok' || normalized === 'video') return 'video';
   if (normalized === 'text' || normalized === 'note') return 'manual_note';
   if (normalized === 'url' || normalized === 'rss') return 'link';
   if (normalized === 'image') return 'image';
@@ -467,6 +478,16 @@ function nativeMemoryFromSource(source, firebaseUserId) {
     links: Array.isArray(source.links) ? source.links : [],
     media: Array.isArray(source.media) ? source.media : [],
     referencedPosts: Array.isArray(source.referencedPosts) ? source.referencedPosts : [],
+    source: source.source,
+    originalUrl: source.originalUrl,
+    canonicalUrl: source.canonicalUrl,
+    platformVideoId: source.platformVideoId,
+    authorName: source.authorName,
+    authorUrl: source.authorUrl,
+    thumbnailUrl: source.thumbnailUrl,
+    embedHtml: source.embedHtml,
+    playerUrl: source.playerUrl,
+    transcriptStatus: source.transcriptStatus,
     externalId: source.externalId,
     importSource: source.importSource,
     originalText: source.translation?.originalText,
@@ -2416,10 +2437,51 @@ app.post('/api/x-post/preview', auth, async (req, res) => {
   });
 });
 
+app.post('/api/tiktok/preview', auth, async (req, res) => {
+  const data = parseBody(TIKTOK_PREVIEW_SCHEMA, req, res);
+  if (!data) return;
+  if (!isTikTokUrl(data.url)) {
+    return res.status(400).json({ error: 'Paste a valid TikTok URL.' });
+  }
+
+  try {
+    const tiktok = await enrichTikTokUrl(data.url);
+    const generated = generateMemoryMetadata(tiktok.memoryText || tiktok.title || tiktok.canonicalUrl);
+    return res.json({
+      tiktok: {
+        ...tiktok,
+        category: generated.category,
+        tags: ['tiktok', 'video', ...generated.tags].slice(0, 12),
+      },
+    });
+  } catch (error) {
+    const fallback = fallbackTikTokMetadata(data.url);
+    const generated = generateMemoryMetadata(fallback.memoryText || fallback.canonicalUrl || data.url);
+    return res.json({
+      message: error.message || 'TikTok did not return metadata for this video.',
+      unavailable: true,
+      tiktok: {
+        ...fallback,
+        category: generated.category,
+        tags: ['tiktok', 'video', ...generated.tags].slice(0, 12),
+      },
+    });
+  }
+});
+
 app.post('/api/ingest', auth, async (req, res) => {
   const data = parseBody(INGEST_SCHEMA, req, res);
   if (!data) return;
-  const rawText = data.raw_text || data.url || '';
+  let tiktok;
+  if ((data.type === 'tiktok_video' || (data.url && isTikTokUrl(data.url))) && data.url) {
+    try {
+      tiktok = await enrichTikTokUrl(data.url);
+    } catch (error) {
+      tiktok = fallbackTikTokMetadata(data.url, { title: data.title });
+    }
+  }
+
+  const rawText = tiktok?.memoryText || data.raw_text || data.url || '';
   const title = data.title || fallbackTitle(rawText) || data.url || 'Untitled source';
   let category = data.category || 'General';
   let tags = data.tags?.length ? data.tags : ['capture'];
@@ -2431,16 +2493,26 @@ app.post('/api/ingest', auth, async (req, res) => {
     // Keep save path resilient even if metadata generation fails.
   }
   const source = {
-    ...newSource(String(title), data.type || (data.url ? 'url' : 'note')),
+    ...newSource(String(tiktok?.title || title), data.type || (tiktok ? 'tiktok_video' : (data.url ? 'url' : 'note'))),
     body: String(rawText || ''),
-    source_url: data.url,
+    source_url: tiktok?.canonicalUrl || data.url,
     authorUsername: data.authorUsername,
     postDate: data.postDate,
     links: data.links,
     media: data.media,
     referencedPosts: data.referencedPosts,
     category,
-    tags,
+    tags: tiktok ? Array.from(new Set(['tiktok', 'video', ...tags])).slice(0, 12) : tags,
+    source: tiktok?.source,
+    originalUrl: tiktok?.originalUrl,
+    canonicalUrl: tiktok?.canonicalUrl,
+    platformVideoId: tiktok?.platformVideoId || extractTikTokVideoId(data.url),
+    authorName: tiktok?.author_name,
+    authorUrl: tiktok?.author_url,
+    thumbnailUrl: tiktok?.thumbnail_url,
+    embedHtml: tiktok?.embedHtml,
+    playerUrl: tiktok?.playerUrl,
+    transcriptStatus: tiktok?.transcriptStatus,
   };
   await store.addSource(req.userId, source);
   await writeNativeMemoryDocumentFromSource(req.userId, source);
@@ -2524,6 +2596,16 @@ app.get('/api/memories', auth, async (req, res) => {
       links: Array.isArray(source.links) ? source.links : [],
       media: Array.isArray(source.media) ? source.media : [],
       referencedPosts: Array.isArray(source.referencedPosts) ? source.referencedPosts : [],
+      source: source.source,
+      originalUrl: source.originalUrl,
+      canonicalUrl: source.canonicalUrl,
+      platformVideoId: source.platformVideoId,
+      authorName: source.authorName,
+      authorUrl: source.authorUrl,
+      thumbnailUrl: source.thumbnailUrl,
+      embedHtml: source.embedHtml,
+      playerUrl: source.playerUrl,
+      transcriptStatus: source.transcriptStatus,
     }));
   return res.json({ memories });
 });
@@ -2664,6 +2746,8 @@ app.get('/api/memories/:id', auth, async (req, res) => {
     memory: {
       id: String(memory.id),
       title: String(memory.title || 'Untitled memory'),
+      sourceType: memorySourceType(memory.source_type, memory.importSource),
+      sourceUrl: memory.source_url,
       source_type: String(memory.source_type || 'note'),
       createdAt: memory.createdAt,
       category: memory.category || 'General',
@@ -2676,6 +2760,16 @@ app.get('/api/memories/:id', auth, async (req, res) => {
       links: Array.isArray(memory.links) ? memory.links : [],
       media: Array.isArray(memory.media) ? memory.media : [],
       referencedPosts: Array.isArray(memory.referencedPosts) ? memory.referencedPosts : [],
+      source: memory.source,
+      originalUrl: memory.originalUrl,
+      canonicalUrl: memory.canonicalUrl,
+      platformVideoId: memory.platformVideoId,
+      authorName: memory.authorName,
+      authorUrl: memory.authorUrl,
+      thumbnailUrl: memory.thumbnailUrl,
+      embedHtml: memory.embedHtml,
+      playerUrl: memory.playerUrl,
+      transcriptStatus: memory.transcriptStatus,
     },
   });
 });
@@ -2694,6 +2788,8 @@ app.patch('/api/memories/:id', auth, async (req, res) => {
     memory: {
       id: String(updated.id),
       title: String(updated.title || 'Untitled memory'),
+      sourceType: memorySourceType(updated.source_type, updated.importSource),
+      sourceUrl: updated.source_url,
       source_type: String(updated.source_type || 'note'),
       createdAt: updated.createdAt,
       category: updated.category || 'General',
@@ -2706,6 +2802,16 @@ app.patch('/api/memories/:id', auth, async (req, res) => {
       links: Array.isArray(updated.links) ? updated.links : [],
       media: Array.isArray(updated.media) ? updated.media : [],
       referencedPosts: Array.isArray(updated.referencedPosts) ? updated.referencedPosts : [],
+      source: updated.source,
+      originalUrl: updated.originalUrl,
+      canonicalUrl: updated.canonicalUrl,
+      platformVideoId: updated.platformVideoId,
+      authorName: updated.authorName,
+      authorUrl: updated.authorUrl,
+      thumbnailUrl: updated.thumbnailUrl,
+      embedHtml: updated.embedHtml,
+      playerUrl: updated.playerUrl,
+      transcriptStatus: updated.transcriptStatus,
     },
   });
 });

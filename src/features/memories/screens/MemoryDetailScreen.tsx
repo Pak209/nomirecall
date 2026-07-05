@@ -114,6 +114,7 @@ export default function MemoryDetailScreen() {
   if (memoryQuery.isError || !memory) return <View style={styles.center}><Text style={styles.stateText}>Memory unavailable.</Text></View>;
 
   const isTweet = memory.source_type === 'tweet';
+  const isTikTok = memory.source === 'tiktok' || memory.sourceType === 'video' || memory.source_type === 'video';
   const body = memory.body || 'No content saved for this memory.';
   const links = memory.links || [];
   const media = memory.media || [];
@@ -140,6 +141,39 @@ export default function MemoryDetailScreen() {
         </View>
 
         <Text style={styles.bodyText}>{body}</Text>
+
+        {isTikTok ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>TikTok Player</Text>
+            <View style={styles.mediaCard}>
+              {memory.thumbnailUrl ? (
+                <Image source={{ uri: memory.thumbnailUrl }} style={styles.mediaImage} resizeMode="cover" />
+              ) : (
+                <View style={styles.mediaFallback}>
+                  <Ionicons name="play-circle-outline" size={34} color="#776B64" />
+                </View>
+              )}
+              <View style={styles.mediaMeta}>
+                <Text style={styles.mediaType}>{memory.authorName || 'TikTok video'}</Text>
+                <Text style={styles.mediaAlt} numberOfLines={2}>Open with TikTok’s official player or in your browser.</Text>
+              </View>
+            </View>
+            <View style={styles.tiktokActions}>
+              {memory.playerUrl ? (
+                <TouchableOpacity style={styles.linkCard} onPress={() => Linking.openURL(memory.playerUrl!)} activeOpacity={0.86}>
+                  <Ionicons name="play-outline" size={18} color="#3762A8" />
+                  <Text style={styles.linkTitle}>Open in TikTok</Text>
+                </TouchableOpacity>
+              ) : null}
+              {memory.canonicalUrl || memory.source_url ? (
+                <TouchableOpacity style={styles.linkCard} onPress={() => Linking.openURL(memory.canonicalUrl || memory.source_url!)} activeOpacity={0.86}>
+                  <Ionicons name="open-outline" size={18} color="#3762A8" />
+                  <Text style={styles.linkTitle}>Open in Browser</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+          </View>
+        ) : null}
 
         {media.length ? (
           <View style={styles.section}>
@@ -323,6 +357,7 @@ const styles = StyleSheet.create({
   linkTextWrap: { flex: 1 },
   linkTitle: { color: '#1C1C22', fontWeight: '800', lineHeight: 19 },
   linkUrl: { color: '#3762A8', marginTop: 3, fontSize: 12 },
+  tiktokActions: { gap: 2 },
   modalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(28,28,34,0.28)' },
   infoSheet: {
     maxHeight: '82%',

@@ -456,6 +456,37 @@ export const XPostAPI = {
   },
 };
 
+// ── TikTok ────────────────────────────────────────────────────────────────────
+
+export interface TikTokPreview {
+  source?: 'tiktok';
+  sourceType?: 'video';
+  originalUrl?: string;
+  canonicalUrl?: string;
+  platformVideoId?: string;
+  title?: string;
+  author_name?: string;
+  author_url?: string;
+  thumbnail_url?: string;
+  provider_name?: string;
+  provider_url?: string;
+  embedHtml?: string;
+  playerUrl?: string;
+  transcriptStatus?: string;
+  category?: string;
+  tags?: string[];
+  memoryText?: string;
+}
+
+export const TikTokAPI = {
+  async preview(url: string): Promise<{ tiktok: TikTokPreview }> {
+    return request('/tiktok/preview', {
+      method: 'POST',
+      body: JSON.stringify({ url }),
+    });
+  },
+};
+
 export interface XBookmarkStatus {
   connected: boolean;
   username?: string | null;

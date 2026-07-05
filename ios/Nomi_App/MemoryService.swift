@@ -5,9 +5,19 @@ import FirebaseStorage
 struct NomiMemory: Identifiable, Codable, Equatable, Hashable {
     let id: String
     let userId: String
+    var source: String?
     var sourceType: String
     var sourceUrl: URL?
     var sourceId: String?
+    var originalUrl: URL?
+    var canonicalUrl: URL?
+    var platformVideoId: String?
+    var authorName: String?
+    var authorUrl: URL?
+    var thumbnailUrl: URL?
+    var embedHtml: String?
+    var playerUrl: URL?
+    var transcriptStatus: String?
     var title: String
     var rawText: String
     var cleanText: String?
@@ -73,6 +83,20 @@ struct NomiMemorySync: Codable, Equatable, Hashable {
     var errorMessage: String?
     var retryCount: Int
     var rawPayloadHash: String?
+}
+
+struct TikTokMemoryMetadata: Equatable, Hashable {
+    var source: String = "tiktok"
+    var sourceType: String = "video"
+    var originalUrl: URL?
+    var canonicalUrl: URL?
+    var platformVideoId: String?
+    var authorName: String?
+    var authorUrl: URL?
+    var thumbnailUrl: URL?
+    var embedHtml: String?
+    var playerUrl: URL?
+    var transcriptStatus: String = "unavailable"
 }
 
 enum NomiMemoryDateRange: String, CaseIterable, Identifiable {
@@ -484,7 +508,8 @@ final class MemoryService {
         type: String = "note",
         links: [NomiMemoryLink] = [],
         media: [NomiMemoryMedia] = [],
-        referencedPosts: [NomiReferencedPost] = []
+        referencedPosts: [NomiReferencedPost] = [],
+        tiktok: TikTokMemoryMetadata? = nil
     ) async throws -> String {
         guard FirebaseAppReady.isConfigured else { throw AuthServiceError.firebaseNotConfigured }
 
@@ -497,7 +522,7 @@ final class MemoryService {
         var data: [String: Any] = [
             "id": document.documentID,
             "userId": userId,
-            "sourceType": Self.memorySourceType(for: type),
+            "sourceType": tiktok?.sourceType ?? Self.memorySourceType(for: type),
             "title": title,
             "rawText": content,
             "summary": String(content.prefix(240)),
@@ -518,11 +543,25 @@ final class MemoryService {
             "media": Self.mediaDictionaries(media),
             "referencedPosts": Self.referencedPostDictionaries(referencedPosts),
             "sync": [
-                "provider": "manual",
+                "provider": tiktok?.source ?? "manual",
                 "importStatus": "imported",
                 "retryCount": 0
             ]
         ]
+
+        if let tiktok {
+            data["source"] = tiktok.source
+            data["sourceType"] = tiktok.sourceType
+            data["originalUrl"] = tiktok.originalUrl?.absoluteString
+            data["canonicalUrl"] = tiktok.canonicalUrl?.absoluteString
+            data["platformVideoId"] = tiktok.platformVideoId
+            data["authorName"] = tiktok.authorName
+            data["authorUrl"] = tiktok.authorUrl?.absoluteString
+            data["thumbnailUrl"] = tiktok.thumbnailUrl?.absoluteString
+            data["embedHtml"] = tiktok.embedHtml
+            data["playerUrl"] = tiktok.playerUrl?.absoluteString
+            data["transcriptStatus"] = tiktok.transcriptStatus
+        }
 
         if let sourceURL {
             data["sourceUrl"] = sourceURL.absoluteString
@@ -587,6 +626,37 @@ final class MemoryService {
             "referencedPosts": Self.referencedPostDictionaries(memory.referencedPosts),
             "updatedAt": FieldValue.serverTimestamp()
         ]
+
+        if let source = memory.source {
+            data["source"] = source
+        }
+        if let originalUrl = memory.originalUrl {
+            data["originalUrl"] = originalUrl.absoluteString
+        }
+        if let canonicalUrl = memory.canonicalUrl {
+            data["canonicalUrl"] = canonicalUrl.absoluteString
+        }
+        if let platformVideoId = memory.platformVideoId {
+            data["platformVideoId"] = platformVideoId
+        }
+        if let authorName = memory.authorName {
+            data["authorName"] = authorName
+        }
+        if let authorUrl = memory.authorUrl {
+            data["authorUrl"] = authorUrl.absoluteString
+        }
+        if let thumbnailUrl = memory.thumbnailUrl {
+            data["thumbnailUrl"] = thumbnailUrl.absoluteString
+        }
+        if let embedHtml = memory.embedHtml {
+            data["embedHtml"] = embedHtml
+        }
+        if let playerUrl = memory.playerUrl {
+            data["playerUrl"] = playerUrl.absoluteString
+        }
+        if let transcriptStatus = memory.transcriptStatus {
+            data["transcriptStatus"] = transcriptStatus
+        }
 
         if let mediaURL = memory.mediaURL {
             data["mediaURL"] = mediaURL.absoluteString
@@ -747,6 +817,16 @@ final class MemoryService {
         let mediaURL = (data["mediaURL"] as? String).flatMap(URL.init(string:))
         let sourceUrl = stringURL(data["sourceUrl"] ?? data["sourceURL"])
         let sourceURL = stringURL(data["sourceURL"] ?? data["sourceUrl"])
+        let source = data["source"] as? String
+        let originalUrl = stringURL(data["originalUrl"])
+        let canonicalUrl = stringURL(data["canonicalUrl"])
+        let platformVideoId = data["platformVideoId"] as? String
+        let authorName = data["authorName"] as? String
+        let authorUrl = stringURL(data["authorUrl"])
+        let thumbnailUrl = stringURL(data["thumbnailUrl"])
+        let embedHtml = data["embedHtml"] as? String
+        let playerUrl = stringURL(data["playerUrl"])
+        let transcriptStatus = data["transcriptStatus"] as? String
         let author = author(from: data["author"])
         let sourceUsername = data["sourceUsername"] as? String ?? author?.username
         let sourceDate = (data["sourceDate"] as? Timestamp)?.dateValue()
@@ -762,9 +842,19 @@ final class MemoryService {
         return NomiMemory(
             id: document.documentID,
             userId: userId,
+            source: source,
             sourceType: sourceType,
             sourceUrl: sourceUrl,
             sourceId: sourceId,
+            originalUrl: originalUrl,
+            canonicalUrl: canonicalUrl,
+            platformVideoId: platformVideoId,
+            authorName: authorName,
+            authorUrl: authorUrl,
+            thumbnailUrl: thumbnailUrl,
+            embedHtml: embedHtml,
+            playerUrl: playerUrl,
+            transcriptStatus: transcriptStatus,
             title: title,
             rawText: rawText,
             cleanText: cleanText,
@@ -949,6 +1039,8 @@ final class MemoryService {
 
     private static func memorySourceType(for type: String) -> String {
         switch type.lowercased() {
+        case "tiktok_video", "tiktok", "video":
+            return "video"
         case "tweet":
             return "x_bookmark"
         case "text", "note":

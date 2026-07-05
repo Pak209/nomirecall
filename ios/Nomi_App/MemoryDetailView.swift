@@ -1,6 +1,7 @@
 import SwiftUI
 import UIKit
 import AVKit
+import WebKit
 
 struct MemoryDetailView: View {
     @EnvironmentObject private var memoryStore: MemoryStore
@@ -23,6 +24,8 @@ struct MemoryDetailView: View {
     @State private var exportErrorMessage: String?
     @State private var activeSheet: RecallDetailSheet?
     @State private var isOriginalExpanded = false
+    @State private var didTikTokPlayerFail = false
+    @State private var tiktokPlayerStatus = ""
 
     init(memory: NomiMemory) {
         _draft = State(initialValue: memory)
@@ -41,6 +44,9 @@ struct MemoryDetailView: View {
                     topBar
                     recallSourceIdentityCard
                     originalPostHeroCard
+                    if isTikTokMemory {
+                        tiktokPlayerCard
+                    }
                     nomiTakeawayCard
                     recallQuickActions
                     connectedIdeasPreview
@@ -289,6 +295,112 @@ struct MemoryDetailView: View {
         }
         .padding(16)
         .recallCard(cornerRadius: 24)
+    }
+
+    private var tiktokPlayerCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 10) {
+                Image(systemName: "play.rectangle.fill")
+                    .font(.subheadline.bold())
+                    .foregroundStyle(.white)
+                    .frame(width: 34, height: 34)
+                    .background(Color.black, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("TikTok Player")
+                        .font(.headline.weight(.bold))
+                        .foregroundStyle(Color.nomiInk)
+                    if let authorName = draft.authorName ?? draft.sourceUsername {
+                        Text(authorName)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(Color.nomiMuted)
+                    }
+                    Text(tiktokPlaybackDiagnostic)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Color.nomiMuted)
+                }
+
+                Spacer()
+            }
+
+            if let playbackUrl = tiktokPlaybackURL, !didTikTokPlayerFail {
+                TikTokPlayerWebView(url: playbackUrl) { status in
+                    tiktokPlayerStatus = status
+                } onFailure: { status in
+                    tiktokPlayerStatus = status
+                    didTikTokPlayerFail = true
+                }
+                .frame(height: 560)
+                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .stroke(Color.nomiStroke, lineWidth: 1)
+                )
+            } else {
+                tiktokFallbackPreview
+            }
+
+            if !tiktokPlayerStatus.isEmpty {
+                Text(tiktokPlayerStatus)
+                    .font(.caption)
+                    .foregroundStyle(Color.nomiMuted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            HStack(spacing: 10) {
+                if let canonicalUrl = draft.canonicalUrl ?? draft.sourceURL ?? draft.sourceUrl {
+                    Link(destination: canonicalUrl) {
+                        Label("Open in TikTok", systemImage: "music.note")
+                            .font(.caption.bold())
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(NomiSecondaryButtonStyle())
+                }
+
+                if let browserUrl = draft.originalUrl ?? draft.canonicalUrl ?? draft.sourceURL ?? draft.sourceUrl {
+                    Link(destination: browserUrl) {
+                        Label("Open in Browser", systemImage: "safari")
+                            .font(.caption.bold())
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(NomiSecondaryButtonStyle())
+                }
+            }
+        }
+        .padding(14)
+        .recallCard(cornerRadius: 24)
+    }
+
+    private var tiktokFallbackPreview: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if let thumbnailUrl = draft.thumbnailUrl {
+                AsyncImage(url: thumbnailUrl) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFill()
+                    default:
+                        ZStack {
+                            Color.black.opacity(0.06)
+                            Image(systemName: "play.rectangle.fill")
+                                .font(.system(size: 40, weight: .semibold))
+                                .foregroundStyle(Color.nomiPink)
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 260)
+                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            }
+
+            Text("This TikTok is unavailable here.")
+                .font(.headline.weight(.bold))
+                .foregroundStyle(Color.nomiInk)
+            Text("It may be private, removed, region-limited, or blocked from embedded playback.")
+                .font(.subheadline)
+                .foregroundStyle(Color.nomiMuted)
+        }
     }
 
     private var nomiTakeawayCard: some View {
@@ -688,6 +800,15 @@ struct MemoryDetailView: View {
                 detailRow("Source ID", sourceId)
             }
 
+            if isTikTokMemory {
+                if let platformVideoId = draft.platformVideoId {
+                    detailRow("TikTok video ID", platformVideoId)
+                }
+                if let transcriptStatus = draft.transcriptStatus {
+                    detailRow("Transcript", transcriptStatus)
+                }
+            }
+
             chipGroup("Tags", values: draft.tags)
             chipGroup("Concepts", values: draft.concepts)
             chipGroup("Entities", values: draft.entities)
@@ -937,6 +1058,7 @@ struct MemoryDetailView: View {
 
     private var hasSourceContext: Bool {
         draft.sourceURL != nil ||
+            isTikTokMemory ||
             draft.sourceUsername?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false ||
             !draft.media.isEmpty ||
             !draft.links.isEmpty ||
@@ -944,6 +1066,10 @@ struct MemoryDetailView: View {
     }
 
     private var sourceHeading: String {
+        if isTikTokMemory {
+            return draft.authorName ?? draft.sourceUsername ?? "TikTok video"
+        }
+
         if sourceTitle.hasPrefix("@") {
             return "\(sourceTitle) on X"
         }
@@ -952,6 +1078,10 @@ struct MemoryDetailView: View {
     }
 
     private var sourceTitle: String {
+        if isTikTokMemory {
+            return draft.authorName ?? "TikTok"
+        }
+
         if let sourceUsername = draft.sourceUsername?.trimmingCharacters(in: .whitespacesAndNewlines),
            !sourceUsername.isEmpty {
             return sourceUsername.hasPrefix("@") ? sourceUsername : "@\(sourceUsername)"
@@ -965,6 +1095,12 @@ struct MemoryDetailView: View {
     }
 
     private var sourceSubtitle: String {
+        if isTikTokMemory {
+            return (draft.canonicalUrl ?? draft.originalUrl ?? draft.sourceURL)?.absoluteString
+                .replacingOccurrences(of: "https://", with: "")
+                .replacingOccurrences(of: "http://", with: "") ?? "tiktok.com"
+        }
+
         if let sourceURL = draft.sourceURL {
             return sourceURL.absoluteString
                 .replacingOccurrences(of: "https://", with: "")
@@ -1023,7 +1159,35 @@ struct MemoryDetailView: View {
         return "No original text saved for this memory."
     }
 
+    private var isTikTokMemory: Bool {
+        draft.source?.lowercased() == "tiktok" ||
+            draft.type.lowercased() == "tiktok_video" ||
+            (draft.sourceType.lowercased() == "video" && tiktokPlaybackURL != nil)
+    }
+
+    private var tiktokPlaybackURL: URL? {
+        draft.playerUrl ??
+            draft.canonicalUrl ??
+            draft.originalUrl ??
+            draft.sourceURL ??
+            draft.sourceUrl
+    }
+
+    private var tiktokPlaybackDiagnostic: String {
+        if draft.playerUrl != nil {
+            return "Official TikTok player URL available"
+        }
+        if draft.platformVideoId != nil {
+            return "Video ID saved, trying TikTok page"
+        }
+        return "No video ID yet, trying saved TikTok link"
+    }
+
     private var sourceIcon: String {
+        if isTikTokMemory {
+            return "play.rectangle.fill"
+        }
+
         switch draft.type.lowercased() {
         case "x_post", "x-post", "xpost", "tweet":
             return "quote.bubble.fill"
@@ -1080,6 +1244,10 @@ struct MemoryDetailView: View {
     }
 
     private var sourceTypeLabel: String {
+        if isTikTokMemory {
+            return "TikTok Video"
+        }
+
         switch draft.sourceType.lowercased() {
         case "x_bookmark": return "X Bookmark"
         case "manual_note": return "Manual Note"
@@ -1818,6 +1986,107 @@ private struct CompactLinkRow: View {
         }
 
         return link.displayUrl ?? url.host ?? url.absoluteString
+    }
+}
+
+private struct TikTokPlayerWebView: UIViewRepresentable {
+    let url: URL
+    let onStatus: (String) -> Void
+    let onFailure: (String) -> Void
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onStatus: onStatus, onFailure: onFailure)
+    }
+
+    func makeUIView(context: Context) -> WKWebView {
+        let configuration = WKWebViewConfiguration()
+        configuration.allowsInlineMediaPlayback = true
+        configuration.mediaTypesRequiringUserActionForPlayback = []
+
+        let webView = WKWebView(frame: .zero, configuration: configuration)
+        webView.navigationDelegate = context.coordinator
+        webView.scrollView.isScrollEnabled = true
+        webView.scrollView.backgroundColor = .clear
+        webView.isOpaque = false
+        webView.backgroundColor = .clear
+        return webView
+    }
+
+    func updateUIView(_ webView: WKWebView, context: Context) {
+        if webView.url != url {
+            onStatus("Loading TikTok inside Nomi...")
+            webView.load(URLRequest(url: url))
+        }
+    }
+
+    final class Coordinator: NSObject, WKNavigationDelegate {
+        private let onStatus: (String) -> Void
+        private let onFailure: (String) -> Void
+
+        init(onStatus: @escaping (String) -> Void, onFailure: @escaping (String) -> Void) {
+            self.onStatus = onStatus
+            self.onFailure = onFailure
+        }
+
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            let script = """
+            (() => {
+              const hasVideo = !!document.querySelector('video');
+              const hasIframe = !!document.querySelector('iframe');
+              const hasPlayer = location.href.includes('/player/') || !!document.querySelector('[data-e2e], blockquote');
+              return JSON.stringify({ title: document.title || '', href: location.href, hasVideo, hasIframe, hasPlayer });
+            })();
+            """
+            webView.evaluateJavaScript(script) { result, _ in
+                let message = Self.statusMessage(from: result)
+                DispatchQueue.main.async {
+                    self.onStatus(message)
+                }
+            }
+        }
+
+        func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+            guard !Self.isRedirectCancellation(error) else { return }
+            onFailure(Self.failureMessage(error))
+        }
+
+        func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+            guard !Self.isRedirectCancellation(error) else { return }
+            onFailure(Self.failureMessage(error))
+        }
+
+        private static func isRedirectCancellation(_ error: Error) -> Bool {
+            let nsError = error as NSError
+            return nsError.domain == NSURLErrorDomain && nsError.code == NSURLErrorCancelled
+        }
+
+        private static func failureMessage(_ error: Error) -> String {
+            "TikTok blocked embedded playback here: \((error as NSError).localizedDescription)"
+        }
+
+        private static func statusMessage(from result: Any?) -> String {
+            guard
+                let string = result as? String,
+                let data = string.data(using: .utf8),
+                let row = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+            else {
+                return "TikTok loaded, but Nomi could not inspect whether a player was available."
+            }
+
+            let hasVideo = row["hasVideo"] as? Bool ?? false
+            let hasIframe = row["hasIframe"] as? Bool ?? false
+            let hasPlayer = row["hasPlayer"] as? Bool ?? false
+            if hasVideo || hasIframe || hasPlayer {
+                return "TikTok allowed an embedded player surface in Nomi."
+            }
+
+            let href = row["href"] as? String ?? ""
+            if href.contains("login") || href.contains("captcha") {
+                return "TikTok loaded a gate instead of the video, so playback is not permitted in Nomi for this link."
+            }
+
+            return "TikTok loaded, but no playable video surface was detected. Use Open in TikTok or Open in Browser for this one."
+        }
     }
 }
 

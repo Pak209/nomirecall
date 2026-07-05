@@ -41,6 +41,54 @@ struct XPostPreview: Decodable {
     let title: String?
 }
 
+struct TikTokPreviewResponse: Decodable {
+    let tiktok: TikTokPreview
+    let unavailable: Bool?
+    let message: String?
+}
+
+struct TikTokPreview: Decodable, Equatable, Hashable {
+    let source: String?
+    let sourceType: String?
+    let originalUrl: URL?
+    let canonicalUrl: URL?
+    let platformVideoId: String?
+    let title: String?
+    let authorName: String?
+    let authorUrl: URL?
+    let thumbnailUrl: URL?
+    let providerName: String?
+    let providerUrl: URL?
+    let embedHtml: String?
+    let playerUrl: URL?
+    let transcriptStatus: String?
+    let category: String?
+    let tags: [String]?
+    let memoryText: String?
+    let unavailable: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case source
+        case sourceType
+        case originalUrl
+        case canonicalUrl
+        case platformVideoId
+        case title
+        case authorName = "author_name"
+        case authorUrl = "author_url"
+        case thumbnailUrl = "thumbnail_url"
+        case providerName = "provider_name"
+        case providerUrl = "provider_url"
+        case embedHtml
+        case playerUrl
+        case transcriptStatus
+        case category
+        case tags
+        case memoryText
+        case unavailable
+    }
+}
+
 struct XDiscoverResponse: Decodable {
     let items: [XDiscoverItem]
     let nextCursor: String?
@@ -481,6 +529,14 @@ final class XBackendService {
 
     func previewPost(url: String) async throws -> XPostPreviewResponse {
         var request = try await authorizedRequest(path: "x-post/preview")
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(["url": url])
+        return try await send(request)
+    }
+
+    func previewTikTok(url: String) async throws -> TikTokPreviewResponse {
+        var request = try await authorizedRequest(path: "tiktok/preview")
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONEncoder().encode(["url": url])

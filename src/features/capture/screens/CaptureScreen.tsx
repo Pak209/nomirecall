@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -16,7 +17,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import * as DocumentPicker from 'expo-document-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { IngestAPI, XPostAPI } from '../../../services/api';
+import { IngestAPI, TikTokAPI, TikTokPreview, XPostAPI } from '../../../services/api';
 import { MainTabParamList, MemoryLink, MemoryMedia } from '../../../types';
 import { useToast } from '../../ui/shared/ToastProvider';
 
@@ -59,6 +60,17 @@ function isXPostUrl(url: string): boolean {
   return /(?:https?:\/\/)?(?:www\.)?(?:x|twitter)\.com\/[^/?#]+\/status\/\d+/i.test(url.trim());
 }
 
+function normalizeTikTokUrl(url: string): string {
+  const trimmed = url.trim();
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  if (/^(www\.)?(tiktok|vm\.tiktok|vt\.tiktok)\.com\//i.test(trimmed)) return `https://${trimmed}`;
+  return trimmed;
+}
+
+function isTikTokUrl(url: string): boolean {
+  return /(?:https?:\/\/)?(?:www\.)?(?:tiktok|vm\.tiktok|vt\.tiktok)\.com\//i.test(url.trim());
+}
+
 function parseTags(value: string): string[] {
   return Array.from(new Set(
     value
@@ -85,6 +97,7 @@ export default function CaptureScreen() {
   const [xPostDate, setXPostDate] = useState('');
   const [xLinks, setXLinks] = useState<MemoryLink[]>([]);
   const [xMedia, setXMedia] = useState<MemoryMedia[]>([]);
+  const [tiktokPreview, setTikTokPreview] = useState<TikTokPreview | null>(null);
   const [pickedImage, setPickedImage] = useState<DocumentPicker.DocumentPickerAsset | null>(null);
 
   useEffect(() => {
@@ -98,6 +111,7 @@ export default function CaptureScreen() {
   }, [link, mode, xUsername]);
 
   const isXPost = mode === 'link' && isXPostUrl(link);
+  const isTikTok = mode === 'link' && isTikTokUrl(link);
   const tags = useMemo(() => parseTags(tagText), [tagText]);
 
   const captureText = useMemo(() => {
@@ -129,6 +143,7 @@ export default function CaptureScreen() {
     setXPostDate('');
     setXLinks([]);
     setXMedia([]);
+    setTikTokPreview(null);
     setPickedImage(null);
   }
 
@@ -137,14 +152,17 @@ export default function CaptureScreen() {
       IngestAPI.ingest({
         raw_text: mode === 'link' && !isXPost ? undefined : captureText,
         url: mode === 'link' ? link.trim() : undefined,
-        title: title.trim() || (isXPost && xUsername ? `@${xUsername} on X` : fallbackTitle(captureText, mode)),
-        type: isXPost ? 'tweet' : (mode === 'link' ? 'url' : mode),
+        title: title.trim()
+          || (isTikTok ? (tiktokPreview?.title || 'TikTok video') : undefined)
+          || (isXPost && xUsername ? `@${xUsername} on X` : fallbackTitle(captureText, mode)),
+        type: isTikTok ? 'tiktok_video' : (isXPost ? 'tweet' : (mode === 'link' ? 'url' : mode)),
         category: category.trim() || 'General',
-        tags: isXPost ? ['xpost', ...tags] : tags.length ? tags : undefined,
+        tags: isTikTok ? (tiktokPreview?.tags || ['tiktok', 'video', ...tags]) : (isXPost ? ['xpost', ...tags] : tags.length ? tags : undefined),
         authorUsername: isXPost ? xUsername.trim().replace(/^@/, '') || parseXUsername(link) : undefined,
         postDate: isXPost ? xPostDate.trim() || undefined : undefined,
         links: isXPost ? xLinks : undefined,
         media: isXPost ? xMedia : undefined,
+        processWithAI: true,
       }),
     onSuccess: () => {
       resetCurrentMode();
@@ -181,6 +199,37 @@ export default function CaptureScreen() {
     },
     onError: (e: any) => showToast(e?.message || 'Could not fetch this X post', 'error'),
   });
+
+  const fetchTikTokMutation = useMutation({
+    mutationFn: () => TikTokAPI.preview(normalizeTikTokUrl(link)),
+    onSuccess: (res) => {
+      const preview = res.tiktok;
+      setTikTokPreview(preview);
+      const previewUrl = preview.canonicalUrl || preview.originalUrl || normalizeTikTokUrl(link);
+      setLink((current) => (current === previewUrl ? current : previewUrl));
+      setTitle((current) => current || preview.title || 'TikTok video');
+      if (preview.category) setCategory(preview.category);
+      if (preview.tags?.length) setTagText(preview.tags.join(', '));
+      showToast('TikTok preview loaded', 'success');
+    },
+    onError: (e: any) => {
+      setTikTokPreview(null);
+      showToast(e?.message || 'Could not preview this TikTok', 'error');
+    },
+  });
+
+  useEffect(() => {
+    if (mode !== 'link' || !isTikTokUrl(link)) {
+      setTikTokPreview(null);
+      return;
+    }
+    const normalized = normalizeTikTokUrl(link);
+    if (tiktokPreview?.canonicalUrl === normalized || tiktokPreview?.originalUrl === normalized) return;
+    const handle = setTimeout(() => {
+      if (!fetchTikTokMutation.isLoading) fetchTikTokMutation.mutate();
+    }, 650);
+    return () => clearTimeout(handle);
+  }, [link, mode, tiktokPreview?.canonicalUrl, tiktokPreview?.originalUrl, fetchTikTokMutation.isLoading]);
 
   const saveButton = (
     <TouchableOpacity
@@ -278,7 +327,32 @@ export default function CaptureScreen() {
               autoCorrect={false}
               keyboardType="url"
             />
-            {isXPost ? (
+            {isTikTok ? (
+              <View style={styles.xCard}>
+                <Text style={styles.xHeader}>TikTok video</Text>
+                {tiktokPreview?.thumbnail_url ? (
+                  <Image source={{ uri: tiktokPreview.thumbnail_url }} style={styles.tiktokThumb} resizeMode="cover" />
+                ) : null}
+                {tiktokPreview ? (
+                  <View style={styles.importedCard}>
+                    <Text style={styles.importedTitle} numberOfLines={3}>{tiktokPreview.title || 'TikTok video'}</Text>
+                    <Text style={styles.importedMeta}>{tiktokPreview.author_name || 'TikTok creator'}</Text>
+                  </View>
+                ) : null}
+                <TouchableOpacity
+                  style={[styles.fetchButton, fetchTikTokMutation.isLoading && styles.buttonDisabled]}
+                  onPress={() => fetchTikTokMutation.mutate()}
+                  disabled={fetchTikTokMutation.isLoading}
+                  activeOpacity={0.9}
+                >
+                  {fetchTikTokMutation.isLoading ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text style={styles.fetchButtonText}>{tiktokPreview ? 'Refresh preview' : 'Load preview'}</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            ) : isXPost ? (
               <View style={styles.xCard}>
                 <Text style={styles.xHeader}>X post import</Text>
                 <TouchableOpacity
@@ -533,6 +607,12 @@ const styles = StyleSheet.create({
   importedTitle: { color: '#8E878C', fontSize: 12, fontWeight: '800' },
   importedRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
   importedMeta: { color: '#FF2D72', fontWeight: '800', fontSize: 12 },
+  tiktokThumb: {
+    width: '100%',
+    height: 220,
+    borderRadius: 16,
+    backgroundColor: '#F1E8E2',
+  },
   xTextarea: { minHeight: 150 },
   xDateInput: { minHeight: 56 },
   fetchButton: {

@@ -14,5 +14,14 @@ web-build/
 obsidian-graph-test-vault/
 .env
 .env.local
+.env.paper
+.env.alpha
+__pycache__/
+.pytest_cache/
+paper_trader/logs/
+paper_trader/inbox/
+paper_trader/processed/
+paper_trader/rejected/
+alpha_lab/data/
 GoogleService-Info.plist
 google-services.json
