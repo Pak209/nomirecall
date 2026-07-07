@@ -493,6 +493,137 @@ test('x bookmark oauth callback and manual sync imports new bookmarks', async ()
   global.fetch = previousFetch;
 });
 
+test('x bookmark sync still imports bookmarks when AI enrichment throws', async () => {
+  const email = `x.bookmarks.ai-fail.${Date.now()}@example.com`;
+  const password = 'password123';
+
+  const signup = await request(app)
+    .post('/api/auth/email/signup')
+    .send({ email, password });
+  assert.equal(signup.status, 201);
+  const authHeader = { Authorization: `Bearer ${signup.body.token}` };
+
+  const previousEnv = {
+    X_CLIENT_ID: process.env.X_CLIENT_ID,
+    X_CLIENT_SECRET: process.env.X_CLIENT_SECRET,
+    X_REDIRECT_URI: process.env.X_REDIRECT_URI,
+    X_TOKEN_ENCRYPTION_KEY: process.env.X_TOKEN_ENCRYPTION_KEY,
+    OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+    NOMI_AI_PROVIDER: process.env.NOMI_AI_PROVIDER,
+  };
+  const previousFetch = global.fetch;
+  process.env.X_CLIENT_ID = 'client-id';
+  delete process.env.X_CLIENT_SECRET;
+  process.env.X_REDIRECT_URI = 'https://nomi.example.com/api/x/oauth/callback';
+  process.env.X_TOKEN_ENCRYPTION_KEY = 'test-encryption-key';
+  process.env.OPENAI_API_KEY = 'test-openai-key';
+  process.env.NOMI_AI_PROVIDER = 'openai';
+
+  const connect = await request(app)
+    .get('/api/x/bookmarks/connect')
+    .set(authHeader);
+  assert.equal(connect.status, 200);
+  assert.equal(connect.body.configured, true);
+
+  const authorizationUrl = new URL(connect.body.authorizationUrl);
+  const state = authorizationUrl.searchParams.get('state');
+  assert.ok(state);
+
+  let fetchCall = 0;
+  global.fetch = async (url) => {
+    fetchCall += 1;
+    const rawUrl = String(url);
+    if (rawUrl.includes('/oauth2/token') && fetchCall === 1) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          access_token: 'access-token-1',
+          refresh_token: 'refresh-token-1',
+          expires_in: 7200,
+          scope: 'tweet.read users.read bookmark.read offline.access',
+        }),
+      };
+    }
+    if (rawUrl.includes('/2/users/me')) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          data: { id: 'x-user-ai-fail', username: 'ai_fail_user', name: 'AI Fail User' },
+        }),
+      };
+    }
+    if (rawUrl.includes('/2/users/x-user-ai-fail/bookmarks')) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          data: [{
+            id: '555',
+            author_id: 'author-ai-fail',
+            text: 'APRENDER CLAUDE AHORA ES COMO COMPRAR BITCOIN EN 2017.',
+            created_at: '2026-05-15T20:39:00.000Z',
+            entities: {
+              urls: [{
+                url: 'https://t.co/codex2',
+                expanded_url: 'https://example.com/codex2',
+                display_url: 'example.com/codex2',
+              }],
+            },
+          }],
+          includes: {
+            users: [{ id: 'author-ai-fail', username: 'testingcatalog2', name: 'Testing Catalog Two' }],
+          },
+        }),
+      };
+    }
+    if (rawUrl.includes('/v1/chat/completions')) {
+      // Simulate the AI provider/enrichment call failing (e.g. translation).
+      throw new Error('Simulated AI enrichment failure');
+    }
+    throw new Error(`Unexpected fetch: ${rawUrl}`);
+  };
+
+  const callback = await request(app)
+    .get(`/api/x/oauth/callback?code=test-code&state=${state}`);
+  assert.equal(callback.status, 200);
+  assert.match(callback.text, /X bookmarks connected/);
+
+  const sync = await request(app)
+    .post('/api/x/bookmarks/sync')
+    .set(authHeader)
+    .send({ limit: 10 });
+
+  // AI enrichment (translation) throwing does not block the bookmark import.
+  assert.equal(sync.status, 200);
+  assert.equal(sync.body.imported, 1);
+  assert.equal(sync.body.skipped, 0);
+  // FINDING: the AI enrichment failure is currently silent — the sync response has
+  // no field (e.g. no `warnings`/`aiError`/`enrichmentFailed`) indicating that
+  // translation/enrichment failed for this bookmark. Assert that today's shape has
+  // no such field so this test breaks (loudly) if that ever changes.
+  assert.equal(sync.body.warnings, undefined);
+  assert.equal(sync.body.aiError, undefined);
+  assert.equal(sync.body.enrichmentFailed, undefined);
+
+  const memories = await request(app)
+    .get('/api/memories?type=tweet')
+    .set(authHeader);
+  assert.equal(memories.status, 200);
+  assert.equal(memories.body.memories.length, 1);
+  // Without successful AI translation/enrichment, the original (untranslated) text
+  // is stored as-is — again with no indication in the memory record that
+  // enrichment failed.
+  assert.match(memories.body.memories[0].body, /APRENDER CLAUDE AHORA/);
+
+  for (const [key, value] of Object.entries(previousEnv)) {
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+  }
+  global.fetch = previousFetch;
+});
+
 test('x bookmark sync can use fresh stored access token before refreshing', async () => {
   const email = `x.bookmarks.access.${Date.now()}@example.com`;
   const password = 'password123';

@@ -44,6 +44,24 @@ test('AI usage tier is derived flexibly from user fields', () => {
   assert.equal(getUserAIUsageTier({ tier: 'admin' }), 'admin');
 });
 
+test('BASELINE BUG: brain/pro tiers currently fall through to the free tier and free daily limit', () => {
+  // BASELINE BUG TEST: brain/pro tiers currently fall through to the free limit.
+  // Phase 2 Task 2.1 will UPDATE (not duplicate) this test to assert the fixed mapping.
+  assert.equal(getUserAIUsageTier({ tier: 'brain' }), 'free');
+  assert.equal(getUserAIUsageTier({ tier: 'pro' }), 'free');
+
+  const previous = {
+    NOMI_AI_DAILY_LIMIT_FREE: process.env.NOMI_AI_DAILY_LIMIT_FREE,
+  };
+  delete process.env.NOMI_AI_DAILY_LIMIT_FREE;
+
+  const freeLimit = getDailyAiLimitForTier('free');
+  assert.equal(getDailyAiLimitForTier(getUserAIUsageTier({ tier: 'brain' })), freeLimit);
+  assert.equal(getDailyAiLimitForTier(getUserAIUsageTier({ tier: 'pro' })), freeLimit);
+
+  restoreEnv(previous);
+});
+
 test('AI daily limits use production env names with older aliases as fallback', () => {
   const previous = {
     NOMI_AI_DAILY_LIMIT_FREE: process.env.NOMI_AI_DAILY_LIMIT_FREE,
