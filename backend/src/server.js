@@ -2901,7 +2901,21 @@ app.patch('/api/memories/:id', auth, async (req, res) => {
   const updated = await store.updateSource(req.userId, req.params.id, data);
   if (!updated) return res.status(404).json({ error: 'Memory not found' });
   if (admin.apps.length) {
+    // Firestore mode: writeNativeMemoryDocumentFromSource already re-indexes
+    // retrieval chunks (via indexMemoryForRetrieval) and recomputes edges.
     await writeNativeMemoryDocumentFromSource(req.userId, updated).catch((error) => {
+      console.warn(`[memory-index] patch reindex failed user=${req.userId} memory=${req.params.id}: ${error.message}`);
+    });
+  } else {
+    // Injected-store mode (dev/test): writeNativeMemoryDocumentFromSource is a
+    // no-op, so re-index explicitly against the store to avoid serving stale
+    // embeddings after an edit. Fire-and-forget to match the async pattern
+    // above; a brief staleness window is acceptable and far better than never
+    // re-indexing.
+    indexMemoryForRetrieval(req.userId, req.params.id, {
+      store,
+      memory: { id: String(updated.id), ...updated },
+    }).catch((error) => {
       console.warn(`[memory-index] patch reindex failed user=${req.userId} memory=${req.params.id}: ${error.message}`);
     });
   }
