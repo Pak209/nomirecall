@@ -493,10 +493,14 @@ export default function SettingsScreen() {
                 right={deleteAccountMutation.isLoading ? <ActivityIndicator color={Colors.red} /> : undefined}
               />
             </View>
-            <SectionHeader title="Developer Debug" />
-            <View style={[styles.section, dark && styles.sectionDark]}>
-              <SettingsRow label="Connection" value={serverOnline ? 'online' : 'offline'} />
-            </View>
+            {__DEV__ && (
+              <>
+                <SectionHeader title="Developer Debug" />
+                <View style={[styles.section, dark && styles.sectionDark]}>
+                  <SettingsRow label="Connection" value={serverOnline ? 'online' : 'offline'} />
+                </View>
+              </>
+            )}
           </View>
         </View>
       </Modal>
