@@ -27,7 +27,10 @@ jobs:
       - name: Install client deps
         run: npm ci
       - name: Run client tests
-        run: npx jest
+        # --forceExit: jest workers can hang on leaked toast timers after all
+        # tests pass (pre-existing teardown issue); exit code still reflects
+        # test results.
+        run: npx jest --ci --forceExit
 
   rules:
     runs-on: ubuntu-latest
