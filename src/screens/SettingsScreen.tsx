@@ -12,10 +12,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Colors, Typography, Spacing, Radius, INTERESTS } from '../constants/theme';
 import { useStore } from '../store/useStore';
-import { InterestTag, MemoryItem, RootStackParamList } from '../types';
+import { InterestTag, RootStackParamList } from '../types';
 import { API_BASE, AuthAPI, MemoryAPI, XBookmarkAPI } from '../services/api';
 import { deleteCurrentAccount, updateCurrentUserProfile } from '../services/auth';
 import { restorePurchases } from '../services/payments';
+import { exportMarkdown } from './settingsExport';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -69,43 +70,6 @@ function SettingsRow({ label, value, onPress, danger, right, disabled }: {
 function SectionHeader({ title }: { title: string }) {
   const dark = useStore((state) => state.theme === 'dark');
   return <Text style={[styles.sectionHeader, dark && styles.sectionHeaderDark]}>{title}</Text>;
-}
-
-function markdownValue(value?: string) {
-  return String(value || '').replace(/"/g, '\\"');
-}
-
-function memoryToMarkdown(memory: MemoryItem) {
-  const body = memory.body || '';
-  const tags = memory.tags?.length ? memory.tags.map((tag) => `#${tag.replace(/^#/, '')}`).join(' ') : '';
-  return [
-    '---',
-    `title: "${markdownValue(memory.title)}"`,
-    `type: "${markdownValue(memory.source_type)}"`,
-    `category: "${markdownValue(memory.category || 'General')}"`,
-    memory.source_url ? `source: "${markdownValue(memory.source_url)}"` : '',
-    memory.authorUsername ? `author: "@${markdownValue(memory.authorUsername)}"` : '',
-    memory.postDate ? `postDate: "${markdownValue(memory.postDate)}"` : '',
-    '---',
-    '',
-    `# ${memory.title || 'Untitled memory'}`,
-    '',
-    body || '_No body saved._',
-    '',
-    tags,
-  ].filter(Boolean).join('\n');
-}
-
-function exportMarkdown(memories: MemoryItem[]) {
-  const exportedAt = new Date().toISOString();
-  return [
-    '# Nomi Obsidian Export',
-    '',
-    `Exported: ${exportedAt}`,
-    `Memories: ${memories.length}`,
-    '',
-    memories.map(memoryToMarkdown).join('\n\n---\n\n'),
-  ].join('\n');
 }
 
 export default function SettingsScreen() {
