@@ -179,9 +179,9 @@ test('embedding provider failure falls back to keyword retrieval without throwin
   );
 });
 
-// BASELINE BUG TEST: documents that hallucinated citations pass through unfiltered.
-// Phase 1 Task 1.1 will UPDATE (not duplicate) this test to assert filtered behavior.
-test('AI-provided relatedMemoryIds are not validated against retrieved memories (baseline bug)', async (t) => {
+// Task 1.1: validates that AI-provided relatedMemoryIds are filtered against
+// the retrieved memory set so hallucinated citations never reach the client.
+test('AI-provided relatedMemoryIds are validated against retrieved memories', async (t) => {
   process.env.OPENAI_API_KEY = 'test-key';
   process.env.NOMI_AI_PROVIDER = 'openai';
   // queryMemories.js destructures `createAIProvider` from aiProvider.js at
@@ -209,11 +209,10 @@ test('AI-provided relatedMemoryIds are not validated against retrieved memories 
     store: memoryStore(memories),
   });
 
-  // Today's code passes ai.relatedMemoryIds straight through unfiltered
-  // (queryMemories.js:773 `relatedMemoryIds: ai.relatedMemoryIds || []`),
-  // with no cross-check against citedMemoryIds/sources. This asserts that
-  // CURRENT (buggy) reality, not the desired behavior.
-  assert.deepEqual(result.relatedMemoryIds, ['mem-atlas-pricing', 'hallucinated-mem-999']);
+  // queryMemories.js filters ai.relatedMemoryIds down to only the IDs present
+  // in the retrieved memory set, so the hallucinated id is dropped while the
+  // genuinely retrieved id is preserved.
+  assert.deepEqual(result.relatedMemoryIds, ['mem-atlas-pricing']);
   assert.ok(
     !result.sources.some((source) => source.memoryId === 'hallucinated-mem-999'),
     'hallucinated id should not appear in retrieved sources, confirming it was never actually retrieved',

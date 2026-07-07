@@ -764,13 +764,18 @@ async function answerQuestionFromMemories(userId, question, options = {}) {
       memories: contextForAI(retrieved),
     });
 
+    const retrievedMemoryIds = new Set(retrieved.map((memory) => memory.id));
+    const relatedMemoryIds = [...new Set(ai.relatedMemoryIds || [])].filter((id) =>
+      retrievedMemoryIds.has(id)
+    );
+
     return {
       answer: ai.answer || fallbackAnswer(question, retrieved).answer,
       sources,
       confidence: ai.confidence || confidenceFor(retrieved),
       retrievalMode,
       ...(scope ? { scope } : {}),
-      relatedMemoryIds: ai.relatedMemoryIds || [],
+      relatedMemoryIds,
     };
   } catch (error) {
     console.warn(`[brain-query] AI synthesis failed user=${userId}: ${error.message}`);
