@@ -13,6 +13,17 @@ npm run dev
 
 Server runs at `http://localhost:3000`.
 
+`JWT_SECRET` is now **required in every environment** (dev, staging, production). The
+server refuses to start if it is unset or left as the placeholder
+`dev-secret-change-me`. After `cp .env.example .env`, generate a strong value:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
+```
+
+and paste it into `JWT_SECRET` in `backend/.env`. The automated test suite sets its
+own throwaway `JWT_SECRET`, so `npm test` works without any local configuration.
+
 ## Firebase persistence setup
 
 1. In Firebase Console, open your project settings and create a service account key JSON.

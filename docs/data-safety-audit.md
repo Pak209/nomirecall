@@ -9,7 +9,7 @@ Date: 2026-05-14
 | Firestore rules | Pass | `firestore.rules` only allows `/users/{userId}` and `/users/{userId}/memories/{memoryId}` when `request.auth.uid == userId`; memory creates/updates must keep `userId` equal to the authenticated UID. |
 | Storage rules | Pass | `storage.rules` only allows access under `/users/{userId}/...` when `request.auth.uid == userId`. |
 | Firebase config | Pass | Real `GoogleService-Info.plist` is ignored; only `GoogleService-Info.example.plist` is tracked. App skips Firebase setup if the real plist is absent. |
-| Backend secrets | Fixed | Production now requires `JWT_SECRET` and Firebase Admin environment variables. Local/test can still use memory mode and the dev JWT fallback. |
+| Backend secrets | Fixed | `JWT_SECRET` is now required in every environment (dev, staging, production); the server refuses to start if it is unset or left as the placeholder `dev-secret-change-me`. Firebase Admin environment variables are required in production. Local/test can still use memory mode, but must supply a real `JWT_SECRET` (the test suite sets a throwaway value automatically). |
 | Backend health | Pass | `GET /api/health` exists and returns service status plus persistence mode. |
 | Render cold starts | Fixed | React Native and native iOS backend clients now use timeouts and user-friendly backend waking/offline copy. |
 | Tracked secrets | Pass after scan | Tracked files contain templates/placeholders only; local `.env` files are ignored and were not printed. |

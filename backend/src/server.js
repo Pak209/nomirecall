@@ -70,7 +70,6 @@ dotenv.config();
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
-const isProduction = process.env.NODE_ENV === 'production';
 const JWT_SECRET = jwtSecret();
 const store = createStore();
 
@@ -1569,10 +1568,10 @@ function issueToken(user) {
 
 function jwtSecret() {
   const value = process.env.JWT_SECRET;
-  if (isProduction && (!value || value === 'dev-secret-change-me')) {
-    throw new Error('JWT_SECRET must be set to a strong Render environment variable in production.');
+  if (!value || value === 'dev-secret-change-me') {
+    throw new Error('JWT_SECRET must be set to a strong secret in every environment (unset or the placeholder "dev-secret-change-me" is not allowed).');
   }
-  return value || 'dev-secret-change-me';
+  return value;
 }
 
 function parseBody(schema, req, res) {
