@@ -41,19 +41,20 @@ function supportUrl() {
   return env.EXPO_PUBLIC_SUPPORT_URL || 'mailto:support@nomirecall.app?subject=Nomi%20Recall%20Support';
 }
 
-function SettingsRow({ label, value, onPress, danger, right }: {
+function SettingsRow({ label, value, onPress, danger, right, disabled }: {
   label: string;
   value?: string;
   onPress?: () => void;
   danger?: boolean;
   right?: React.ReactNode;
+  disabled?: boolean;
 }) {
   const dark = useStore((state) => state.theme === 'dark');
   return (
     <TouchableOpacity
-      style={[styles.row, dark && styles.rowDark]}
+      style={[styles.row, dark && styles.rowDark, disabled && styles.rowDisabled]}
       onPress={onPress}
-      disabled={!onPress && !right}
+      disabled={disabled || (!onPress && !right)}
       activeOpacity={0.7}
     >
       <Text style={[styles.rowLabel, dark && styles.rowLabelDark, danger && styles.rowLabelDanger]}>{label}</Text>
@@ -436,8 +437,12 @@ export default function SettingsScreen() {
           <SettingsRow
             label="Obsidian Markdown"
             onPress={() => exportMutation.mutate()}
+            disabled={!serverOnline || exportMutation.isLoading}
             right={exportMutation.isLoading ? <ActivityIndicator color={Colors.teal} /> : undefined}
           />
+          {!serverOnline && (
+            <Text style={[styles.xHelpText, dark && styles.xHelpTextDark]}>You're offline. Reconnect to export your memories.</Text>
+          )}
         </View>
 
         <Text style={styles.versionText}>Nomi v1.0.0</Text>
@@ -702,6 +707,9 @@ const styles = StyleSheet.create({
   },
   rowDark: {
     borderBottomColor: '#342D39',
+  },
+  rowDisabled: {
+    opacity: 0.5,
   },
   rowLabel: { flex: 1, fontSize: Typography.sm, color: Colors.textPrimary },
   rowLabelDark: { color: '#F5EFFB' },

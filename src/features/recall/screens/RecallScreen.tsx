@@ -136,6 +136,14 @@ export default function RecallScreen() {
         </TouchableOpacity>
       </View>
 
+      {askMutation.isError ? (
+        <View style={[styles.answerCard, dark && styles.answerCardDark]}>
+          <Text style={styles.errorText}>
+            {(askMutation.error as Error)?.message || 'Nomi could not answer right now.'}
+          </Text>
+        </View>
+      ) : null}
+
       {askMutation.data?.answer ? (
         <View style={[styles.answerCard, dark && styles.answerCardDark]}>
           <Text style={[styles.answer, dark && styles.answerDark]}>{askMutation.data.answer}</Text>
@@ -326,6 +334,7 @@ const styles = StyleSheet.create({
   answerDark: { color: '#F5EFFB' },
   answerMeta: { color: '#776B64', fontSize: 11, fontWeight: '700', marginTop: 8, textTransform: 'capitalize' },
   answerMetaDark: { color: '#BDB3C8' },
+  errorText: { color: '#FF5B5B', fontWeight: '800' },
   sourceList: { marginTop: 10, gap: 8 },
   sourceHeader: { color: '#655C57', fontSize: 11, fontWeight: '900', textTransform: 'uppercase' },
   sourceHeaderDark: { color: '#D6CFDD' },
