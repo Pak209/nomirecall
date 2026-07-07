@@ -1674,6 +1674,34 @@ async function requireAdmin(req, res, next) {
   }
 }
 
+// Rank map for tier gating. Higher rank == more access. early_access is treated
+// as >= brain so existing privileged users are never locked out; admin outranks
+// everything. Used only for genuinely premium-exclusive endpoints (e.g. on-demand
+// Daily Brief generation) — NOT for endpoints that free users can legitimately use
+// under a daily quota (AI processing/query), which stay gated only by `auth`.
+const TIER_RANK = {
+  free: 0,
+  early_access: 1,
+  brain: 1,
+  pro: 2,
+  admin: 3,
+};
+
+function requireTier(minTier) {
+  const requiredRank = TIER_RANK[minTier] ?? 0;
+  return async function requireTierMiddleware(req, res, next) {
+    try {
+      const user = await store.getUserById?.(req.userId);
+      const tier = getUserAIUsageTier(user || req.firebaseUser || {});
+      const userRank = TIER_RANK[tier] ?? 0;
+      if (userRank >= requiredRank) return next();
+    } catch {
+      // Fall through to the 403 below on any lookup error.
+    }
+    return res.status(403).json({ error: `This feature requires a Nomi ${minTier} subscription.` });
+  };
+}
+
 function requireDebugAccess(_req, res, next) {
   if (!isDebugEnabled()) return res.status(404).json({ error: 'Not found' });
   return next();
@@ -2939,7 +2967,7 @@ app.get('/api/daily-briefs/today', auth, async (req, res) => {
   }
 });
 
-app.post('/api/daily-briefs/generate-today', auth, async (req, res) => {
+app.post('/api/daily-briefs/generate-today', auth, requireTier('brain'), async (req, res) => {
   const data = parseBody(DAILY_BRIEF_QUERY_SCHEMA, req, res);
   if (!data) return;
   const dateKey = data.dateKey || dateKeyFor(new Date(), data.timezone);
@@ -2951,7 +2979,7 @@ app.post('/api/daily-briefs/generate-today', auth, async (req, res) => {
   }
 });
 
-app.post('/api/daily-briefs/generate-for-date', auth, async (req, res) => {
+app.post('/api/daily-briefs/generate-for-date', auth, requireTier('brain'), async (req, res) => {
   const data = parseBody(DAILY_BRIEF_QUERY_SCHEMA.extend({
     dateKey: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   }), req, res);
@@ -2983,7 +3011,7 @@ app.get('/api/daily-briefs/:dateKey', auth, async (req, res) => {
   }
 });
 
-app.post('/api/daily-briefs/:dateKey/generate', auth, async (req, res) => {
+app.post('/api/daily-briefs/:dateKey/generate', auth, requireTier('brain'), async (req, res) => {
   const data = parseBody(DAILY_BRIEF_QUERY_SCHEMA, req, res);
   if (!data) return;
   try {
