@@ -2,3 +2,7 @@
 .env.*
 !.env.example
 keys/
+
+# Firestore emulator debug log
+firestore-debug.log
+firebase-debug.log
