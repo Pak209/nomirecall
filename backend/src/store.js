@@ -119,6 +119,12 @@ class MemoryStore {
     return (this.sourcesByUser.get(userId) || []).length;
   }
 
+  async findSourceByContentHash(userId, contentHash) {
+    if (!contentHash) return null;
+    const list = this.sourcesByUser.get(userId) || [];
+    return list.find((source) => source.contentHash === contentHash) || null;
+  }
+
   async upsertChunks(userId, memoryId, chunks) {
     const byMemory = this.chunksByUser.get(userId) || new Map();
     byMemory.set(String(memoryId), chunks.map((chunk) => ({ ...chunk, memoryId: String(memoryId) })));
@@ -458,6 +464,17 @@ class FirestoreStore {
   async countSources(userId) {
     const snapshot = await this.sourceCollection().where('userId', '==', userId).get();
     return snapshot.size;
+  }
+
+  async findSourceByContentHash(userId, contentHash) {
+    if (!contentHash) return null;
+    // Filter on userId only (single-field, no composite index needed) and match
+    // contentHash in memory, mirroring listSources/countSources. A two-equality
+    // Firestore query would require a composite index that may not exist, which
+    // would throw in the ingest hot path.
+    const snapshot = await this.sourceCollection().where('userId', '==', userId).get();
+    const match = snapshot.docs.find((doc) => doc.data()?.contentHash === contentHash);
+    return match ? { id: match.id, ...match.data() } : null;
   }
 
   async getFeedItems() {

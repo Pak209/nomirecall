@@ -441,6 +441,7 @@ async function retryFailedMemoriesForUser(userId, options = {}) {
 module.exports = {
   batchStatus,
   extractCleanTextFromMemory,
+  hashContent,
   markMemoryAIProcessingStatus,
   processMemoryForAI,
   processMemoryIds,

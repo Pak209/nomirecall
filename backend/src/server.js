@@ -12,6 +12,7 @@ const { aiConfig } = require('./ai/aiConfig');
 const { createAIProvider } = require('./ai/aiProvider');
 const {
   extractCleanTextFromMemory,
+  hashContent,
   processMemoryForAI,
   processMemoryIds,
   processUnprocessedMemoriesForUser,
@@ -2623,6 +2624,28 @@ app.post('/api/ingest', auth, async (req, res) => {
   } catch {
     // Keep save path resilient even if metadata generation fails.
   }
+  const trimmedRawText = String(rawText || '').trim();
+  const contentHash = trimmedRawText ? hashContent(trimmedRawText) : '';
+  if (contentHash) {
+    // Dedup is a best-effort safeguard: a lookup failure must never block a
+    // capture, so fail open (treat as not-a-duplicate) on any store error.
+    const duplicate = await store
+      .findSourceByContentHash(req.userId, contentHash)
+      .catch((error) => {
+        console.warn(`[ingest] dedup lookup failed user=${req.userId}: ${error.message}`);
+        return null;
+      });
+    if (duplicate) {
+      return res.json({
+        success: true,
+        duplicate: true,
+        source_id: String(duplicate.id),
+        title: String(duplicate.title || title),
+        message: 'Duplicate content; existing memory returned',
+      });
+    }
+  }
+
   const source = {
     ...newSource(String(tiktok?.title || title), data.type || (tiktok ? 'tiktok_video' : (data.url ? 'url' : 'note'))),
     body: String(rawText || ''),
@@ -2645,6 +2668,9 @@ app.post('/api/ingest', auth, async (req, res) => {
     playerUrl: tiktok?.playerUrl,
     transcriptStatus: tiktok?.transcriptStatus,
   };
+  if (contentHash) {
+    source.contentHash = contentHash;
+  }
   await store.addSource(req.userId, source);
   await writeNativeMemoryDocumentFromSource(req.userId, source);
   let aiProcessing;
@@ -2653,6 +2679,7 @@ app.post('/api/ingest', auth, async (req, res) => {
   }
   return res.json({
     success: true,
+    duplicate: false,
     source_id: source.id,
     title: String(title),
     message: 'Source queued for processing',
