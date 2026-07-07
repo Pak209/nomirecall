@@ -20,7 +20,7 @@ import { HomeFeedTab, HomeFeedTabs } from '../components/nomi/HomeFeedTabs';
 import { MemoryFeedCard } from '../components/nomi/MemoryFeedCard';
 import { NomiSideDrawer } from '../components/nomi/NomiSideDrawer';
 import { CaptureActionSheet } from '../components/nomi/CaptureActionSheet';
-import { DashboardAPI, DashboardCategory, DashboardSummary } from '../services/api';
+import { DashboardAPI, DashboardCategory, DashboardSummary, IntelligenceAPI } from '../services/api';
 import { MemoryFeedItem } from '../components/nomi/homeFeedUtils';
 
 type Nav = any;
@@ -61,6 +61,7 @@ export default function NomiDashboardScreen() {
     summaryQuery,
     recentQuery,
     categoriesQuery,
+    briefQuery,
   ] = useQueries({
     queries: [
       {
@@ -78,6 +79,11 @@ export default function NomiDashboardScreen() {
         queryFn: DashboardAPI.getCategories,
         enabled: serverOnline,
       },
+      {
+        queryKey: ['daily-brief-today'],
+        queryFn: () => IntelligenceAPI.getTodayBrief(),
+        enabled: serverOnline,
+      },
     ],
   });
 
@@ -85,6 +91,9 @@ export default function NomiDashboardScreen() {
   const recent: MemoryFeedItem[] = recentQuery.data?.items ?? EMPTY_FEED_ITEMS;
   const categories: DashboardCategory[] = categoriesQuery.data?.categories ?? EMPTY_CATEGORIES;
   const loading = summaryQuery.isFetching || recentQuery.isFetching || categoriesQuery.isFetching;
+  const dashboardError = summaryQuery.isError || recentQuery.isError || categoriesQuery.isError;
+  const brief = briefQuery.data?.brief ?? null;
+  const briefLoading = briefQuery.isFetching && !brief;
   const memoryCount = summary?.stats?.totalCaptures ?? recent.length;
   const projectCount = categories.find((category) => category.label.toLowerCase() === 'projects')?.count ?? 0;
   const summaryFeedItem: MemoryFeedItem | null = useMemo(() => {
@@ -115,9 +124,10 @@ export default function NomiDashboardScreen() {
       summaryQuery.refetch(),
       recentQuery.refetch(),
       categoriesQuery.refetch(),
+      briefQuery.refetch(),
     ]);
     setRefreshing(false);
-  }, [summaryQuery, recentQuery, categoriesQuery]);
+  }, [summaryQuery, recentQuery, categoriesQuery, briefQuery]);
 
   function openCapture(action: QuickCaptureAction) {
     setCaptureSheetOpen(false);
@@ -182,13 +192,17 @@ export default function NomiDashboardScreen() {
         >
           <CompactCaptureComposer actions={QUICK_CAPTURE_ACTIONS} onActionPress={openCapture} />
 
+          <DailyBriefCard brief={brief} loading={briefLoading} onOpen={() => nav.navigate('Recall')} />
+
           {loading && !feedItems.length ? (
             <View style={styles.loadingBlock}>
               <ActivityIndicator color="#EF6359" />
             </View>
           ) : null}
 
-          {feedItems.length ? (
+          {dashboardError && !feedItems.length ? (
+            <DashboardErrorState onRetry={refreshDashboard} />
+          ) : feedItems.length ? (
             <View style={styles.feedList}>
               {feedItems.map((item) => (
                 <MemoryFeedCard
@@ -253,6 +267,91 @@ function EmptyFeedState({ activeTab }: { activeTab: HomeFeedTab }) {
       </View>
       <Text style={styles.emptyTitle}>{copy.title}</Text>
       <Text style={styles.emptyBody}>{copy.body}</Text>
+    </View>
+  );
+}
+
+function DashboardErrorState({ onRetry }: { onRetry: () => void }) {
+  return (
+    <View style={styles.emptyState}>
+      <View style={styles.emptyIcon}>
+        <Ionicons name="cloud-offline-outline" size={25} color="#EF6359" />
+      </View>
+      <Text style={styles.emptyTitle}>We couldn&apos;t load your feed</Text>
+      <Text style={styles.emptyBody}>Nomi ran into a problem reaching your memories. Check your connection and try again.</Text>
+      <TouchableOpacity
+        style={styles.errorRetryButton}
+        onPress={onRetry}
+        activeOpacity={0.82}
+        accessibilityRole="button"
+        accessibilityLabel="Retry loading dashboard"
+      >
+        <Text style={styles.errorRetryLabel}>Try again</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+type DailyBrief = {
+  title?: string;
+  overview?: string;
+  actionableIdeas?: Array<{ text?: string }>;
+};
+
+function DailyBriefCard({
+  brief,
+  loading,
+  onOpen,
+}: {
+  brief: DailyBrief | null;
+  loading: boolean;
+  onOpen: () => void;
+}) {
+  const hasBrief = !!brief && !!(brief.overview || brief.title);
+  const ideas = (brief?.actionableIdeas ?? [])
+    .map((idea) => idea?.text)
+    .filter((text): text is string => !!text)
+    .slice(0, 3);
+
+  return (
+    <View style={styles.briefCard}>
+      <View style={styles.briefHeader}>
+        <View style={styles.briefIcon}>
+          <Ionicons name="sunny-outline" size={20} color="#F29A3F" />
+        </View>
+        <Text style={styles.briefKicker}>Daily Brief</Text>
+      </View>
+
+      {loading ? (
+        <View style={styles.briefLoading}>
+          <ActivityIndicator color="#EF6359" />
+          <Text style={styles.briefLoadingLabel}>Nomi is gathering today&apos;s brief…</Text>
+        </View>
+      ) : hasBrief ? (
+        <TouchableOpacity
+          activeOpacity={0.86}
+          onPress={onOpen}
+          accessibilityRole="button"
+          accessibilityLabel="Open today's daily brief"
+        >
+          <Text style={styles.briefTitle}>{brief?.title || 'Daily Nomi Brief'}</Text>
+          {brief?.overview ? (
+            <Text style={styles.briefOverview} numberOfLines={4}>{brief.overview}</Text>
+          ) : null}
+          {ideas.length ? (
+            <View style={styles.briefIdeas}>
+              {ideas.map((idea, index) => (
+                <View style={styles.briefIdeaRow} key={index}>
+                  <Ionicons name="ellipse" size={6} color="#EF6359" style={styles.briefIdeaDot} />
+                  <Text style={styles.briefIdeaText} numberOfLines={2}>{idea}</Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
+        </TouchableOpacity>
+      ) : (
+        <Text style={styles.briefEmpty}>No brief yet today. Save a few memories and Nomi will pull them into a brief.</Text>
+      )}
     </View>
   );
 }
@@ -400,5 +499,95 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'center',
     marginTop: 7,
+  },
+  errorRetryButton: {
+    marginTop: 16,
+    paddingHorizontal: 22,
+    paddingVertical: 11,
+    borderRadius: 22,
+    backgroundColor: '#EF6359',
+  },
+  errorRetryLabel: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  briefCard: {
+    borderWidth: 1,
+    borderColor: '#F4E2C9',
+    borderRadius: 18,
+    backgroundColor: '#FFFDF8',
+    paddingHorizontal: 18,
+    paddingVertical: 18,
+  },
+  briefHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 12,
+  },
+  briefIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#FFF0DC',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  briefKicker: {
+    color: '#B77A2A',
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+  },
+  briefLoading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 6,
+  },
+  briefLoadingLabel: {
+    color: '#7F7777',
+    fontSize: 14,
+    fontWeight: '600',
+    flexShrink: 1,
+  },
+  briefTitle: {
+    color: '#201F24',
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  briefOverview: {
+    color: '#5C5555',
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '600',
+    marginTop: 8,
+  },
+  briefIdeas: {
+    marginTop: 12,
+    gap: 8,
+  },
+  briefIdeaRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 9,
+  },
+  briefIdeaDot: {
+    marginTop: 7,
+  },
+  briefIdeaText: {
+    color: '#3E3A3A',
+    fontSize: 14,
+    lineHeight: 19,
+    fontWeight: '600',
+    flexShrink: 1,
+  },
+  briefEmpty: {
+    color: '#7F7777',
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '600',
   },
 });
