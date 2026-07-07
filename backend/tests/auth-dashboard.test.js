@@ -8,7 +8,7 @@ process.env.FIREBASE_SERVICE_ACCOUNT_JSON = '';
 process.env.NODE_ENV = 'test';
 process.env.JWT_SECRET ||= 'test-jwt-secret-not-for-production';
 
-const { app } = require('../src/server');
+const { app, _store: store } = require('../src/server');
 
 test('legal pages are public html routes', async () => {
   const privacy = await request(app).get('/privacy');
@@ -699,6 +699,165 @@ test('x bookmark sync can use fresh stored access token before refreshing', asyn
   assert.equal(sync.status, 200);
   assert.equal(sync.body.imported, 0);
   assert.equal(tokenExchangeCalls, 1);
+
+  for (const [key, value] of Object.entries(previousEnv)) {
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+  }
+  global.fetch = previousFetch;
+});
+
+test('x bookmark sync rawPayloadHash safeguard catches duplicates the external-ID check misses', async () => {
+  const email = `x.bookmarks.hash-safeguard.${Date.now()}@example.com`;
+  const password = 'password123';
+
+  const signup = await request(app)
+    .post('/api/auth/email/signup')
+    .send({ email, password });
+  assert.equal(signup.status, 201);
+  const authHeader = { Authorization: `Bearer ${signup.body.token}` };
+  const userId = signup.body.user.id;
+  assert.ok(userId);
+
+  // The incoming "new" bookmark from X. Its externalId ("999-new") has never been
+  // seen before, so the existing external-ID/native-memory checks cannot catch it.
+  const incomingTweet = {
+    id: '999-new',
+    author_id: 'author-hash-safeguard',
+    text: 'This exact payload was already imported under a different bookkeeping trail.',
+    created_at: '2026-05-15T20:39:00.000Z',
+  };
+
+  // Compute the rawPayloadHash exactly the way server.js does (sha256 of the
+  // JSON-stringified, undefined-stripped tweet object), so we can seed an existing
+  // source that will collide on hash alone.
+  const crypto = require('crypto');
+  function sanitizeFirestoreValue(value) {
+    if (value === undefined) return undefined;
+    if (Array.isArray(value)) {
+      return value.map(sanitizeFirestoreValue).filter((entry) => entry !== undefined);
+    }
+    if (value && typeof value === 'object'
+      && (Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null)) {
+      return Object.fromEntries(
+        Object.entries(value)
+          .map(([key, entryValue]) => [key, sanitizeFirestoreValue(entryValue)])
+          .filter(([, entryValue]) => entryValue !== undefined),
+      );
+    }
+    return value;
+  }
+  const expectedHash = crypto
+    .createHash('sha256')
+    .update(JSON.stringify(sanitizeFirestoreValue(incomingTweet) || {}))
+    .digest('hex');
+
+  // Seed a pre-existing source that carries the SAME rawPayloadHash the incoming
+  // tweet will produce, but whose import bookkeeping has drifted so the
+  // external-ID check cannot recognize it as a duplicate:
+  //   - importSource is NOT 'x_bookmark' (fails the x_bookmark filter used to
+  //     build existingBookmarkIds)
+  //   - its id does NOT start with 'x_bookmark_' (also fails that filter)
+  //   - its externalId does not match the incoming tweet's id ('999-new')
+  // This means existingBookmarkIds will not contain '999-new', and
+  // nativeMemoryExists is a no-op in this test environment (no Firebase Admin
+  // app initialized), so ONLY the rawPayloadHash safeguard can flag this as a
+  // duplicate.
+  await store.addSource(userId, {
+    id: 'legacy-manual-note-1',
+    title: 'Manually re-entered note',
+    source_type: 'note',
+    importSource: 'manual',
+    externalId: 'unrelated-external-id',
+    body: 'This exact payload was already imported under a different bookkeeping trail.',
+    summary: 'This exact payload was already imported under a different bookkeeping trail.',
+    category: 'General',
+    tags: [],
+    createdAt: new Date('2026-01-01T00:00:00.000Z').toISOString(),
+    rawPayloadHash: expectedHash,
+  });
+
+  const previousEnv = {
+    X_CLIENT_ID: process.env.X_CLIENT_ID,
+    X_CLIENT_SECRET: process.env.X_CLIENT_SECRET,
+    X_REDIRECT_URI: process.env.X_REDIRECT_URI,
+    X_TOKEN_ENCRYPTION_KEY: process.env.X_TOKEN_ENCRYPTION_KEY,
+  };
+  const previousFetch = global.fetch;
+  process.env.X_CLIENT_ID = 'client-id';
+  delete process.env.X_CLIENT_SECRET;
+  process.env.X_REDIRECT_URI = 'https://nomi.example.com/api/x/oauth/callback';
+  process.env.X_TOKEN_ENCRYPTION_KEY = 'test-encryption-key';
+
+  const connect = await request(app)
+    .get('/api/x/bookmarks/connect')
+    .set(authHeader);
+  assert.equal(connect.status, 200);
+  const state = new URL(connect.body.authorizationUrl).searchParams.get('state');
+  assert.ok(state);
+
+  global.fetch = async (url) => {
+    const rawUrl = String(url);
+    if (rawUrl.includes('/oauth2/token')) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          access_token: 'access-token-hash-safeguard',
+          refresh_token: 'refresh-token-hash-safeguard',
+          expires_in: 7200,
+          scope: 'tweet.read users.read bookmark.read offline.access',
+        }),
+      };
+    }
+    if (rawUrl.includes('/2/users/me')) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          data: { id: 'x-user-hash-safeguard', username: 'hash_safeguard_user', name: 'Hash Safeguard User' },
+        }),
+      };
+    }
+    if (rawUrl.includes('/2/users/x-user-hash-safeguard/bookmarks')) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          data: [incomingTweet],
+          includes: {
+            users: [{ id: 'author-hash-safeguard', username: 'hash_safeguard_author', name: 'Hash Safeguard Author' }],
+          },
+        }),
+      };
+    }
+    throw new Error(`Unexpected fetch: ${rawUrl}`);
+  };
+
+  const callback = await request(app)
+    .get(`/api/x/oauth/callback?code=test-code&state=${state}`);
+  assert.equal(callback.status, 200);
+  assert.match(callback.text, /X bookmarks connected/);
+
+  const sync = await request(app)
+    .post('/api/x/bookmarks/sync')
+    .set(authHeader)
+    .send({ limit: 10 });
+  assert.equal(sync.status, 200);
+  // The external-ID check alone would have imported this (its externalId,
+  // "999-new", is not present in existingBookmarkIds). The rawPayloadHash
+  // safeguard must catch it instead, so it should be reported as a duplicate,
+  // not a fresh import.
+  assert.equal(sync.body.imported, 0);
+  assert.equal(sync.body.skipped, 1);
+
+  const sources = await store.listSources(userId);
+  const matchingSources = sources.filter((source) => source.rawPayloadHash === expectedHash);
+  // Still exactly one source with this payload hash: the original seeded one.
+  // No second (duplicate) source was added for the incoming bookmark.
+  assert.equal(matchingSources.length, 1);
+  assert.equal(matchingSources[0].id, 'legacy-manual-note-1');
+  assert.equal(sources.some((source) => source.externalId === '999-new'), false);
 
   for (const [key, value] of Object.entries(previousEnv)) {
     if (value === undefined) delete process.env[key];

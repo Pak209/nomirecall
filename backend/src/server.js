@@ -1200,6 +1200,11 @@ async function syncXBookmarksForUser(userId, options = {}) {
         .filter((source) => source.importSource === 'x_bookmark' || source.id?.startsWith?.('x_bookmark_'))
         .map((source) => String(source.externalId || String(source.id || '').replace(/^x_bookmark_/, ''))),
     );
+    // Second line of defense: dedup by rawPayloadHash across ALL of the user's
+    // existing sources (not just those recognized as x_bookmark imports). This
+    // catches bookmarks that would otherwise be double-imported if the external-ID
+    // bookkeeping above ever falls out of sync (e.g. importSource/externalId drift).
+    const existingPayloadHashes = new Set(existingSources.map((s) => s.rawPayloadHash).filter(Boolean));
 
     const sources = await mapXBookmarkPayloadToSources(payload);
     const imported = [];
@@ -1211,7 +1216,11 @@ async function syncXBookmarksForUser(userId, options = {}) {
     for (const source of sources) {
       const sourceId = String(source.externalId);
       try {
-        if (existingBookmarkIds.has(sourceId) || await nativeMemoryExists(userId, source.externalId)) {
+        if (
+          existingBookmarkIds.has(sourceId)
+          || (source.rawPayloadHash && existingPayloadHashes.has(source.rawPayloadHash))
+          || await nativeMemoryExists(userId, source.externalId)
+        ) {
           duplicates.push(sourceId);
           await writeNativeMemoryFromSource(userId, source);
           continue;
@@ -1220,6 +1229,7 @@ async function syncXBookmarksForUser(userId, options = {}) {
         await store.addSource(userId, source);
         await writeNativeMemoryFromSource(userId, source);
         existingBookmarkIds.add(sourceId);
+        if (source.rawPayloadHash) existingPayloadHashes.add(source.rawPayloadHash);
         imported.push(source);
         importedMemoryIds.push(source.id);
       } catch (error) {
