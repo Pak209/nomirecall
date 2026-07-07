@@ -57,7 +57,20 @@ function createFakeFirestore() {
         return this;
       },
       async get() {
-        return { docs: [] };
+        // Return every doc stored directly under this collection path, i.e.
+        // keys of the form `${path}/<docId>` with no further nesting.
+        const docs = [];
+        for (const [key, data] of store.entries()) {
+          if (!key.startsWith(`${path}/`)) continue;
+          const rest = key.slice(path.length + 1);
+          if (rest.includes('/')) continue; // skip nested sub-collection docs
+          docs.push({
+            id: rest,
+            exists: data !== undefined,
+            data: () => ({ ...data }),
+          });
+        }
+        return { docs };
       },
     };
   }
@@ -117,6 +130,7 @@ aiProviderModule.createAIProvider = () => ({
 const {
   processMemoryForAI,
   processMemoryIds,
+  retryFailedMemoriesForUser,
 } = require('../src/ai/processMemory');
 
 function seedMemory(userId, memoryId, memory) {
@@ -187,4 +201,106 @@ test('processMemoryIds records a partial batch failure: 2 processed, 1 failed, u
   assert.equal(getMemory(userId, 'mem-good-1').ai.processingStatus, 'processed');
   assert.equal(getMemory(userId, 'mem-fail').ai.processingStatus, 'failed');
   assert.equal(getMemory(userId, 'mem-good-2').ai.processingStatus, 'processed');
+});
+
+test('retryFailedMemoriesForUser retries a failed memory under the retry cap and reprocesses it', async () => {
+  const userId = 'user-retry-under-cap';
+  const memoryId = 'mem-retry';
+  seedMemory(userId, memoryId, {
+    createdAt: '2026-01-01T00:00:00.000Z',
+    rawText: 'A sufficiently long failed memory that should be retried by AI.',
+    ai: { processingStatus: 'failed', retryCount: 1, errorMessage: 'earlier failure' },
+  });
+
+  const seen = [];
+  mockProcessMemoryImpl = async (input) => {
+    seen.push(input.memoryId);
+    return {
+      summary: `recovered summary for ${input.memoryId}`,
+      category: 'note',
+      tags: [],
+      concepts: [],
+      entities: [],
+    };
+  };
+
+  const summary = await retryFailedMemoriesForUser(userId, {});
+
+  assert.equal(summary.retriedCount, 1);
+  assert.equal(summary.cappedCount, 0);
+  assert.equal(summary.processedCount, 1);
+  assert.deepEqual(seen, [memoryId]);
+  assert.equal(getMemory(userId, memoryId).ai.processingStatus, 'processed');
+});
+
+test('retryFailedMemoriesForUser does NOT retry a memory at/over the retry cap (capped, provider never called)', async () => {
+  const userId = 'user-retry-capped';
+  seedMemory(userId, 'mem-under-cap', {
+    createdAt: '2026-01-02T00:00:00.000Z',
+    rawText: 'A failed memory still under the retry cap and eligible for retry.',
+    ai: { processingStatus: 'failed', retryCount: 2, errorMessage: 'boom' },
+  });
+  seedMemory(userId, 'mem-at-cap', {
+    createdAt: '2026-01-01T00:00:00.000Z',
+    rawText: 'A permanently failing memory that has already hit the retry cap.',
+    ai: { processingStatus: 'failed', retryCount: 3, errorMessage: 'permanent boom' },
+  });
+
+  const seen = [];
+  mockProcessMemoryImpl = async (input) => {
+    seen.push(input.memoryId);
+    return {
+      summary: `recovered summary for ${input.memoryId}`,
+      category: 'note',
+      tags: [],
+      concepts: [],
+      entities: [],
+    };
+  };
+
+  const summary = await retryFailedMemoriesForUser(userId, {});
+
+  // Only the under-cap memory is retried; the capped one is counted, not retried.
+  assert.equal(summary.retriedCount, 1);
+  assert.equal(summary.cappedCount, 1);
+  assert.equal(summary.processedCount, 1);
+
+  // The mock provider must NEVER be called for the capped memory.
+  assert.ok(seen.includes('mem-under-cap'));
+  assert.ok(!seen.includes('mem-at-cap'), 'capped memory must not be reprocessed by the provider');
+
+  // The capped memory is left untouched at its terminal failed state.
+  assert.equal(getMemory(userId, 'mem-at-cap').ai.processingStatus, 'failed');
+  assert.equal(getMemory(userId, 'mem-at-cap').ai.retryCount, 3);
+});
+
+test('retryFailedMemoriesForUser honors an explicit maxRetries (the value the route clamps to <= 3)', async () => {
+  const userId = 'user-retry-explicit-cap';
+  seedMemory(userId, 'mem-rc-2', {
+    createdAt: '2026-01-02T00:00:00.000Z',
+    rawText: 'Failed memory with retryCount 2, eligible only when maxRetries > 2.',
+    ai: { processingStatus: 'failed', retryCount: 2, errorMessage: 'boom' },
+  });
+  seedMemory(userId, 'mem-rc-3', {
+    createdAt: '2026-01-01T00:00:00.000Z',
+    rawText: 'Failed memory with retryCount 3, at the hard cap of 3.',
+    ai: { processingStatus: 'failed', retryCount: 3, errorMessage: 'boom' },
+  });
+
+  const seen = [];
+  mockProcessMemoryImpl = async (input) => {
+    seen.push(input.memoryId);
+    return { summary: 's', category: 'note', tags: [], concepts: [], entities: [] };
+  };
+
+  // The server route clamps any client-supplied maxRetries to at most 3, so the
+  // effective value reaching this function is never above 3. With maxRetries=3,
+  // the retryCount===3 memory is still excluded (capped), proving the cap holds
+  // even at the clamped ceiling.
+  const summary = await retryFailedMemoriesForUser(userId, { maxRetries: 3 });
+
+  assert.equal(summary.retriedCount, 1);
+  assert.equal(summary.cappedCount, 1);
+  assert.ok(seen.includes('mem-rc-2'));
+  assert.ok(!seen.includes('mem-rc-3'), 'retryCount at the hard cap must never be retried');
 });

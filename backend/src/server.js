@@ -16,6 +16,7 @@ const {
   processMemoryIds,
   processUnprocessedMemoriesForUser,
   processRecentImportedMemories,
+  retryFailedMemoriesForUser,
 } = require('./ai/processMemory');
 const { answerQuestionFromMemories, traceQuestionRetrieval } = require('./ai/queryMemories');
 const {
@@ -223,6 +224,15 @@ const PROCESS_MEMORY_AI_SCHEMA = z.object({
 const PROCESS_MEMORIES_BATCH_SCHEMA = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
   forceReprocess: z.boolean().optional().default(false),
+});
+
+// Hard cap on retries per memory (cost safety). The client may request a
+// smaller value but can never raise it above this ceiling.
+const RETRY_FAILED_MAX_RETRIES_CAP = 3;
+
+const RETRY_FAILED_MEMORIES_SCHEMA = z.object({
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+  maxRetries: z.coerce.number().int().min(0).optional(),
 });
 
 const BACKFILL_SCHEMA = z.object({
@@ -2825,6 +2835,34 @@ app.post('/api/memories/process-recent', auth, async (req, res) => {
       skippedCount: 0,
       failedCount: 1,
       errors: [error.message || 'AI recent-memory processing is not available.'],
+    });
+  }
+});
+
+app.post('/api/memories/retry-failed', auth, async (req, res) => {
+  const data = parseBody(RETRY_FAILED_MEMORIES_SCHEMA, req, res);
+  if (!data) return;
+  // Clamp the client-supplied maxRetries to the hard cap so a caller can never
+  // bypass the cost ceiling (e.g. maxRetries: 99 -> 3).
+  const maxRetries = Math.min(
+    RETRY_FAILED_MAX_RETRIES_CAP,
+    Number.isFinite(Number(data.maxRetries)) ? Number(data.maxRetries) : RETRY_FAILED_MAX_RETRIES_CAP,
+  );
+  try {
+    const result = await retryFailedMemoriesForUser(req.userId, { ...data, maxRetries, store });
+    return res.status(result.limitReached && result.processedCount === 0 ? 429 : 200).json(
+      result.limitReached && result.processedCount === 0
+        ? { ...limitReachedPayload(await getAIProcessingLimitForUser(req.userId, { store })), ...result }
+        : result,
+    );
+  } catch (error) {
+    return res.status(503).json({
+      processedCount: 0,
+      skippedCount: 0,
+      failedCount: 1,
+      retriedCount: 0,
+      cappedCount: 0,
+      errors: [error.message || 'AI retry processing is not available.'],
     });
   }
 });
