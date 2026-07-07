@@ -44,20 +44,40 @@ test('AI usage tier is derived flexibly from user fields', () => {
   assert.equal(getUserAIUsageTier({ tier: 'admin' }), 'admin');
 });
 
-test('BASELINE BUG: brain/pro tiers currently fall through to the free tier and free daily limit', () => {
-  // BASELINE BUG TEST: brain/pro tiers currently fall through to the free limit.
-  // Phase 2 Task 2.1 will UPDATE (not duplicate) this test to assert the fixed mapping.
-  assert.equal(getUserAIUsageTier({ tier: 'brain' }), 'free');
-  assert.equal(getUserAIUsageTier({ tier: 'pro' }), 'free');
+test('Task 2.1: brain/pro tiers resolve to their own AI usage tiers and daily limits', () => {
+  // Validates Task 2.1: brain/pro subscription tiers must no longer fall through
+  // to the free tier/limit. They now resolve to dedicated 'brain'/'pro' AI usage
+  // tiers with their own configured daily limits.
+  assert.equal(getUserAIUsageTier({ tier: 'brain' }), 'brain');
+  assert.equal(getUserAIUsageTier({ tier: 'pro' }), 'pro');
 
   const previous = {
     NOMI_AI_DAILY_LIMIT_FREE: process.env.NOMI_AI_DAILY_LIMIT_FREE,
+    NOMI_AI_DAILY_LIMIT_BRAIN: process.env.NOMI_AI_DAILY_LIMIT_BRAIN,
+    NOMI_AI_DAILY_LIMIT_PRO: process.env.NOMI_AI_DAILY_LIMIT_PRO,
   };
   delete process.env.NOMI_AI_DAILY_LIMIT_FREE;
+  delete process.env.NOMI_AI_DAILY_LIMIT_BRAIN;
+  delete process.env.NOMI_AI_DAILY_LIMIT_PRO;
 
   const freeLimit = getDailyAiLimitForTier('free');
-  assert.equal(getDailyAiLimitForTier(getUserAIUsageTier({ tier: 'brain' })), freeLimit);
-  assert.equal(getDailyAiLimitForTier(getUserAIUsageTier({ tier: 'pro' })), freeLimit);
+  const brainLimit = getDailyAiLimitForTier('brain');
+  const proLimit = getDailyAiLimitForTier('pro');
+
+  assert.equal(getDailyAiLimitForTier(getUserAIUsageTier({ tier: 'brain' })), brainLimit);
+  assert.equal(getDailyAiLimitForTier(getUserAIUsageTier({ tier: 'pro' })), proLimit);
+  assert.notEqual(brainLimit, freeLimit);
+  assert.notEqual(proLimit, freeLimit);
+  assert.equal(brainLimit, 100);
+  assert.equal(proLimit, 200);
+
+  // admin still takes precedence over brain/pro entitlements.
+  assert.equal(getUserAIUsageTier({ isAdmin: true, tier: 'brain' }), 'admin');
+  assert.equal(getUserAIUsageTier({ role: 'admin', aiTier: 'pro' }), 'admin');
+
+  // early_access resolution remains unchanged.
+  assert.equal(getUserAIUsageTier({ isEarlyAccess: true }), 'early_access');
+  assert.equal(getUserAIUsageTier({ tier: 'early_access' }), 'early_access');
 
   restoreEnv(previous);
 });
