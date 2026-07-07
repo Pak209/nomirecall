@@ -4,6 +4,10 @@ const { buildMemoryChunks, listStoredChunks, timestampToIso } = require('./ai/me
 const { listPersistedEdges } = require('./ai/memoryEdges');
 
 function isDebugEnabled() {
+  // Debug inspection is never available in production, regardless of the
+  // ENABLE_NOMI_DEBUG flag. This prevents accidentally shipping the debug
+  // surface (chunk/edge/topic-page inspection) to real users.
+  if (process.env.NODE_ENV === 'production') return false;
   if (String(process.env.ENABLE_NOMI_DEBUG || '').toLowerCase() === 'true') return true;
   if (String(process.env.ENABLE_NOMI_DEBUG || '').toLowerCase() === 'false') return false;
   return process.env.NODE_ENV !== 'production';
