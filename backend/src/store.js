@@ -50,6 +50,23 @@ class MemoryStore {
     return user;
   }
 
+  async applyRevenueCatTier(userId, { tier, eventId, eventType } = {}) {
+    for (const [email, user] of this.usersByEmail.entries()) {
+      if (user.id === userId) {
+        const updated = {
+          ...user,
+          tier,
+          lastRevenueCatEventId: eventId || null,
+          lastRevenueCatEventType: eventType || null,
+          updatedAt: new Date().toISOString(),
+        };
+        this.usersByEmail.set(email, updated);
+        return { updated: true, tier };
+      }
+    }
+    return { updated: false, reason: 'user_not_found' };
+  }
+
   async deleteUserData(userId) {
     for (const [email, user] of this.usersByEmail.entries()) {
       if (user.id === userId) {
@@ -312,6 +329,26 @@ class FirestoreStore {
       { merge: true },
     );
     return user;
+  }
+
+  async applyRevenueCatTier(userId, { tier, eventId, eventType } = {}) {
+    const patch = this.withoutUndefined({
+      tier,
+      lastRevenueCatEventId: eventId || null,
+      lastRevenueCatEventType: eventType || null,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    const direct = await this.userCollection().doc(userId).get();
+    if (direct.exists) {
+      await direct.ref.set(patch, { merge: true });
+      return { updated: true, tier };
+    }
+
+    const snapshot = await this.userCollection().where('id', '==', userId).limit(1).get();
+    if (snapshot.empty) return { updated: false, reason: 'user_not_found' };
+    await snapshot.docs[0].ref.set(patch, { merge: true });
+    return { updated: true, tier };
   }
 
   async deleteUserData(userId) {

@@ -1574,6 +1574,52 @@ function jwtSecret() {
   return value;
 }
 
+// Constant-time string comparison. Guards against length mismatch first (a
+// length difference is not itself secret and timingSafeEqual throws on unequal
+// buffer lengths), then compares equal-length buffers in constant time.
+function timingSafeEqualStrings(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
+}
+
+const REVENUECAT_DOWNGRADE_TYPES = new Set([
+  'CANCELLATION',
+  'EXPIRATION',
+  'SUBSCRIPTION_PAUSED',
+  'BILLING_ISSUE',
+]);
+
+const REVENUECAT_UPGRADE_TYPES = new Set([
+  'INITIAL_PURCHASE',
+  'RENEWAL',
+  'PRODUCT_CHANGE',
+  'UNCANCELLATION',
+  'NON_RENEWING_PURCHASE',
+]);
+
+// Maps a RevenueCat webhook event to a product tier.
+// Returns 'free' | 'brain' | 'pro' for handled types, or null for TEST /
+// unknown types (caller should acknowledge without a state change).
+function tierFromRevenueCatEvent(event = {}) {
+  const type = String(event.type || '').toUpperCase();
+
+  if (REVENUECAT_DOWNGRADE_TYPES.has(type)) return 'free';
+
+  if (REVENUECAT_UPGRADE_TYPES.has(type)) {
+    const productId = String(event.product_id || '').toLowerCase();
+    if (productId.includes('pro')) return 'pro';
+    if (productId.includes('brain')) return 'brain';
+    // Unrecognized product on a paid event: default to the base paid tier.
+    return 'brain';
+  }
+
+  // TEST and any unknown/unhandled event type.
+  return null;
+}
+
 function parseBody(schema, req, res) {
   const parsed = schema.safeParse(req.body || {});
   if (!parsed.success) {
@@ -1899,6 +1945,54 @@ app.patch('/api/auth/tier', auth, async (req, res) => {
   if (!user) return res.status(404).json({ error: 'User not found' });
   await store.upsertUser({ ...user, tier: data.tier });
   return res.json({ ok: true });
+});
+
+// RevenueCat subscription webhook. NOT auth-protected: RevenueCat is not a
+// logged-in user. Instead RevenueCat is configured (in its dashboard) to send a
+// static Authorization header, which we compare against REVENUECAT_WEBHOOK_SECRET
+// using a timing-safe comparison. The endpoint fails safe (503) until the secret
+// is configured, so a misconfigured deploy cannot accept unsigned events.
+app.post('/api/webhooks/revenuecat', async (req, res) => {
+  const secret = process.env.REVENUECAT_WEBHOOK_SECRET;
+  if (!secret) {
+    return res.status(503).json({ error: 'RevenueCat webhook not configured' });
+  }
+
+  const provided = req.get('authorization') || '';
+  if (!timingSafeEqualStrings(provided, secret)) {
+    return res.status(401).json({ error: 'Invalid webhook signature' });
+  }
+
+  try {
+    const event = (req.body && req.body.event) || {};
+    const eventType = String(event.type || '').toUpperCase();
+
+    const tier = tierFromRevenueCatEvent(event);
+    if (tier === null) {
+      // TEST events and unknown/unhandled types: acknowledge with 200 so
+      // RevenueCat stops retrying, but make no state change.
+      return res.status(200).json({ ok: true, ignored: true });
+    }
+
+    const appUserId = event.app_user_id;
+    const result = await store.applyRevenueCatTier(appUserId, {
+      tier,
+      eventId: event.id,
+      eventType,
+    });
+
+    if (!result.updated) {
+      // Unknown app_user_id. Still 200 so RevenueCat does not retry forever.
+      console.warn(`[revenuecat] no user for app_user_id=${appUserId} (type=${eventType}, reason=${result.reason})`);
+      return res.status(200).json({ ok: true, updated: false, tier });
+    }
+
+    console.log(`[revenuecat] applied tier=${tier} to user=${appUserId} (type=${eventType})`);
+    return res.status(200).json({ ok: true, updated: true, tier });
+  } catch (error) {
+    console.error(`[revenuecat] webhook error: ${error.message}`);
+    return res.status(500).json({ error: 'RevenueCat webhook processing failed' });
+  }
 });
 
 app.get('/api/auth/me', auth, async (req, res) => {
