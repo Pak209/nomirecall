@@ -105,7 +105,7 @@ struct MainTabsView: View {
             selectedTab = .ideas
         case .circle:
             isShowingCircle = true
-        case .obsidianExport, .importSources:
+        case .importSources:
             selectedTab = .profile
         case .help:
             selectedTab = .profile
