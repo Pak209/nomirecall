@@ -17,6 +17,32 @@ function timestamp() {
   return admin.apps.length ? admin.firestore.FieldValue.serverTimestamp() : new Date().toISOString();
 }
 
+// Firestore's admin SDK rejects any document containing `undefined` ("Value for
+// argument 'data' is not a valid Firestore document"). Brief docs aggregate data
+// from several sources that can legitimately carry undefined fields (e.g. a
+// project doc without a `name`, usage metadata without counts), so strip them
+// deeply before every write. Objects with a toDate/serverTimestamp sentinel or
+// non-plain prototypes (FieldValue, Date) are passed through untouched.
+function stripUndefinedDeep(value) {
+  if (Array.isArray(value)) {
+    return value.filter((item) => item !== undefined).map(stripUndefinedDeep);
+  }
+  if (value && typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype) {
+    const result = {};
+    for (const [key, entry] of Object.entries(value)) {
+      if (entry === undefined) continue;
+      result[key] = stripUndefinedDeep(entry);
+    }
+    return result;
+  }
+  return value;
+}
+
+function writeDailyBrief(userId, dateKey, brief) {
+  return db().collection('users').doc(userId).collection('dailyBriefs').doc(dateKey)
+    .set(stripUndefinedDeep(brief), { merge: true });
+}
+
 function dateFromValue(value) {
   if (typeof value?.toDate === 'function') return value.toDate();
   if (typeof value?._seconds === 'number') return new Date(value._seconds * 1000);
@@ -234,7 +260,7 @@ async function generateDailyBriefForUser(userId, dateKey, options = {}) {
           generatedAt: timestamp(),
         },
       };
-      await db().collection('users').doc(userId).collection('dailyBriefs').doc(dateKey).set(brief, { merge: true });
+      await writeDailyBrief(userId, dateKey, brief);
       return getDailyBrief(userId, dateKey);
     }
 
@@ -288,7 +314,7 @@ async function generateDailyBriefForUser(userId, dateKey, options = {}) {
     }
   }
 
-  await db().collection('users').doc(userId).collection('dailyBriefs').doc(dateKey).set(brief, { merge: true });
+  await writeDailyBrief(userId, dateKey, brief);
   return getDailyBrief(userId, dateKey);
 }
 
