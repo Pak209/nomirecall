@@ -841,7 +841,6 @@ enum HomeDrawerDestination {
     case projects
     case connectedIdeas
     case circle
-    case obsidianExport
     case importSources
     case settings
     case help
@@ -854,7 +853,6 @@ private enum NomiDrawerItem: CaseIterable, Identifiable {
     case projects
     case connectedIdeas
     case circle
-    case obsidianExport
     case importSources
     case settings
     case help
@@ -869,7 +867,6 @@ private enum NomiDrawerItem: CaseIterable, Identifiable {
         case .projects: return "Projects"
         case .connectedIdeas: return "Connected Ideas"
         case .circle: return "Circle"
-        case .obsidianExport: return "Obsidian Export"
         case .importSources: return "Import Sources"
         case .settings: return "Settings & Privacy"
         case .help: return "Help"
@@ -884,7 +881,6 @@ private enum NomiDrawerItem: CaseIterable, Identifiable {
         case .projects: return "folder"
         case .connectedIdeas: return "point.3.connected.trianglepath.dotted"
         case .circle: return "person.2"
-        case .obsidianExport: return "shippingbox"
         case .importSources: return "square.and.arrow.down"
         case .settings: return "gearshape"
         case .help: return "questionmark.circle"
@@ -901,7 +897,7 @@ private enum NomiDrawerItem: CaseIterable, Identifiable {
     var accent: Color {
         switch self {
         case .nomiPro, .dailyBrief: return Color.nomiOrange
-        case .connectedIdeas, .circle, .obsidianExport: return Color.nomiPurple
+        case .connectedIdeas, .circle: return Color.nomiPurple
         default: return Color.nomiInk
         }
     }
@@ -918,7 +914,6 @@ private enum NomiDrawerItem: CaseIterable, Identifiable {
         case .projects: return .projects
         case .connectedIdeas: return .connectedIdeas
         case .circle: return .circle
-        case .obsidianExport: return .obsidianExport
         case .importSources: return .importSources
         case .settings: return .settings
         case .help: return .help
