@@ -2005,9 +2005,19 @@ app.patch('/api/auth/onboarding', auth, async (req, res) => {
   return res.json({ user: publicUser(updated) });
 });
 
+// Clients may only self-DOWNGRADE to free (e.g. after a restore finds no
+// active subscription). Paid tiers are applied exclusively by the RevenueCat
+// webhook — the server-side source of subscription truth — so a client can
+// never self-assert brain/pro/admin. Closes the audit's client-asserted-tier
+// gap.
 app.patch('/api/auth/tier', auth, async (req, res) => {
   const data = parseBody(TIER_SCHEMA, req, res);
   if (!data) return;
+  if (data.tier !== 'free') {
+    return res.status(403).json({
+      error: 'Tier upgrades are managed by the subscription provider. Complete a purchase in the app to upgrade.',
+    });
+  }
   const user = await store.getUserById(req.userId);
   if (!user) return res.status(404).json({ error: 'User not found' });
   await store.upsertUser({ ...user, tier: data.tier });

@@ -145,7 +145,14 @@ async function persistUpdatedUser(patch: Partial<User>) {
 }
 
 async function syncTier(tier: AppTier) {
-  await AuthAPI.updateTier(tier);
+  try {
+    await AuthAPI.updateTier(tier);
+  } catch (error) {
+    // The backend only accepts self-downgrades to 'free'; paid tiers are
+    // applied server-side by the RevenueCat webhook. A 403 here is expected
+    // after a purchase and must not fail the purchase/restore flow.
+    console.warn('[payments] backend tier sync skipped:', (error as Error)?.message);
+  }
   await persistUpdatedUser({ tier });
 }
 
