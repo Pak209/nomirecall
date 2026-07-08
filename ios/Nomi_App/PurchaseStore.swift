@@ -52,20 +52,12 @@ final class PurchaseStore: ObservableObject {
         defer { isLoading = false }
 
         do {
-            // TEMP DEBUG: Log RevenueCat state while diagnosing TestFlight subscription loading.
-            print("RC DEBUG: Fetching customer info...")
             async let customerInfo = Purchases.shared.customerInfo()
-            print("RC DEBUG: Fetching offerings...")
             async let offerings = Purchases.shared.offerings()
             self.customerInfo = try await customerInfo
-            if let selfCustomerInfo = self.customerInfo {
-                print("RC DEBUG: Active entitlement identifiers:", Array(selfCustomerInfo.entitlements.active.keys))
-                print("RC DEBUG: All entitlement identifiers:", Array(selfCustomerInfo.entitlements.all.keys))
-            }
 
             let loadedOfferings = try await offerings
             self.offerings = loadedOfferings
-            Self.logOfferingsDebugInfo(loadedOfferings)
 
             if loadedOfferings.current == nil {
                 errorMessage = "RevenueCat has no current offering. Mark an offering as Current and attach the App Store product."
@@ -73,7 +65,6 @@ final class PurchaseStore: ObservableObject {
                 errorMessage = "RevenueCat current offering has no packages. Add the Monthly App Store product to the offering."
             }
         } catch {
-            Self.logRevenueCatError(error)
             errorMessage = Self.readableErrorMessage(from: error)
         }
     }
@@ -143,35 +134,6 @@ final class PurchaseStore: ObservableObject {
             for await newCustomerInfo in Purchases.shared.customerInfoStream {
                 customerInfo = newCustomerInfo
             }
-        }
-    }
-
-    // TEMP DEBUG: Remove after the TestFlight RevenueCat/StoreKit issue is identified.
-    private static func logOfferingsDebugInfo(_ offerings: Offerings) {
-        let currentPackages = offerings.current?.availablePackages ?? []
-        print("RC DEBUG: Current offering:", offerings.current?.identifier ?? "nil")
-        print("RC DEBUG: All offerings:", Array(offerings.all.keys))
-        print("RC DEBUG: Packages:", currentPackages.map { $0.identifier })
-        print("RC DEBUG: Store products:", currentPackages.map { $0.storeProduct.productIdentifier })
-        print("RC DEBUG: Store product titles:", currentPackages.map { $0.storeProduct.localizedTitle })
-        print("RC DEBUG: Store product prices:", currentPackages.map { $0.storeProduct.localizedPriceString })
-    }
-
-    // TEMP DEBUG: Remove after the TestFlight RevenueCat/StoreKit issue is identified.
-    private static func logRevenueCatError(_ error: Error) {
-        let nsError = error as NSError
-        print("RC ERROR: Failed to fetch offerings:", error)
-        print("RC ERROR localized:", error.localizedDescription)
-        print("RC ERROR domain:", nsError.domain)
-        print("RC ERROR code:", nsError.code)
-        print("RC ERROR userInfo:", nsError.userInfo)
-
-        if let underlyingError = nsError.userInfo[NSUnderlyingErrorKey] as? NSError {
-            print("RC ERROR underlying:", underlyingError)
-            print("RC ERROR underlying localized:", underlyingError.localizedDescription)
-            print("RC ERROR underlying domain:", underlyingError.domain)
-            print("RC ERROR underlying code:", underlyingError.code)
-            print("RC ERROR underlying userInfo:", underlyingError.userInfo)
         }
     }
 
