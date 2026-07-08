@@ -157,7 +157,7 @@ Then restart Expo.
 - `POST /api/auth/signin`
 - `POST /api/auth/signup`
 - `PATCH /api/auth/interests`
-- `PATCH /api/auth/tier`
+- `PATCH /api/auth/tier` (self-downgrade to `free` only; paid tiers are set exclusively by the RevenueCat webhook)
 - `POST /api/webhooks/revenuecat`
 - `GET /api/x/discover`
 - `GET /api/x/bookmarks/connect`

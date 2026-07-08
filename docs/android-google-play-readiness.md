@@ -86,7 +86,7 @@ Useful checks:
 
 - Paywall shows "Setup" when RevenueCat returns no package for a plan.
 - Paywall shows "Live" and Google Play prices after the products are active and attached to the current RevenueCat offering.
-- Test purchases should activate the backend tier through `PATCH /api/auth/tier` after RevenueCat returns active entitlements.
+- Test purchases activate the backend tier through the RevenueCat webhook (`POST /api/webhooks/revenuecat`), the sole source of paid-tier truth. `PATCH /api/auth/tier` only accepts self-downgrade to `free` — verify the tier lands via the webhook, not the client call.
 
 ## Android Permission Audit
 

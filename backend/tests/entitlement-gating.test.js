@@ -8,6 +8,9 @@ process.env.FIREBASE_SERVICE_ACCOUNT_JSON = '';
 process.env.NODE_ENV = 'test';
 process.env.JWT_SECRET ||= 'test-jwt-secret-not-for-production';
 
+const GATING_WEBHOOK_SECRET = 'test-revenuecat-webhook-secret-gating';
+process.env.REVENUECAT_WEBHOOK_SECRET ||= GATING_WEBHOOK_SECRET;
+
 const { app } = require('../src/server');
 
 // Helper: create a fresh user and return an Authorization header for them.
@@ -17,16 +20,31 @@ async function signup(label) {
     .post('/api/auth/email/signup')
     .send({ email, password: 'password123' });
   assert.equal(res.status, 201, 'signup should succeed');
-  return { authHeader: { Authorization: `Bearer ${res.body.token}` }, email };
+  return {
+    authHeader: { Authorization: `Bearer ${res.body.token}` },
+    email,
+    userId: res.body.user.id,
+  };
 }
 
-// Helper: set the signed-in user's tier via the app's own PATCH route (black-box).
-async function setTier(authHeader, tier) {
+// Helper: set the user's PAID tier the way production does — via the
+// RevenueCat webhook (clients can no longer self-upgrade through
+// PATCH /api/auth/tier; the webhook is the sole source of paid-tier truth).
+async function setTier({ userId }, tier) {
   const res = await request(app)
-    .patch('/api/auth/tier')
-    .set(authHeader)
-    .send({ tier });
-  assert.equal(res.status, 200, `setting tier=${tier} should succeed`);
+    .post('/api/webhooks/revenuecat')
+    .set('Authorization', process.env.REVENUECAT_WEBHOOK_SECRET)
+    .send({
+      event: {
+        id: `evt_gating_${tier}_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+        type: 'INITIAL_PURCHASE',
+        app_user_id: userId,
+        entitlement_ids: [tier],
+        product_id: `${tier}_monthly`,
+      },
+    });
+  assert.equal(res.status, 200, `setting tier=${tier} via webhook should succeed`);
+  assert.equal(res.body.tier, tier);
 }
 
 // The exact 403 message requireTier('brain') emits. Used to distinguish a
@@ -47,8 +65,9 @@ test('free-tier user is blocked from on-demand brief generation (403)', async ()
 });
 
 test('brain-tier user is allowed PAST the brief-generation gate', async () => {
-  const { authHeader } = await signup('brain');
-  await setTier(authHeader, 'brain');
+  const user = await signup('brain');
+  const { authHeader } = user;
+  await setTier(user, 'brain');
 
   const res = await request(app)
     .post('/api/daily-briefs/generate-today')
@@ -63,8 +82,9 @@ test('brain-tier user is allowed PAST the brief-generation gate', async () => {
 });
 
 test('pro-tier user is allowed PAST the brief-generation gate', async () => {
-  const { authHeader } = await signup('pro');
-  await setTier(authHeader, 'pro');
+  const user = await signup('pro');
+  const { authHeader } = user;
+  await setTier(user, 'pro');
 
   const res = await request(app)
     .post('/api/daily-briefs/generate-today')
