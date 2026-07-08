@@ -127,12 +127,12 @@ Behavior:
 
 - Secret unset → `503` (fails safe; the endpoint refuses to accept unsigned events).
 - Missing/incorrect Authorization header → `401`, no state change.
-- `INITIAL_PURCHASE`/`RENEWAL`/`PRODUCT_CHANGE`/`UNCANCELLATION`/`NON_RENEWING_PURCHASE` → tier derived from `product_id` (`brain_pro_monthly` or any `pro` → `pro`; `brain_monthly` or any `brain` → `brain`).
+- `INITIAL_PURCHASE`/`RENEWAL`/`PRODUCT_CHANGE`/`UNCANCELLATION`/`NON_RENEWING_PURCHASE` → tier derived from **`entitlement_ids` first** (store-agnostic; the iOS entitlement `Nomi Pro` → `pro`, `brain` → `brain`; `pro` beats `brain` when both appear), then **`product_id` as fallback** (`brain_pro_monthly` or any `pro` → `pro`; `brain_monthly` or any `brain` → `brain`). The legacy single `entitlement_id` field is also honored. No tier signal anywhere → base paid tier `brain`. Note: iOS App Store product ids (`monthly`/`yearly`/`lifetime`) carry no tier information, which is why entitlements are the primary source.
 - `CANCELLATION`/`EXPIRATION`/`SUBSCRIPTION_PAUSED`/`BILLING_ISSUE` → downgrade to `free`.
 - `TEST` and unknown event types → `200 { ignored: true }` (acknowledged, no change).
 - Unknown `app_user_id` → still `200` (so RevenueCat stops retrying) with `updated: false`.
 
-The webhook's `app_user_id` is the backend `user.id` (the mobile client sets RevenueCat's `appUserID` to it), so it maps directly via `store.getUserById(app_user_id)`.
+The webhook's `app_user_id` is whatever the client passes to RevenueCat's `logIn`/`configure`: the RN client uses the backend `user.id`; the native iOS app uses the **Firebase UID**. Both resolve via `store.getUserById(app_user_id)` (Firestore user docs are keyed accordingly — verified in the 2026-07-08 sandbox replay).
 
 **Live activation is a human/operator step:** the endpoint stays inert until an operator sets a real `REVENUECAT_WEBHOOK_SECRET`, configures the matching Authorization header + webhook URL in the RevenueCat dashboard, and replays a sandbox event to confirm.
 

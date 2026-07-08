@@ -1624,16 +1624,34 @@ const REVENUECAT_UPGRADE_TYPES = new Set([
 // Maps a RevenueCat webhook event to a product tier.
 // Returns 'free' | 'brain' | 'pro' for handled types, or null for TEST /
 // unknown types (caller should acknowledge without a state change).
+//
+// Mapping source order:
+// 1. entitlement_ids / entitlement_id — RevenueCat's store-agnostic
+//    abstraction, stable across stores and product renames. This is the
+//    primary signal: the iOS App Store product ids are literally
+//    "monthly"/"yearly"/"lifetime" (no tier information), while the iOS
+//    entitlement is "Nomi Pro".
+// 2. product_id — fallback for events without entitlements; the Android/RN
+//    catalog (brain_monthly, brain_pro_monthly) encodes the tier here.
+// 'pro' is checked before 'brain' at each level so the higher tier wins on
+// multi-entitlement events.
 function tierFromRevenueCatEvent(event = {}) {
   const type = String(event.type || '').toUpperCase();
 
   if (REVENUECAT_DOWNGRADE_TYPES.has(type)) return 'free';
 
   if (REVENUECAT_UPGRADE_TYPES.has(type)) {
+    const entitlements = [
+      ...(Array.isArray(event.entitlement_ids) ? event.entitlement_ids : []),
+      ...(event.entitlement_id ? [event.entitlement_id] : []),
+    ].map((value) => String(value).toLowerCase());
+    if (entitlements.some((id) => id.includes('pro'))) return 'pro';
+    if (entitlements.some((id) => id.includes('brain'))) return 'brain';
+
     const productId = String(event.product_id || '').toLowerCase();
     if (productId.includes('pro')) return 'pro';
     if (productId.includes('brain')) return 'brain';
-    // Unrecognized product on a paid event: default to the base paid tier.
+    // No tier signal in entitlements or product: default to the base paid tier.
     return 'brain';
   }
 
