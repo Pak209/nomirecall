@@ -50,6 +50,23 @@ class MemoryStore {
     return user;
   }
 
+  async applyRevenueCatTier(userId, { tier, eventId, eventType } = {}) {
+    for (const [email, user] of this.usersByEmail.entries()) {
+      if (user.id === userId) {
+        const updated = {
+          ...user,
+          tier,
+          lastRevenueCatEventId: eventId || null,
+          lastRevenueCatEventType: eventType || null,
+          updatedAt: new Date().toISOString(),
+        };
+        this.usersByEmail.set(email, updated);
+        return { updated: true, tier };
+      }
+    }
+    return { updated: false, reason: 'user_not_found' };
+  }
+
   async deleteUserData(userId) {
     for (const [email, user] of this.usersByEmail.entries()) {
       if (user.id === userId) {
@@ -100,6 +117,12 @@ class MemoryStore {
 
   async countSources(userId) {
     return (this.sourcesByUser.get(userId) || []).length;
+  }
+
+  async findSourceByContentHash(userId, contentHash) {
+    if (!contentHash) return null;
+    const list = this.sourcesByUser.get(userId) || [];
+    return list.find((source) => source.contentHash === contentHash) || null;
   }
 
   async upsertChunks(userId, memoryId, chunks) {
@@ -314,6 +337,26 @@ class FirestoreStore {
     return user;
   }
 
+  async applyRevenueCatTier(userId, { tier, eventId, eventType } = {}) {
+    const patch = this.withoutUndefined({
+      tier,
+      lastRevenueCatEventId: eventId || null,
+      lastRevenueCatEventType: eventType || null,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    const direct = await this.userCollection().doc(userId).get();
+    if (direct.exists) {
+      await direct.ref.set(patch, { merge: true });
+      return { updated: true, tier };
+    }
+
+    const snapshot = await this.userCollection().where('id', '==', userId).limit(1).get();
+    if (snapshot.empty) return { updated: false, reason: 'user_not_found' };
+    await snapshot.docs[0].ref.set(patch, { merge: true });
+    return { updated: true, tier };
+  }
+
   async deleteUserData(userId) {
     const directUser = await this.userCollection().doc(userId).get();
     const users = await this.userCollection().where('id', '==', userId).get();
@@ -421,6 +464,17 @@ class FirestoreStore {
   async countSources(userId) {
     const snapshot = await this.sourceCollection().where('userId', '==', userId).get();
     return snapshot.size;
+  }
+
+  async findSourceByContentHash(userId, contentHash) {
+    if (!contentHash) return null;
+    // Filter on userId only (single-field, no composite index needed) and match
+    // contentHash in memory, mirroring listSources/countSources. A two-equality
+    // Firestore query would require a composite index that may not exist, which
+    // would throw in the ingest hot path.
+    const snapshot = await this.sourceCollection().where('userId', '==', userId).get();
+    const match = snapshot.docs.find((doc) => doc.data()?.contentHash === contentHash);
+    return match ? { id: match.id, ...match.data() } : null;
   }
 
   async getFeedItems() {

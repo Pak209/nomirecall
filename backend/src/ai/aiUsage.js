@@ -13,6 +13,8 @@ function getUserAIUsageTier(user = {}) {
   if (user.isEarlyAccess === true || user.earlyAccessEnabled === true || user.tier === 'early_access' || user.aiTier === 'early_access') return 'early_access';
   if (Array.isArray(user.entitlements) && user.entitlements.includes('early_access')) return 'early_access';
   if (user.subscriptionStatus === 'early_access') return 'early_access';
+  if (user.tier === 'pro' || user.aiTier === 'pro' || (Array.isArray(user.entitlements) && user.entitlements.includes('pro')) || user.subscriptionStatus === 'pro') return 'pro';
+  if (user.tier === 'brain' || user.aiTier === 'brain' || (Array.isArray(user.entitlements) && user.entitlements.includes('brain')) || user.subscriptionStatus === 'brain') return 'brain';
   return 'free';
 }
 

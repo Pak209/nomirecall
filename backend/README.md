@@ -13,6 +13,17 @@ npm run dev
 
 Server runs at `http://localhost:3000`.
 
+`JWT_SECRET` is now **required in every environment** (dev, staging, production). The
+server refuses to start if it is unset or left as the placeholder
+`dev-secret-change-me`. After `cp .env.example .env`, generate a strong value:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
+```
+
+and paste it into `JWT_SECRET` in `backend/.env`. The automated test suite sets its
+own throwaway `JWT_SECRET`, so `npm test` works without any local configuration.
+
 ## Firebase persistence setup
 
 1. In Firebase Console, open your project settings and create a service account key JSON.
@@ -102,6 +113,29 @@ X_TOKEN_ENCRYPTION_KEY= # 32+ random chars
 
 The bookmark MVP requests `tweet.read users.read bookmark.read offline.access`, stores the refresh token encrypted, and exposes manual sync through `/api/x/bookmarks/sync`.
 
+## RevenueCat subscription webhook
+
+`POST /api/webhooks/revenuecat` receives subscription lifecycle events from RevenueCat and updates the user's `tier` (`free` | `brain` | `pro`). It is intentionally not behind the app auth middleware — the caller is RevenueCat, not a logged-in user.
+
+Authentication is by a **static Authorization header** that you configure on the webhook in the RevenueCat dashboard (RevenueCat does not HMAC-sign the body). The backend compares the incoming `Authorization` header against `REVENUECAT_WEBHOOK_SECRET` using a timing-safe comparison.
+
+```env
+REVENUECAT_WEBHOOK_SECRET= # must match the Authorization header set in the RevenueCat dashboard
+```
+
+Behavior:
+
+- Secret unset → `503` (fails safe; the endpoint refuses to accept unsigned events).
+- Missing/incorrect Authorization header → `401`, no state change.
+- `INITIAL_PURCHASE`/`RENEWAL`/`PRODUCT_CHANGE`/`UNCANCELLATION`/`NON_RENEWING_PURCHASE` → tier derived from `product_id` (`brain_pro_monthly` or any `pro` → `pro`; `brain_monthly` or any `brain` → `brain`).
+- `CANCELLATION`/`EXPIRATION`/`SUBSCRIPTION_PAUSED`/`BILLING_ISSUE` → downgrade to `free`.
+- `TEST` and unknown event types → `200 { ignored: true }` (acknowledged, no change).
+- Unknown `app_user_id` → still `200` (so RevenueCat stops retrying) with `updated: false`.
+
+The webhook's `app_user_id` is the backend `user.id` (the mobile client sets RevenueCat's `appUserID` to it), so it maps directly via `store.getUserById(app_user_id)`.
+
+**Live activation is a human/operator step:** the endpoint stays inert until an operator sets a real `REVENUECAT_WEBHOOK_SECRET`, configures the matching Authorization header + webhook URL in the RevenueCat dashboard, and replays a sandbox event to confirm.
+
 ## App config
 
 In app `.env`:
@@ -124,6 +158,7 @@ Then restart Expo.
 - `POST /api/auth/signup`
 - `PATCH /api/auth/interests`
 - `PATCH /api/auth/tier`
+- `POST /api/webhooks/revenuecat`
 - `GET /api/x/discover`
 - `GET /api/x/bookmarks/connect`
 - `GET /api/x/oauth/callback`

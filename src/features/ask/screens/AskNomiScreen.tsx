@@ -25,6 +25,7 @@ export default function AskNomiScreen() {
   const insets = useSafeAreaInsets();
   const nav = useNavigation<any>();
   const theme = useStore((s) => s.theme);
+  const serverOnline = useStore((s) => s.serverOnline);
   const dark = theme === 'dark';
   const [question, setQuestion] = useState('');
   const askMutation = useMutation({
@@ -32,6 +33,7 @@ export default function AskNomiScreen() {
   });
 
   function ask(text = question) {
+    if (!serverOnline) return;
     const trimmed = text.trim();
     if (!trimmed) return;
     setQuestion(trimmed);
@@ -60,12 +62,16 @@ export default function AskNomiScreen() {
           multiline
         />
         <TouchableOpacity
-          style={[styles.askButton, !question.trim() && styles.askButtonDisabled]}
+          style={[styles.askButton, (!question.trim() || !serverOnline) && styles.askButtonDisabled]}
           onPress={() => ask()}
-          disabled={!question.trim() || askMutation.isLoading}
+          disabled={!question.trim() || askMutation.isLoading || !serverOnline}
+          accessibilityState={{ disabled: !question.trim() || askMutation.isLoading || !serverOnline }}
         >
           {askMutation.isLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.askButtonText}>Ask</Text>}
         </TouchableOpacity>
+        {!serverOnline ? (
+          <Text style={[styles.offlineHint, dark && styles.offlineHintDark]}>You're offline. Reconnect to ask Nomi.</Text>
+        ) : null}
       </View>
 
       <ScrollView
@@ -137,6 +143,8 @@ const styles = StyleSheet.create({
   askButton: { height: 48, borderRadius: 15, backgroundColor: '#FF2D8E', alignItems: 'center', justifyContent: 'center' },
   askButtonDisabled: { opacity: 0.48 },
   askButtonText: { color: '#fff', fontWeight: '900', fontSize: 16 },
+  offlineHint: { color: '#B45A2E', fontSize: 12, fontWeight: '700', textAlign: 'center' },
+  offlineHintDark: { color: '#FFB088' },
   scroller: { flex: 1 },
   content: { paddingTop: 16, paddingBottom: 18 },
   suggestions: { gap: 10 },

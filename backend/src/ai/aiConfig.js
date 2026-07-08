@@ -5,6 +5,10 @@ const DEFAULT_EMBEDDING_MODEL = 'text-embedding-3-small';
 const DEFAULT_FREE_DAILY_LIMIT = 10;
 const DEFAULT_EARLY_ACCESS_DAILY_LIMIT = 50;
 const DEFAULT_ADMIN_DAILY_LIMIT = 150;
+// PLACEHOLDER defaults for paid tiers pending product sign-off on final limits.
+// Env-overridable via NOMI_AI_DAILY_LIMIT_BRAIN / NOMI_AI_DAILY_LIMIT_PRO.
+const DEFAULT_BRAIN_DAILY_LIMIT = 100;
+const DEFAULT_PRO_DAILY_LIMIT = 200;
 
 function parseLimit(value, fallback) {
   const parsed = Number(value);
@@ -24,6 +28,8 @@ function aiConfig() {
     free: parseLimit(process.env.NOMI_AI_DAILY_LIMIT_FREE || process.env.NOMI_AI_FREE_DAILY_LIMIT, DEFAULT_FREE_DAILY_LIMIT),
     early_access: parseLimit(process.env.NOMI_AI_DAILY_LIMIT_EARLY_ACCESS || process.env.NOMI_AI_EARLY_ACCESS_DAILY_LIMIT, DEFAULT_EARLY_ACCESS_DAILY_LIMIT),
     admin: parseLimit(process.env.NOMI_AI_DAILY_LIMIT_ADMIN || process.env.NOMI_AI_ADMIN_DAILY_LIMIT, DEFAULT_ADMIN_DAILY_LIMIT),
+    brain: parseLimit(process.env.NOMI_AI_DAILY_LIMIT_BRAIN, DEFAULT_BRAIN_DAILY_LIMIT),
+    pro: parseLimit(process.env.NOMI_AI_DAILY_LIMIT_PRO, DEFAULT_PRO_DAILY_LIMIT),
   };
   const disableLimits = String(process.env.NOMI_AI_DISABLE_LIMITS || 'false').toLowerCase() === 'true';
   const dailySyncEnabled = String(process.env.NOMI_DAILY_SYNC_ENABLED || 'false').toLowerCase() === 'true';

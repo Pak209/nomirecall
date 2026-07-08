@@ -12,10 +12,12 @@ const { aiConfig } = require('./ai/aiConfig');
 const { createAIProvider } = require('./ai/aiProvider');
 const {
   extractCleanTextFromMemory,
+  hashContent,
   processMemoryForAI,
   processMemoryIds,
   processUnprocessedMemoriesForUser,
   processRecentImportedMemories,
+  retryFailedMemoriesForUser,
 } = require('./ai/processMemory');
 const { answerQuestionFromMemories, traceQuestionRetrieval } = require('./ai/queryMemories');
 const {
@@ -70,7 +72,6 @@ dotenv.config();
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
-const isProduction = process.env.NODE_ENV === 'production';
 const JWT_SECRET = jwtSecret();
 const store = createStore();
 
@@ -224,6 +225,15 @@ const PROCESS_MEMORY_AI_SCHEMA = z.object({
 const PROCESS_MEMORIES_BATCH_SCHEMA = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
   forceReprocess: z.boolean().optional().default(false),
+});
+
+// Hard cap on retries per memory (cost safety). The client may request a
+// smaller value but can never raise it above this ceiling.
+const RETRY_FAILED_MAX_RETRIES_CAP = 3;
+
+const RETRY_FAILED_MEMORIES_SCHEMA = z.object({
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+  maxRetries: z.coerce.number().int().min(0).optional(),
 });
 
 const BACKFILL_SCHEMA = z.object({
@@ -1190,6 +1200,11 @@ async function syncXBookmarksForUser(userId, options = {}) {
         .filter((source) => source.importSource === 'x_bookmark' || source.id?.startsWith?.('x_bookmark_'))
         .map((source) => String(source.externalId || String(source.id || '').replace(/^x_bookmark_/, ''))),
     );
+    // Second line of defense: dedup by rawPayloadHash across ALL of the user's
+    // existing sources (not just those recognized as x_bookmark imports). This
+    // catches bookmarks that would otherwise be double-imported if the external-ID
+    // bookkeeping above ever falls out of sync (e.g. importSource/externalId drift).
+    const existingPayloadHashes = new Set(existingSources.map((s) => s.rawPayloadHash).filter(Boolean));
 
     const sources = await mapXBookmarkPayloadToSources(payload);
     const imported = [];
@@ -1201,7 +1216,11 @@ async function syncXBookmarksForUser(userId, options = {}) {
     for (const source of sources) {
       const sourceId = String(source.externalId);
       try {
-        if (existingBookmarkIds.has(sourceId) || await nativeMemoryExists(userId, source.externalId)) {
+        if (
+          existingBookmarkIds.has(sourceId)
+          || (source.rawPayloadHash && existingPayloadHashes.has(source.rawPayloadHash))
+          || await nativeMemoryExists(userId, source.externalId)
+        ) {
           duplicates.push(sourceId);
           await writeNativeMemoryFromSource(userId, source);
           continue;
@@ -1210,6 +1229,7 @@ async function syncXBookmarksForUser(userId, options = {}) {
         await store.addSource(userId, source);
         await writeNativeMemoryFromSource(userId, source);
         existingBookmarkIds.add(sourceId);
+        if (source.rawPayloadHash) existingPayloadHashes.add(source.rawPayloadHash);
         imported.push(source);
         importedMemoryIds.push(source.id);
       } catch (error) {
@@ -1569,10 +1589,56 @@ function issueToken(user) {
 
 function jwtSecret() {
   const value = process.env.JWT_SECRET;
-  if (isProduction && (!value || value === 'dev-secret-change-me')) {
-    throw new Error('JWT_SECRET must be set to a strong Render environment variable in production.');
+  if (!value || value === 'dev-secret-change-me') {
+    throw new Error('JWT_SECRET must be set to a strong secret in every environment (unset or the placeholder "dev-secret-change-me" is not allowed).');
   }
-  return value || 'dev-secret-change-me';
+  return value;
+}
+
+// Constant-time string comparison. Guards against length mismatch first (a
+// length difference is not itself secret and timingSafeEqual throws on unequal
+// buffer lengths), then compares equal-length buffers in constant time.
+function timingSafeEqualStrings(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
+}
+
+const REVENUECAT_DOWNGRADE_TYPES = new Set([
+  'CANCELLATION',
+  'EXPIRATION',
+  'SUBSCRIPTION_PAUSED',
+  'BILLING_ISSUE',
+]);
+
+const REVENUECAT_UPGRADE_TYPES = new Set([
+  'INITIAL_PURCHASE',
+  'RENEWAL',
+  'PRODUCT_CHANGE',
+  'UNCANCELLATION',
+  'NON_RENEWING_PURCHASE',
+]);
+
+// Maps a RevenueCat webhook event to a product tier.
+// Returns 'free' | 'brain' | 'pro' for handled types, or null for TEST /
+// unknown types (caller should acknowledge without a state change).
+function tierFromRevenueCatEvent(event = {}) {
+  const type = String(event.type || '').toUpperCase();
+
+  if (REVENUECAT_DOWNGRADE_TYPES.has(type)) return 'free';
+
+  if (REVENUECAT_UPGRADE_TYPES.has(type)) {
+    const productId = String(event.product_id || '').toLowerCase();
+    if (productId.includes('pro')) return 'pro';
+    if (productId.includes('brain')) return 'brain';
+    // Unrecognized product on a paid event: default to the base paid tier.
+    return 'brain';
+  }
+
+  // TEST and any unknown/unhandled event type.
+  return null;
 }
 
 function parseBody(schema, req, res) {
@@ -1627,6 +1693,34 @@ async function requireAdmin(req, res, next) {
   } catch {
     return res.status(403).json({ error: 'Admin access required' });
   }
+}
+
+// Rank map for tier gating. Higher rank == more access. early_access is treated
+// as >= brain so existing privileged users are never locked out; admin outranks
+// everything. Used only for genuinely premium-exclusive endpoints (e.g. on-demand
+// Daily Brief generation) — NOT for endpoints that free users can legitimately use
+// under a daily quota (AI processing/query), which stay gated only by `auth`.
+const TIER_RANK = {
+  free: 0,
+  early_access: 1,
+  brain: 1,
+  pro: 2,
+  admin: 3,
+};
+
+function requireTier(minTier) {
+  const requiredRank = TIER_RANK[minTier] ?? 0;
+  return async function requireTierMiddleware(req, res, next) {
+    try {
+      const user = await store.getUserById?.(req.userId);
+      const tier = getUserAIUsageTier(user || req.firebaseUser || {});
+      const userRank = TIER_RANK[tier] ?? 0;
+      if (userRank >= requiredRank) return next();
+    } catch {
+      // Fall through to the 403 below on any lookup error.
+    }
+    return res.status(403).json({ error: `This feature requires a Nomi ${minTier} subscription.` });
+  };
 }
 
 function requireDebugAccess(_req, res, next) {
@@ -1900,6 +1994,54 @@ app.patch('/api/auth/tier', auth, async (req, res) => {
   if (!user) return res.status(404).json({ error: 'User not found' });
   await store.upsertUser({ ...user, tier: data.tier });
   return res.json({ ok: true });
+});
+
+// RevenueCat subscription webhook. NOT auth-protected: RevenueCat is not a
+// logged-in user. Instead RevenueCat is configured (in its dashboard) to send a
+// static Authorization header, which we compare against REVENUECAT_WEBHOOK_SECRET
+// using a timing-safe comparison. The endpoint fails safe (503) until the secret
+// is configured, so a misconfigured deploy cannot accept unsigned events.
+app.post('/api/webhooks/revenuecat', async (req, res) => {
+  const secret = process.env.REVENUECAT_WEBHOOK_SECRET;
+  if (!secret) {
+    return res.status(503).json({ error: 'RevenueCat webhook not configured' });
+  }
+
+  const provided = req.get('authorization') || '';
+  if (!timingSafeEqualStrings(provided, secret)) {
+    return res.status(401).json({ error: 'Invalid webhook signature' });
+  }
+
+  try {
+    const event = (req.body && req.body.event) || {};
+    const eventType = String(event.type || '').toUpperCase();
+
+    const tier = tierFromRevenueCatEvent(event);
+    if (tier === null) {
+      // TEST events and unknown/unhandled types: acknowledge with 200 so
+      // RevenueCat stops retrying, but make no state change.
+      return res.status(200).json({ ok: true, ignored: true });
+    }
+
+    const appUserId = event.app_user_id;
+    const result = await store.applyRevenueCatTier(appUserId, {
+      tier,
+      eventId: event.id,
+      eventType,
+    });
+
+    if (!result.updated) {
+      // Unknown app_user_id. Still 200 so RevenueCat does not retry forever.
+      console.warn(`[revenuecat] no user for app_user_id=${appUserId} (type=${eventType}, reason=${result.reason})`);
+      return res.status(200).json({ ok: true, updated: false, tier });
+    }
+
+    console.log(`[revenuecat] applied tier=${tier} to user=${appUserId} (type=${eventType})`);
+    return res.status(200).json({ ok: true, updated: true, tier });
+  } catch (error) {
+    console.error(`[revenuecat] webhook error: ${error.message}`);
+    return res.status(500).json({ error: 'RevenueCat webhook processing failed' });
+  }
 });
 
 app.get('/api/auth/me', auth, async (req, res) => {
@@ -2492,6 +2634,28 @@ app.post('/api/ingest', auth, async (req, res) => {
   } catch {
     // Keep save path resilient even if metadata generation fails.
   }
+  const trimmedRawText = String(rawText || '').trim();
+  const contentHash = trimmedRawText ? hashContent(trimmedRawText) : '';
+  if (contentHash) {
+    // Dedup is a best-effort safeguard: a lookup failure must never block a
+    // capture, so fail open (treat as not-a-duplicate) on any store error.
+    const duplicate = await store
+      .findSourceByContentHash(req.userId, contentHash)
+      .catch((error) => {
+        console.warn(`[ingest] dedup lookup failed user=${req.userId}: ${error.message}`);
+        return null;
+      });
+    if (duplicate) {
+      return res.json({
+        success: true,
+        duplicate: true,
+        source_id: String(duplicate.id),
+        title: String(duplicate.title || title),
+        message: 'Duplicate content; existing memory returned',
+      });
+    }
+  }
+
   const source = {
     ...newSource(String(tiktok?.title || title), data.type || (tiktok ? 'tiktok_video' : (data.url ? 'url' : 'note'))),
     body: String(rawText || ''),
@@ -2514,6 +2678,9 @@ app.post('/api/ingest', auth, async (req, res) => {
     playerUrl: tiktok?.playerUrl,
     transcriptStatus: tiktok?.transcriptStatus,
   };
+  if (contentHash) {
+    source.contentHash = contentHash;
+  }
   await store.addSource(req.userId, source);
   await writeNativeMemoryDocumentFromSource(req.userId, source);
   let aiProcessing;
@@ -2522,6 +2689,7 @@ app.post('/api/ingest', auth, async (req, res) => {
   }
   return res.json({
     success: true,
+    duplicate: false,
     source_id: source.id,
     title: String(title),
     message: 'Source queued for processing',
@@ -2708,6 +2876,34 @@ app.post('/api/memories/process-recent', auth, async (req, res) => {
   }
 });
 
+app.post('/api/memories/retry-failed', auth, async (req, res) => {
+  const data = parseBody(RETRY_FAILED_MEMORIES_SCHEMA, req, res);
+  if (!data) return;
+  // Clamp the client-supplied maxRetries to the hard cap so a caller can never
+  // bypass the cost ceiling (e.g. maxRetries: 99 -> 3).
+  const maxRetries = Math.min(
+    RETRY_FAILED_MAX_RETRIES_CAP,
+    Number.isFinite(Number(data.maxRetries)) ? Number(data.maxRetries) : RETRY_FAILED_MAX_RETRIES_CAP,
+  );
+  try {
+    const result = await retryFailedMemoriesForUser(req.userId, { ...data, maxRetries, store });
+    return res.status(result.limitReached && result.processedCount === 0 ? 429 : 200).json(
+      result.limitReached && result.processedCount === 0
+        ? { ...limitReachedPayload(await getAIProcessingLimitForUser(req.userId, { store })), ...result }
+        : result,
+    );
+  } catch (error) {
+    return res.status(503).json({
+      processedCount: 0,
+      skippedCount: 0,
+      failedCount: 1,
+      retriedCount: 0,
+      cappedCount: 0,
+      errors: [error.message || 'AI retry processing is not available.'],
+    });
+  }
+});
+
 app.post('/api/memories/:id/process-ai', auth, async (req, res) => {
   const data = parseBody(PROCESS_MEMORY_AI_SCHEMA, req, res);
   if (!data) return;
@@ -2780,7 +2976,21 @@ app.patch('/api/memories/:id', auth, async (req, res) => {
   const updated = await store.updateSource(req.userId, req.params.id, data);
   if (!updated) return res.status(404).json({ error: 'Memory not found' });
   if (admin.apps.length) {
+    // Firestore mode: writeNativeMemoryDocumentFromSource already re-indexes
+    // retrieval chunks (via indexMemoryForRetrieval) and recomputes edges.
     await writeNativeMemoryDocumentFromSource(req.userId, updated).catch((error) => {
+      console.warn(`[memory-index] patch reindex failed user=${req.userId} memory=${req.params.id}: ${error.message}`);
+    });
+  } else {
+    // Injected-store mode (dev/test): writeNativeMemoryDocumentFromSource is a
+    // no-op, so re-index explicitly against the store to avoid serving stale
+    // embeddings after an edit. Fire-and-forget to match the async pattern
+    // above; a brief staleness window is acceptable and far better than never
+    // re-indexing.
+    indexMemoryForRetrieval(req.userId, req.params.id, {
+      store,
+      memory: { id: String(updated.id), ...updated },
+    }).catch((error) => {
       console.warn(`[memory-index] patch reindex failed user=${req.userId} memory=${req.params.id}: ${error.message}`);
     });
   }
@@ -2846,7 +3056,7 @@ app.get('/api/daily-briefs/today', auth, async (req, res) => {
   }
 });
 
-app.post('/api/daily-briefs/generate-today', auth, async (req, res) => {
+app.post('/api/daily-briefs/generate-today', auth, requireTier('brain'), async (req, res) => {
   const data = parseBody(DAILY_BRIEF_QUERY_SCHEMA, req, res);
   if (!data) return;
   const dateKey = data.dateKey || dateKeyFor(new Date(), data.timezone);
@@ -2858,7 +3068,7 @@ app.post('/api/daily-briefs/generate-today', auth, async (req, res) => {
   }
 });
 
-app.post('/api/daily-briefs/generate-for-date', auth, async (req, res) => {
+app.post('/api/daily-briefs/generate-for-date', auth, requireTier('brain'), async (req, res) => {
   const data = parseBody(DAILY_BRIEF_QUERY_SCHEMA.extend({
     dateKey: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   }), req, res);
@@ -2890,7 +3100,7 @@ app.get('/api/daily-briefs/:dateKey', auth, async (req, res) => {
   }
 });
 
-app.post('/api/daily-briefs/:dateKey/generate', auth, async (req, res) => {
+app.post('/api/daily-briefs/:dateKey/generate', auth, requireTier('brain'), async (req, res) => {
   const data = parseBody(DAILY_BRIEF_QUERY_SCHEMA, req, res);
   if (!data) return;
   try {

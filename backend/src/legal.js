@@ -80,6 +80,7 @@ function privacyPolicyPage() {
 
     <h2>Services We Use</h2>
     <p>Nomi Recall uses Firebase for authentication, Firestore database records, and Storage files. RevenueCat is used for subscription and entitlement management. The Nomi backend may process links or public X post URLs you submit so the app can fetch post text, author, date, links, and media metadata where available.</p>
+    <p>Nomi Recall uses OpenAI to help process the memories you save. When a memory is processed, its title, cleaned text content, source URL, author, and capture date are sent to OpenAI to generate a summary, category, tags, concepts, entities, and related insights, to create embeddings that power search and recall, and to answer questions you ask about your saved memories. Only the account owner's own memory data is sent for that account's processing. OpenAI processes this content under its own data retention and usage policies, which are separate from this Privacy Policy.</p>
 
     <h2>X Import and Backend Processing</h2>
     <p>When you import or discover X posts, the URL and related request data may be sent to the Nomi backend. The backend may call the X API and store returned public post details in your account if you save the memory. Nomi does not control X, YouTube, Reddit, Safari, Obsidian, Apple, Google Play, Firebase, or RevenueCat privacy practices.</p>

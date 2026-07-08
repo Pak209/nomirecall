@@ -390,12 +390,62 @@ async function processRecentImportedMemories(userId, options = {}) {
   return processMemoryIds(userId, ids, options);
 }
 
+async function retryFailedMemoriesForUser(userId, options = {}) {
+  const config = aiConfig();
+  // Hard cap on how many times any single memory may be retried (cost safety).
+  const maxRetries = Number.isFinite(Number(options.maxRetries)) ? Number(options.maxRetries) : 3;
+
+  const limitInfo = await canProcessAIMemory(userId, 1, options);
+  if (!limitInfo.allowed) {
+    return {
+      status: 'limit_reached',
+      processedCount: 0,
+      skippedCount: 0,
+      failedCount: 0,
+      limitReached: true,
+      retriedCount: 0,
+      cappedCount: 0,
+      errors: ['AI_DAILY_LIMIT_REACHED'],
+      usage: usageMetadata(limitInfo, limitInfo),
+    };
+  }
+
+  const requestedLimit = Math.max(1, Math.min(100, Number(options.limit || config.defaultBatchLimit)));
+  const limit = config.disableLimits ? requestedLimit : Math.min(requestedLimit, limitInfo.remaining);
+  const snapshot = await memoriesCollection(userId)
+    .orderBy('createdAt', 'desc')
+    .limit(limit)
+    .get();
+
+  const failedDocs = snapshot.docs
+    .map((doc) => ({ id: doc.id, memory: doc.data() }))
+    .filter(({ memory }) => memory.ai?.processingStatus === 'failed');
+
+  // Cap enforcement: only retry failed memories still under the retry ceiling.
+  const selectedIds = failedDocs
+    .filter(({ memory }) => Number(memory.ai?.retryCount || 0) < maxRetries)
+    .map(({ id }) => id);
+  const cappedCount = failedDocs
+    .filter(({ memory }) => Number(memory.ai?.retryCount || 0) >= maxRetries)
+    .length;
+
+  const summary = await processMemoryIds(userId, selectedIds, { ...options, forceReprocess: true });
+
+  return {
+    ...summary,
+    retriedCount: selectedIds.length,
+    cappedCount,
+  };
+}
+
 module.exports = {
   batchStatus,
   extractCleanTextFromMemory,
+  hashContent,
   markMemoryAIProcessingStatus,
   processMemoryForAI,
   processMemoryIds,
   processUnprocessedMemoriesForUser,
   processRecentImportedMemories,
+  retryFailedMemoriesForUser,
 };

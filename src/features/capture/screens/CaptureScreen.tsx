@@ -442,15 +442,13 @@ export default function CaptureScreen() {
 
         {mode === 'voice' ? (
           <View style={styles.textareaWrap}>
-            <TextInput
-              style={styles.textarea}
-              placeholder="Record-to-text is next; add the voice thought transcript here for now..."
-              placeholderTextColor="#B9B4B7"
-              value={draft}
-              onChangeText={setDraft}
-              multiline
-              textAlignVertical="top"
-            />
+            <View style={styles.picker}>
+              <Ionicons name="mic-off" size={30} color="#B9B4B7" />
+              <Text style={styles.pickerTitle}>Voice capture is coming soon</Text>
+              <Text style={styles.pickerSub}>
+                Recording isn't available yet. Use Note to type a memory in the meantime.
+              </Text>
+            </View>
           </View>
         ) : null}
 

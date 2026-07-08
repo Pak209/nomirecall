@@ -6,8 +6,10 @@ process.env.FIREBASE_PROJECT_ID = '';
 process.env.FIREBASE_SERVICE_ACCOUNT_PATH = '';
 process.env.FIREBASE_SERVICE_ACCOUNT_JSON = '';
 process.env.NODE_ENV = 'test';
+process.env.JWT_SECRET ||= 'test-jwt-secret-not-for-production';
 
 const { app, _store: store } = require('../src/server');
+const { isDebugEnabled } = require('../src/debugInspect');
 
 async function signup(prefix) {
   const response = await request(app)
@@ -207,4 +209,129 @@ test('memory edges and topic pages debug endpoints are user-scoped', async () =>
 
   if (previous === undefined) delete process.env.ENABLE_NOMI_DEBUG;
   else process.env.ENABLE_NOMI_DEBUG = previous;
+});
+
+test('user A cannot fetch user B data through debug routes even with debug enabled', async () => {
+  const previous = process.env.ENABLE_NOMI_DEBUG;
+  process.env.ENABLE_NOMI_DEBUG = 'true';
+
+  const userA = await signup('debug.boundary.a');
+  const userB = await signup('debug.boundary.b');
+
+  // User B owns a memory with chunks, an edge, and a topic page.
+  const bMemoryOne = await ingest(userB.auth, {
+    title: 'B private research',
+    rawText: 'User B private saved memory about semiconductor supply chains and pricing.',
+    tags: ['secret'],
+  });
+  const bMemoryTwo = await ingest(userB.auth, {
+    title: 'B second note',
+    rawText: 'Another private note by user B about pricing power and moats.',
+    tags: ['secret'],
+  });
+
+  await store.upsertChunks(userB.userId, bMemoryOne, [{
+    memoryId: bMemoryOne,
+    chunkId: 'b-chunk-1',
+    chunkIndex: 0,
+    chunkText: 'User B private saved memory about semiconductor supply chains and pricing.',
+    contentHash: 'b-hash-1',
+    embeddingStatus: 'complete',
+    embeddingModel: 'mock-embedding',
+    embeddedAt: '2026-05-20T00:00:00.000Z',
+    retryCount: 0,
+  }]);
+
+  await store.upsertMemoryEdges(userB.userId, [{
+    edgeId: `${bMemoryOne}__${bMemoryTwo}`,
+    fromMemoryId: bMemoryOne,
+    toMemoryId: bMemoryTwo,
+    score: 0.9,
+    confidence: 'high',
+    reasonTypes: ['shared_tags'],
+    reasons: ['Shared tags: secret'],
+    sharedTags: ['secret'],
+    sharedConcepts: [],
+    sharedEntities: [],
+    sharedProjects: [],
+    semanticSimilarity: 0.9,
+    evidence: ['User B private...', 'Another private note...'],
+    lastRecomputedAt: '2026-05-20T00:00:00.000Z',
+  }]);
+
+  await store.upsertTopicPages(userB.userId, [{
+    topicPageId: 'b-topic-secret',
+    title: 'B Secret Topic',
+    slug: 'b-secret',
+    summary: 'User B only grounded summary.',
+    keyIdeas: ['Do not leak this.'],
+    relatedMemoryIds: [bMemoryOne, bMemoryTwo],
+    relatedEdgeIds: [`${bMemoryOne}__${bMemoryTwo}`],
+    concepts: ['Semiconductors'],
+    entities: [],
+    projects: [],
+    sourceCount: 2,
+    synthesisStatus: 'complete',
+    lastSynthesizedAt: '2026-05-20T00:00:00.000Z',
+    retryCount: 0,
+  }]);
+
+  // User A, authenticated with their own token, targets user B's ids directly.
+  const aChunks = await request(app)
+    .get(`/api/debug/memories/${bMemoryOne}/chunks`)
+    .set(userA.auth);
+  assert.equal(aChunks.status, 200);
+  assert.deepEqual(aChunks.body.chunks, [], 'must not leak user B chunks');
+
+  const aEdges = await request(app)
+    .get(`/api/debug/memories/${bMemoryOne}/edges`)
+    .set(userA.auth);
+  assert.equal(aEdges.status, 200);
+  assert.deepEqual(aEdges.body.edges, [], 'must not leak user B edges');
+
+  const aTopics = await request(app)
+    .get('/api/debug/topic-pages')
+    .set(userA.auth);
+  assert.equal(aTopics.status, 200);
+  assert.deepEqual(aTopics.body.topicPages, [], 'must not leak user B topic list');
+
+  // Fetching user B's topic page by id from user A returns not-found (no existence leak).
+  const aTopic = await request(app)
+    .get('/api/debug/topic-pages/b-topic-secret')
+    .set(userA.auth);
+  assert.equal(aTopic.status, 404);
+
+  // Sanity: user B still sees their own data, so the boundary is not just "everything empty".
+  const bChunks = await request(app)
+    .get(`/api/debug/memories/${bMemoryOne}/chunks`)
+    .set(userB.auth);
+  assert.equal(bChunks.status, 200);
+  assert.equal(bChunks.body.chunks.length, 1);
+
+  const bTopic = await request(app)
+    .get('/api/debug/topic-pages/b-topic-secret')
+    .set(userB.auth);
+  assert.equal(bTopic.status, 200);
+  assert.equal(bTopic.body.topicPage.topicPageId, 'b-topic-secret');
+
+  if (previous === undefined) delete process.env.ENABLE_NOMI_DEBUG;
+  else process.env.ENABLE_NOMI_DEBUG = previous;
+});
+
+test('isDebugEnabled() is false in production even when ENABLE_NOMI_DEBUG is true', () => {
+  const previousNodeEnv = process.env.NODE_ENV;
+  const previousDebug = process.env.ENABLE_NOMI_DEBUG;
+
+  process.env.NODE_ENV = 'production';
+  process.env.ENABLE_NOMI_DEBUG = 'true';
+  assert.equal(isDebugEnabled(), false, 'debug must be off in production regardless of the flag');
+
+  process.env.NODE_ENV = 'test';
+  process.env.ENABLE_NOMI_DEBUG = 'true';
+  assert.equal(isDebugEnabled(), true, 'debug still works outside production when flag is true');
+
+  if (previousNodeEnv === undefined) delete process.env.NODE_ENV;
+  else process.env.NODE_ENV = previousNodeEnv;
+  if (previousDebug === undefined) delete process.env.ENABLE_NOMI_DEBUG;
+  else process.env.ENABLE_NOMI_DEBUG = previousDebug;
 });

@@ -12,10 +12,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Colors, Typography, Spacing, Radius, INTERESTS } from '../constants/theme';
 import { useStore } from '../store/useStore';
-import { InterestTag, MemoryItem, RootStackParamList } from '../types';
+import { InterestTag, RootStackParamList } from '../types';
 import { API_BASE, AuthAPI, MemoryAPI, XBookmarkAPI } from '../services/api';
 import { deleteCurrentAccount, updateCurrentUserProfile } from '../services/auth';
 import { restorePurchases } from '../services/payments';
+import { exportMarkdown } from './settingsExport';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -41,19 +42,20 @@ function supportUrl() {
   return env.EXPO_PUBLIC_SUPPORT_URL || 'mailto:support@nomirecall.app?subject=Nomi%20Recall%20Support';
 }
 
-function SettingsRow({ label, value, onPress, danger, right }: {
+function SettingsRow({ label, value, onPress, danger, right, disabled }: {
   label: string;
   value?: string;
   onPress?: () => void;
   danger?: boolean;
   right?: React.ReactNode;
+  disabled?: boolean;
 }) {
   const dark = useStore((state) => state.theme === 'dark');
   return (
     <TouchableOpacity
-      style={[styles.row, dark && styles.rowDark]}
+      style={[styles.row, dark && styles.rowDark, disabled && styles.rowDisabled]}
       onPress={onPress}
-      disabled={!onPress && !right}
+      disabled={disabled || (!onPress && !right)}
       activeOpacity={0.7}
     >
       <Text style={[styles.rowLabel, dark && styles.rowLabelDark, danger && styles.rowLabelDanger]}>{label}</Text>
@@ -68,43 +70,6 @@ function SettingsRow({ label, value, onPress, danger, right }: {
 function SectionHeader({ title }: { title: string }) {
   const dark = useStore((state) => state.theme === 'dark');
   return <Text style={[styles.sectionHeader, dark && styles.sectionHeaderDark]}>{title}</Text>;
-}
-
-function markdownValue(value?: string) {
-  return String(value || '').replace(/"/g, '\\"');
-}
-
-function memoryToMarkdown(memory: MemoryItem) {
-  const body = memory.body || '';
-  const tags = memory.tags?.length ? memory.tags.map((tag) => `#${tag.replace(/^#/, '')}`).join(' ') : '';
-  return [
-    '---',
-    `title: "${markdownValue(memory.title)}"`,
-    `type: "${markdownValue(memory.source_type)}"`,
-    `category: "${markdownValue(memory.category || 'General')}"`,
-    memory.source_url ? `source: "${markdownValue(memory.source_url)}"` : '',
-    memory.authorUsername ? `author: "@${markdownValue(memory.authorUsername)}"` : '',
-    memory.postDate ? `postDate: "${markdownValue(memory.postDate)}"` : '',
-    '---',
-    '',
-    `# ${memory.title || 'Untitled memory'}`,
-    '',
-    body || '_No body saved._',
-    '',
-    tags,
-  ].filter(Boolean).join('\n');
-}
-
-function exportMarkdown(memories: MemoryItem[]) {
-  const exportedAt = new Date().toISOString();
-  return [
-    '# Nomi Obsidian Export',
-    '',
-    `Exported: ${exportedAt}`,
-    `Memories: ${memories.length}`,
-    '',
-    memories.map(memoryToMarkdown).join('\n\n---\n\n'),
-  ].join('\n');
 }
 
 export default function SettingsScreen() {
@@ -436,8 +401,12 @@ export default function SettingsScreen() {
           <SettingsRow
             label="Obsidian Markdown"
             onPress={() => exportMutation.mutate()}
+            disabled={!serverOnline || exportMutation.isLoading}
             right={exportMutation.isLoading ? <ActivityIndicator color={Colors.teal} /> : undefined}
           />
+          {!serverOnline && (
+            <Text style={[styles.xHelpText, dark && styles.xHelpTextDark]}>You're offline. Reconnect to export your memories.</Text>
+          )}
         </View>
 
         <Text style={styles.versionText}>Nomi v1.0.0</Text>
@@ -488,10 +457,14 @@ export default function SettingsScreen() {
                 right={deleteAccountMutation.isLoading ? <ActivityIndicator color={Colors.red} /> : undefined}
               />
             </View>
-            <SectionHeader title="Developer Debug" />
-            <View style={[styles.section, dark && styles.sectionDark]}>
-              <SettingsRow label="Connection" value={serverOnline ? 'online' : 'offline'} />
-            </View>
+            {__DEV__ && (
+              <>
+                <SectionHeader title="Developer Debug" />
+                <View style={[styles.section, dark && styles.sectionDark]}>
+                  <SettingsRow label="Connection" value={serverOnline ? 'online' : 'offline'} />
+                </View>
+              </>
+            )}
           </View>
         </View>
       </Modal>
@@ -702,6 +675,9 @@ const styles = StyleSheet.create({
   },
   rowDark: {
     borderBottomColor: '#342D39',
+  },
+  rowDisabled: {
+    opacity: 0.5,
   },
   rowLabel: { flex: 1, fontSize: Typography.sm, color: Colors.textPrimary },
   rowLabelDark: { color: '#F5EFFB' },

@@ -8,10 +8,13 @@ import * as SplashScreen from 'expo-splash-screen';
 import RootNavigator from './src/navigation';
 import { queryClient } from './src/lib/queryClient';
 import { ToastProvider } from './src/features/ui/shared/ToastProvider';
+import { useStore } from './src/store/useStore';
 
 SplashScreen.preventAutoHideAsync();
 
 export default function App() {
+  const { theme } = useStore();
+
   // Hide splash once fonts/assets are ready
   useEffect(() => {
     // Add any async asset loading here
@@ -24,7 +27,7 @@ export default function App() {
       <QueryClientProvider client={queryClient}>
         <ToastProvider>
           <SafeAreaProvider>
-            <StatusBar style="dark" />
+            <StatusBar style={theme === 'dark' ? 'light' : 'dark'} />
             <RootNavigator />
           </SafeAreaProvider>
         </ToastProvider>
