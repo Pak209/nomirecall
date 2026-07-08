@@ -49,7 +49,9 @@ test('valid webhook: INITIAL_PURCHASE of brain_pro_monthly upgrades user to pro'
         type: 'INITIAL_PURCHASE',
         app_user_id: user.userId,
         product_id: 'brain_pro_monthly',
-        entitlement_ids: ['brain'],
+        // Matches the real RN/Android catalog: brain_pro_monthly grants the
+        // 'pro' entitlement (a 'brain' entitlement here would be contradictory).
+        entitlement_ids: ['pro'],
       },
     });
 
@@ -58,6 +60,97 @@ test('valid webhook: INITIAL_PURCHASE of brain_pro_monthly upgrades user to pro'
   assert.equal(res.body.updated, true);
   assert.equal(res.body.tier, 'pro');
 
+  assert.equal(await tierFor(user.token), 'pro');
+});
+
+// REGRESSION (found in the 2026-07-08 sandbox replay): the iOS App Store
+// products are literally "monthly"/"yearly"/"lifetime" — no tier signal in
+// product_id. The "Nomi Pro" ENTITLEMENT is the only tier signal, and it must
+// map to 'pro', not fall through to the base-paid default of 'brain'.
+test('iOS "Nomi Pro" entitlement with tierless product_id maps to pro', async () => {
+  const user = await createUser();
+  assert.equal(await tierFor(user.token), 'free');
+
+  const res = await request(app)
+    .post('/api/webhooks/revenuecat')
+    .set('Authorization', WEBHOOK_SECRET)
+    .send({
+      event: {
+        id: 'evt_ios_nomi_pro_1',
+        type: 'INITIAL_PURCHASE',
+        app_user_id: user.userId,
+        product_id: 'Monthly',
+        entitlement_ids: ['Nomi Pro'],
+      },
+    });
+
+  assert.equal(res.status, 200);
+  assert.equal(res.body.tier, 'pro');
+  assert.equal(await tierFor(user.token), 'pro');
+});
+
+test('entitlement_ids take precedence over a conflicting product_id', async () => {
+  const user = await createUser();
+
+  const res = await request(app)
+    .post('/api/webhooks/revenuecat')
+    .set('Authorization', WEBHOOK_SECRET)
+    .send({
+      event: {
+        id: 'evt_entitlement_precedence_1',
+        type: 'INITIAL_PURCHASE',
+        app_user_id: user.userId,
+        // product_id says pro, but the granted entitlement is brain — the
+        // entitlement is RevenueCat's source of truth for what was unlocked.
+        product_id: 'brain_pro_monthly',
+        entitlement_ids: ['brain'],
+      },
+    });
+
+  assert.equal(res.status, 200);
+  assert.equal(res.body.tier, 'brain');
+  assert.equal(await tierFor(user.token), 'brain');
+});
+
+test('product_id fallback still maps tiers when entitlements are absent', async () => {
+  const user = await createUser();
+
+  const res = await request(app)
+    .post('/api/webhooks/revenuecat')
+    .set('Authorization', WEBHOOK_SECRET)
+    .send({
+      event: {
+        id: 'evt_product_fallback_1',
+        type: 'INITIAL_PURCHASE',
+        app_user_id: user.userId,
+        product_id: 'brain_monthly',
+        entitlement_ids: [],
+      },
+    });
+
+  assert.equal(res.status, 200);
+  assert.equal(res.body.tier, 'brain');
+  assert.equal(await tierFor(user.token), 'brain');
+});
+
+test('legacy single entitlement_id field is honored', async () => {
+  const user = await createUser();
+
+  const res = await request(app)
+    .post('/api/webhooks/revenuecat')
+    .set('Authorization', WEBHOOK_SECRET)
+    .send({
+      event: {
+        id: 'evt_legacy_entitlement_1',
+        type: 'RENEWAL',
+        app_user_id: user.userId,
+        product_id: 'yearly',
+        entitlement_id: 'Nomi Pro',
+      },
+    });
+
+  assert.equal(res.status, 200);
+  assert.equal(res.body.tier, 'pro');
   assert.equal(await tierFor(user.token), 'pro');
 });
 
