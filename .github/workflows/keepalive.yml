@@ -1,0 +1,33 @@
+name: Render keep-alive
+
+# Stopgap to prevent Render free-tier spin-down (~15 min idle) so users don't
+# hit the "Nomi is waking up the backend" cold start. Remove this workflow when
+# the service moves to an always-on paid instance.
+#
+# Notes:
+# - GitHub cron schedules are best-effort and can be delayed under load, so an
+#   occasional cold start can still slip through. The app's waking/offline copy
+#   remains the graceful fallback.
+# - Keeping the service warm 24/7 uses ~730 instance-hours/month, just inside
+#   Render's free 750 h — do not add a second always-on free service.
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Ping backend health endpoint
+        run: |
+          # Allow up to ~75s so a ping that lands on an already-cold instance
+          # still warms it rather than failing fast.
+          for attempt in 1 2; do
+            status=$(curl -sS -o /dev/null -w "%{http_code}" -m 75 https://nomirecall.onrender.com/api/health) && break || status="000"
+            sleep 10
+          done
+          echo "health status: $status"
+          test "$status" = "200"
