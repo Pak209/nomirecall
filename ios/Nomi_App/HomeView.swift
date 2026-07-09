@@ -947,7 +947,16 @@ private struct NomiHomeSideDrawer: View {
                         .transition(.opacity)
                 }
 
-                drawerContent
+                // On shorter screens the fixed menu stack overflows and the
+                // bottom items (Help, sign out) become unreachable. Keep the
+                // pinned layout when it fits; fall back to scrolling when it
+                // doesn't.
+                ViewThatFits(in: .vertical) {
+                    drawerContent
+                    ScrollView(showsIndicators: false) {
+                        drawerContent
+                    }
+                }
                     .frame(width: drawerWidth)
                     .frame(maxHeight: .infinity)
                     .background(drawerSurface)
