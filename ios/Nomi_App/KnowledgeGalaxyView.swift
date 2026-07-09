@@ -25,6 +25,7 @@ struct KnowledgeGalaxyView: View {
     @State private var selectedFilter: GalaxyFilter = .all
     @State private var selectedNode: GalaxyNode?
     @State private var navigateToMemory: NomiMemory?
+    @State private var openedCategory: GalaxyNode?
     @State private var canvasScale: CGFloat = 1
     @State private var canvasOffset: CGSize = .zero
     @State private var recenterToken = UUID()
@@ -54,6 +55,9 @@ struct KnowledgeGalaxyView: View {
                         focusedNodeID: focusedNodeID,
                         onCategorySwipe: { step in
                             focusCategory(step: step, graph: graph)
+                        },
+                        onCategoryOpen: { node in
+                            openedCategory = node
                         }
                     )
                     .id(recenterToken)
@@ -63,11 +67,17 @@ struct KnowledgeGalaxyView: View {
                     rightToolbar
 
                     if let selectedNode {
-                        GalaxyNodeDetailCard(node: selectedNode) {
-                            if let memory = selectedNode.memory {
-                                navigateToMemory = memory
+                        GalaxyNodeDetailCard(
+                            node: selectedNode,
+                            openMemory: {
+                                if let memory = selectedNode.memory {
+                                    navigateToMemory = memory
+                                }
+                            },
+                            openCategory: {
+                                openedCategory = selectedNode
                             }
-                        }
+                        )
                         .padding(.horizontal, 18)
                         .padding(.bottom, showsBackButton ? 18 : 104)
                         .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -80,6 +90,9 @@ struct KnowledgeGalaxyView: View {
             .navigationBarHidden(true)
             .navigationDestination(item: $navigateToMemory) { memory in
                 MemoryDetailView(memory: memory)
+            }
+            .navigationDestination(item: $openedCategory) { node in
+                CategoryDetailView(categoryName: node.title)
             }
             .onChange(of: selectedFilter) { _, _ in
                 selectedNode = graph?.filteredNodes(for: selectedFilter).first
@@ -362,6 +375,7 @@ private struct GalaxyNodeDetailCard: View {
 
     let node: GalaxyNode
     let openMemory: () -> Void
+    var openCategory: () -> Void = {}
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -415,6 +429,12 @@ private struct GalaxyNodeDetailCard: View {
             if node.isMemory {
                 Button(action: openMemory) {
                     Label("Open Memory", systemImage: "arrow.up.right.square")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(GalaxyMemoryButtonStyle(tint: node.kind.color))
+            } else if node.isCategory {
+                Button(action: openCategory) {
+                    Label("Explore Category", systemImage: "arrow.up.right.square")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(GalaxyMemoryButtonStyle(tint: node.kind.color))

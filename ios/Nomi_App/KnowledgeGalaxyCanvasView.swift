@@ -10,6 +10,7 @@ struct KnowledgeGalaxyCanvasView: View {
     @Binding var offset: CGSize
     let focusedNodeID: String?
     let onCategorySwipe: (Int) -> Void
+    var onCategoryOpen: (GalaxyNode) -> Void = { _ in }
 
     @State private var steadyScale: CGFloat = 1
     @State private var steadyOffset: CGSize = .zero
@@ -42,8 +43,14 @@ struct KnowledgeGalaxyCanvasView: View {
                     )
                     .position(point)
                     .onTapGesture {
-                        withAnimation(.spring(response: 0.34, dampingFraction: 0.82)) {
-                            selectedNode = node
+                        // Second tap on an already-selected category enters
+                        // its dedicated category screen.
+                        if node.isCategory && selectedNode?.id == node.id {
+                            onCategoryOpen(node)
+                        } else {
+                            withAnimation(.spring(response: 0.34, dampingFraction: 0.82)) {
+                                selectedNode = node
+                            }
                         }
                     }
                 }
