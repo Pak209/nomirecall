@@ -123,3 +123,73 @@ test('empty day still writes a valid "no saves" brief', async () => {
   assert.ok(stored);
   assertNoUndefined(stored);
 });
+
+// REGRESSION (TestFlight bake): opening the brief in the morning cached
+// "No saves today" with status generated, freezing the brief for the whole
+// day even after memories were captured/synced later.
+test('a cached EMPTY brief is regenerated once saves arrive (no force needed)', async () => {
+  const userId = 'user-brief-stale';
+  const dateKey = dateKeyFor(new Date(), 'UTC');
+
+  const first = await generateDailyBriefForUser(userId, dateKey, {});
+  assert.equal(first.savedCount, 0, 'first open of an empty day: no saves');
+
+  // A memory arrives later the same day (e.g. an X bookmark sync).
+  fakeFirestore._docs.set(`users/${userId}/memories/mem-later`, {
+    title: 'Bookmark synced later today',
+    rawText: 'Synced after the empty brief was cached.',
+    createdAt: new Date().toISOString(),
+    capturedAt: new Date().toISOString(),
+  });
+
+  const second = await generateDailyBriefForUser(userId, dateKey, {});
+  assert.equal(second.savedCount, 1, 'cached empty brief must be regenerated, not served');
+  assert.notEqual(second.title, 'No saves today');
+});
+
+// REGRESSION (TestFlight bake): X bookmarks carry the TWEET's original post
+// date as capturedAt, so bookmarking an old tweet today was excluded from
+// today's brief. A memory counts for a day if its content date OR its save
+// date lands on that day.
+test('an old tweet bookmarked today counts toward today brief', async () => {
+  const userId = 'user-brief-bookmark';
+  const dateKey = dateKeyFor(new Date(), 'UTC');
+
+  fakeFirestore._docs.set(`users/${userId}/memories/mem-old-tweet`, {
+    title: 'Old tweet, bookmarked today',
+    rawText: 'Tweet text from months ago.',
+    capturedAt: '2026-03-01T12:00:00.000Z', // tweet's original post date
+    createdAt: new Date().toISOString(),     // synced/saved today
+  });
+
+  const brief = await generateDailyBriefForUser(userId, dateKey, {});
+  assert.equal(brief.savedCount, 1, 'bookmark synced today must count toward today');
+  assert.deepEqual(brief.memoryIds, ['mem-old-tweet']);
+});
+
+test('a cached POPULATED brief is still served from cache (no regeneration cost)', async () => {
+  const userId = 'user-brief-cached';
+  const dateKey = dateKeyFor(new Date(), 'UTC');
+
+  fakeFirestore._docs.set(`users/${userId}/memories/mem-first`, {
+    title: 'First save',
+    rawText: 'Captured before the first brief.',
+    capturedAt: new Date().toISOString(),
+    createdAt: new Date().toISOString(),
+  });
+
+  const first = await generateDailyBriefForUser(userId, dateKey, {});
+  assert.equal(first.savedCount, 1);
+
+  // Another memory arrives; without forceRegenerate the cached populated brief
+  // is returned unchanged (cost control — this is the pre-existing contract).
+  fakeFirestore._docs.set(`users/${userId}/memories/mem-second`, {
+    title: 'Second save',
+    rawText: 'Captured after the brief generated.',
+    capturedAt: new Date().toISOString(),
+    createdAt: new Date().toISOString(),
+  });
+
+  const second = await generateDailyBriefForUser(userId, dateKey, {});
+  assert.equal(second.savedCount, 1, 'populated brief stays cached until forceRegenerate');
+});
