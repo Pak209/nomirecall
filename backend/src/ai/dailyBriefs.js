@@ -71,6 +71,19 @@ function memoryDateKey(memory, timezone) {
   return dateKeyFor(dateFromValue(memory.capturedAt || memory.createdAt) || new Date(), timezone);
 }
 
+// A memory belongs to a day's brief if EITHER its content date (capturedAt —
+// for X bookmarks this is the tweet's original post date) OR its save date
+// (createdAt — when the user actually captured/synced it) falls on that day.
+// Bookmarking an old tweet today must count toward today's brief.
+function memoryMatchesDateKey(memory, timezone, dateKey) {
+  const capturedDate = dateFromValue(memory.capturedAt);
+  const createdDate = dateFromValue(memory.createdAt);
+  if (!capturedDate && !createdDate) return dateKeyFor(new Date(), timezone) === dateKey;
+  return [capturedDate, createdDate]
+    .filter(Boolean)
+    .some((date) => dateKeyFor(date, timezone) === dateKey);
+}
+
 function normalize(value = '') {
   return String(value || '').trim().toLowerCase();
 }
@@ -93,6 +106,7 @@ function memorySummaryForAI(doc) {
     entities: ai.entities?.length ? ai.entities : memory.entities || [],
     suggestedProjects: ai.suggestedProjects || [],
     capturedAt: memory.capturedAt || memory.createdAt,
+    createdAt: memory.createdAt,
   };
 }
 
@@ -201,7 +215,14 @@ async function listDailyBriefs(userId, options = {}) {
 async function generateDailyBriefForUser(userId, dateKey, options = {}) {
   const timezone = options.timezone || 'UTC';
   const existing = await getDailyBrief(userId, dateKey);
-  if (existing && !options.forceRegenerate && ['generated', 'fallback', 'limit_reached'].includes(existing.status || existing.ai?.status)) {
+  // A cached EMPTY brief is not trustworthy: "No saves today" written in the
+  // morning would otherwise be frozen for the whole day even after the user
+  // captures/syncs memories. Regenerating an empty day is cheap (the AI call
+  // only runs when there ARE memories), so only serve the cache when the
+  // cached brief actually covered some saves.
+  const cachedIsEmpty = Number(existing?.memoryCount ?? existing?.savedCount ?? 0) === 0;
+  if (existing && !options.forceRegenerate && !cachedIsEmpty
+    && ['generated', 'fallback', 'limit_reached'].includes(existing.status || existing.ai?.status)) {
     return existing;
   }
 
@@ -210,7 +231,7 @@ async function generateDailyBriefForUser(userId, dateKey, options = {}) {
     .limit(250)
     .get();
   const allMemories = snapshot.docs.map(memorySummaryForAI);
-  const todayMemories = allMemories.filter((memory) => memoryDateKey(memory, timezone) === dateKey);
+  const todayMemories = allMemories.filter((memory) => memoryMatchesDateKey(memory, timezone, dateKey));
 
   const projectsSnapshot = await db().collection('users').doc(userId).collection('projects')
     .where('status', 'in', ['active', 'paused'])
