@@ -231,9 +231,16 @@ private struct GalaxyNodeView: View {
                     .overlay(Circle().stroke(.white.opacity(isSelected ? 0.82 : 0.38), lineWidth: isSelected ? 2 : 1))
                     .shadow(color: node.kind.color.opacity(isSelected ? 0.85 : 0.45), radius: isSelected ? 18 : 9)
 
-                Image(systemName: node.kind.icon)
-                    .font(.system(size: iconSize, weight: .black))
-                    .foregroundStyle(.white.opacity(node.kind == .hub ? 0.95 : 0.78))
+                if node.isCategory {
+                    // Category nodes show their category glyph (Nomi icon
+                    // system) instead of the generic concept lightbulb.
+                    NomiCategoryGlyph(categoryName: node.title, color: .white.opacity(0.85), weight: .black)
+                        .frame(width: iconSize, height: iconSize)
+                } else {
+                    Image(systemName: node.kind.icon)
+                        .font(.system(size: iconSize, weight: .black))
+                        .foregroundStyle(.white.opacity(node.kind == .hub ? 0.95 : 0.78))
+                }
             }
 
                 Text(node.title)

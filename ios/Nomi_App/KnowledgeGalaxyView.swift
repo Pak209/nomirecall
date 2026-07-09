@@ -371,12 +371,18 @@ private struct GalaxyNodeDetailCard: View {
                 .frame(maxWidth: .infinity)
 
             HStack(alignment: .center, spacing: 14) {
-                Image(systemName: node.kind.icon)
-                    .font(.title2.weight(.black))
-                    .foregroundStyle(node.kind.color)
-                    .frame(width: 64, height: 64)
-                    .background(node.kind.color.opacity(0.18), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).stroke(node.kind.color.opacity(0.72), lineWidth: 2))
+                Group {
+                    if node.isCategory {
+                        NomiCategoryIconView(categoryName: node.title, size: 46, strokeColor: node.kind.color)
+                    } else {
+                        Image(systemName: node.kind.icon)
+                            .font(.title2.weight(.black))
+                            .foregroundStyle(node.kind.color)
+                    }
+                }
+                .frame(width: 64, height: 64)
+                .background(node.kind.color.opacity(0.18), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).stroke(node.kind.color.opacity(0.72), lineWidth: 2))
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(node.title)

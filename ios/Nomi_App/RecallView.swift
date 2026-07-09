@@ -424,7 +424,7 @@ struct RecallView: View {
                 }
 
                 if let category = options.category {
-                    removableChip(category) {
+                    removableChip(category, showsCategoryIcon: true) {
                         options.category = nil
                     }
                 }
@@ -501,9 +501,12 @@ struct RecallView: View {
         .buttonStyle(.plain)
     }
 
-    private func removableChip(_ title: String, action: @escaping () -> Void) -> some View {
+    private func removableChip(_ title: String, showsCategoryIcon: Bool = false, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 6) {
+                if showsCategoryIcon {
+                    NomiCategoryIconView(categoryName: title, size: 18, strokeColor: Color.nomiPink)
+                }
                 Text(title)
                     .lineLimit(1)
                 Image(systemName: "xmark")
@@ -597,7 +600,7 @@ private struct RecallFilterSheet: View {
                     toggleRow
                     pickerSection("Date", options: NomiMemoryDateRange.allCases, selection: $options.dateRange)
                     pickerSection("Sort", options: NomiMemorySortOption.allCases, selection: $options.sortBy)
-                    singleSelectSection("Category", items: categories, selected: $options.category, emptyLabel: "No categories yet")
+                    singleSelectSection("Category", items: categories, selected: $options.category, emptyLabel: "No categories yet", showsCategoryIcon: true)
                     singleSelectSection("Tag", items: tags, selected: $options.tag, emptyLabel: "No tags yet") { "#\($0)" }
                     singleSelectSection("Source", items: sourceItems, selected: $options.sourceType, emptyLabel: "No sources yet", label: sourceLabel)
                 }
@@ -673,6 +676,7 @@ private struct RecallFilterSheet: View {
         items: [String],
         selected: Binding<String?>,
         emptyLabel: String,
+        showsCategoryIcon: Bool = false,
         label: @escaping (String) -> String = { $0 }
     ) -> some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -690,10 +694,15 @@ private struct RecallFilterSheet: View {
                     Button {
                         selected.wrappedValue = active ? nil : item
                     } label: {
-                        Text(label(item))
-                            .font(.caption.weight(.bold))
-                            .foregroundStyle(active ? Color.nomiPink : Color.nomiInk)
-                            .lineLimit(1)
+                        HStack(spacing: 6) {
+                            if showsCategoryIcon {
+                                NomiCategoryIconView(categoryName: item, size: 18, strokeColor: active ? Color.nomiPink : nil)
+                            }
+                            Text(label(item))
+                                .font(.caption.weight(.bold))
+                                .foregroundStyle(active ? Color.nomiPink : Color.nomiInk)
+                                .lineLimit(1)
+                        }
                             .padding(.vertical, 9)
                             .padding(.horizontal, 12)
                             .background((active ? Color.nomiPink.opacity(0.12) : Color.nomiCardStrong), in: Capsule())
