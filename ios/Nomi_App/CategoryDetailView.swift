@@ -254,9 +254,14 @@ struct CategoryDetailView: View {
 
     let categoryName: String
 
+    @Environment(\.dismiss) private var dismiss
+
     @State private var filter: CategoryContentFilter = .all
     @State private var searchText = ""
     @State private var openedMemory: NomiMemory?
+    @State private var isRenamePresented = false
+    @State private var renameText = ""
+    @State private var isRenaming = false
 
     var body: some View {
         ScrollView {
@@ -305,6 +310,12 @@ struct CategoryDetailView: View {
                     } label: {
                         Label("Refresh", systemImage: "arrow.clockwise")
                     }
+                    Button {
+                        renameText = categoryName
+                        isRenamePresented = true
+                    } label: {
+                        Label("Rename Category", systemImage: "pencil")
+                    }
                 } label: {
                     Image(systemName: "ellipsis.circle")
                 }
@@ -315,6 +326,42 @@ struct CategoryDetailView: View {
         .navigationDestination(item: $openedMemory) { memory in
             MemoryDetailView(memory: memory)
         }
+        .alert("Rename Category", isPresented: $isRenamePresented) {
+            TextField("Category name", text: $renameText)
+            Button("Rename") {
+                Task { await renameCategory() }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Every memory in \(categoryName) will move to the new category.")
+        }
+        .overlay {
+            if isRenaming {
+                ZStack {
+                    Color.black.opacity(0.35).ignoresSafeArea()
+                    ProgressView("Renaming…")
+                        .padding(22)
+                        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                }
+            }
+        }
+        .disabled(isRenaming)
+    }
+
+    /// Renames the category by moving every memory in it to the new name —
+    /// categories are just strings on memories, so this is a batch update
+    /// through the existing store API (no backend changes).
+    private func renameCategory() async {
+        let newName = renameText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !newName.isEmpty, newName.caseInsensitiveCompare(categoryName) != .orderedSame else { return }
+        isRenaming = true
+        defer { isRenaming = false }
+        for memory in categoryMemories {
+            _ = await memoryStore.updateMemory(memory) { $0.category = newName }
+        }
+        // This screen's category no longer exists — return to the galaxy,
+        // which rebuilds with the renamed node.
+        dismiss()
     }
 
     // MARK: Data
