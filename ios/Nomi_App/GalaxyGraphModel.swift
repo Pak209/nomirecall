@@ -25,7 +25,10 @@ struct GalaxyGraphModel {
     func filteredNodes(for filter: GalaxyFilter) -> [GalaxyNode] {
         switch filter {
         case .all, .links:
-            return nodes
+            // Individual memory dots overwhelm the overview (one blue node per
+            // saved memory). The default view stays at the category/concept
+            // altitude; the dedicated Memory chip still shows every memory.
+            return nodes.filter { $0.kind != .memory }
         case .primary:
             return nodes.filter { $0.kind == .hub }
         case .memories:
