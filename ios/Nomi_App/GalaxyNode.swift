@@ -55,6 +55,11 @@ struct GalaxyNode: Identifiable, Hashable {
     let position: SIMD3<Double>
 
     var isMemory: Bool { memory != nil }
+
+    /// Category orbit nodes are concept-kind nodes created with a "category-"
+    /// id prefix (see GalaxyGraphModel). They get the Nomi category icon
+    /// treatment instead of the generic kind glyph.
+    var isCategory: Bool { id.hasPrefix("category-") }
 }
 
 struct GalaxyEdge: Identifiable, Hashable {
