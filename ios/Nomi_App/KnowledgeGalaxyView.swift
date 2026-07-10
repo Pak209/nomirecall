@@ -26,6 +26,8 @@ struct KnowledgeGalaxyView: View {
     @State private var selectedNode: GalaxyNode?
     @State private var navigateToMemory: NomiMemory?
     @State private var openedCategory: GalaxyNode?
+    /// User-chosen center for the Ideas-tab galaxy (empty = automatic pick).
+    @AppStorage("nomi.galaxyCenterMemoryId") private var preferredCenterMemoryId = ""
     @State private var canvasScale: CGFloat = 1
     @State private var canvasOffset: CGSize = .zero
     @State private var recenterToken = UUID()
@@ -76,7 +78,13 @@ struct KnowledgeGalaxyView: View {
                             },
                             openCategory: {
                                 openedCategory = selectedNode
-                            }
+                            },
+                            makeCenter: selectedNode.isMemory && selectedNode.memory?.id != activeCenterMemory?.id ? {
+                                if let memory = selectedNode.memory {
+                                    preferredCenterMemoryId = memory.id
+                                    recenterToken = UUID()
+                                }
+                            } : nil
                         )
                         .padding(.horizontal, 18)
                         .padding(.bottom, showsBackButton ? 18 : 104)
@@ -113,6 +121,12 @@ struct KnowledgeGalaxyView: View {
         if let centerMemory,
            memoryStore.memories.contains(where: { $0.id == centerMemory.id }) {
             return centerMemory
+        }
+        // Honor the user's chosen center ("Set as Galaxy Center") before
+        // falling back to the automatic most-connected pick.
+        if !preferredCenterMemoryId.isEmpty,
+           let preferred = memoryStore.memories.first(where: { $0.id == preferredCenterMemoryId && !$0.isArchived }) {
+            return preferred
         }
         return memoryStore.defaultGraphMemory
     }
@@ -376,6 +390,7 @@ private struct GalaxyNodeDetailCard: View {
     let node: GalaxyNode
     let openMemory: () -> Void
     var openCategory: () -> Void = {}
+    var makeCenter: (() -> Void)? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -432,6 +447,14 @@ private struct GalaxyNodeDetailCard: View {
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(GalaxyMemoryButtonStyle(tint: node.kind.color))
+
+                if let makeCenter {
+                    Button(action: makeCenter) {
+                        Label("Set as Galaxy Center", systemImage: "scope")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(GalaxyMemoryButtonStyle(tint: node.kind.color))
+                }
             } else if node.isCategory {
                 Button(action: openCategory) {
                     Label("Explore Category", systemImage: "arrow.up.right.square")
