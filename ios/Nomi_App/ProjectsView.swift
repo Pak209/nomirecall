@@ -121,6 +121,7 @@ struct ProjectEditorView: View {
     @State private var tags: String
     @State private var concepts: String
     @State private var isSaving = false
+    @State private var saveError: String?
 
     init(project: NomiProject?) {
         self.project = project
@@ -141,6 +142,14 @@ struct ProjectEditorView: View {
                 }
             }
             .navigationTitle(project == nil ? "New Project" : "Edit Project")
+            .alert("Could not save project", isPresented: Binding(
+                get: { saveError != nil },
+                set: { if !$0 { saveError = nil } }
+            )) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(saveError ?? "Something went wrong.")
+            }
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Cancel") { dismiss() }
@@ -173,7 +182,13 @@ struct ProjectEditorView: View {
         } else {
             ok = await intelligenceStore.createProject(name: name, description: description, tags: tagValues, concepts: conceptValues)
         }
-        if ok { dismiss() }
+        if ok {
+            dismiss()
+        } else {
+            // Surface the store's error — previously a failed save left the
+            // sheet open with no feedback at all.
+            saveError = intelligenceStore.errorMessage ?? "Nomi could not reach the backend. Please try again."
+        }
     }
 }
 

@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct QuickCaptureView: View {
+    @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var appSession: AppSession
     @EnvironmentObject private var memoryStore: MemoryStore
 
@@ -54,6 +55,19 @@ struct QuickCaptureView: View {
             }
             .navigationTitle("Quick Capture")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        dismiss()
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.subheadline.weight(.bold))
+                            .foregroundStyle(Color.nomiInk)
+                    }
+                    .accessibilityLabel("Close quick capture")
+                }
+            }
+            .presentationDragIndicator(.visible)
             .alert(alertTitle, isPresented: errorBinding) {
                 Button("OK", role: .cancel) {}
             } message: {
@@ -101,11 +115,11 @@ struct QuickCaptureView: View {
                     .frame(maxWidth: .infinity)
                     .frame(height: 72)
                     .foregroundStyle(selectedType == type ? .pink : .primary)
-                    .background(.white.opacity(selectedType == type ? 0.95 : 0.78))
+                    .background(selectedType == type ? Color.nomiCardStrong : Color.nomiCard)
                     .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                     .overlay(
                         RoundedRectangle(cornerRadius: 18, style: .continuous)
-                            .stroke(selectedType == type ? .pink : Color.black.opacity(0.08), lineWidth: 1.5)
+                            .stroke(selectedType == type ? .pink : Color.nomiStroke, lineWidth: 1.5)
                     )
                 }
                 .buttonStyle(.plain)
@@ -155,11 +169,11 @@ struct QuickCaptureView: View {
             TextEditor(text: $content)
                 .frame(minHeight: 142)
                 .padding(12)
-                .background(.white.opacity(0.9))
+                .background(Color.nomiField)
                 .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .stroke(Color.black.opacity(0.08), lineWidth: 1)
+                        .stroke(Color.nomiStroke, lineWidth: 1)
                 )
                 .overlay(alignment: .topLeading) {
                     if content.isEmpty {
@@ -189,7 +203,7 @@ struct QuickCaptureView: View {
             .pickerStyle(.menu)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding()
-            .background(.white.opacity(0.9))
+            .background(Color.nomiField)
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
     }
@@ -262,7 +276,7 @@ struct QuickCaptureView: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.white.opacity(0.75))
+        .background(Color.nomiCard)
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
@@ -344,11 +358,11 @@ struct QuickCaptureView: View {
             .disabled(isSaving)
         }
         .padding(12)
-        .background(.white.opacity(0.92))
+        .background(Color.nomiCardStrong)
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(Color.black.opacity(0.08), lineWidth: 1)
+                .stroke(Color.nomiStroke, lineWidth: 1)
         )
     }
 

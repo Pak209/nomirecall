@@ -118,6 +118,7 @@ struct CategoryHeaderView: View {
 struct CategoryMemoryCard: View {
     @Environment(\.colorScheme) private var colorScheme
     @EnvironmentObject private var memoryStore: MemoryStore
+    @EnvironmentObject private var intelligenceStore: IntelligenceStore
 
     let memory: NomiMemory
     let onOpen: () -> Void
@@ -198,6 +199,11 @@ struct CategoryMemoryCard: View {
         .buttonStyle(.plain)
     }
 
+    private var availableProjects: [NomiProject] {
+        let linked = Set(memory.projectIds)
+        return intelligenceStore.projects.filter { !linked.contains($0.id) }
+    }
+
     private var overflowMenu: some View {
         Menu {
             Button(action: onOpen) {
@@ -213,6 +219,19 @@ struct CategoryMemoryCard: View {
                 }
             } label: {
                 Label(memory.isFavorite ? "Remove Favorite" : "Favorite", systemImage: memory.isFavorite ? "star.slash" : "star")
+            }
+            // Turn ideas into project work: assign this memory to a project
+            // using the same store API MemoryDetailView's Projects card uses.
+            if !availableProjects.isEmpty {
+                Menu {
+                    ForEach(availableProjects) { project in
+                        Button(project.name) {
+                            Task { _ = await intelligenceStore.assign(memory: memory, to: project) }
+                        }
+                    }
+                } label: {
+                    Label("Add to Project", systemImage: "folder.badge.plus")
+                }
             }
             Button(role: .destructive) {
                 Task { _ = await memoryStore.archiveMemory(memory) }
@@ -250,6 +269,7 @@ struct CategoryMemoryCard: View {
 struct CategoryDetailView: View {
     @EnvironmentObject private var memoryStore: MemoryStore
     @EnvironmentObject private var appSession: AppSession
+    @EnvironmentObject private var intelligenceStore: IntelligenceStore
     @Environment(\.colorScheme) private var colorScheme
 
     let categoryName: String
@@ -325,6 +345,11 @@ struct CategoryDetailView: View {
         .refreshable { await refresh() }
         .navigationDestination(item: $openedMemory) { memory in
             MemoryDetailView(memory: memory)
+        }
+        .task {
+            if intelligenceStore.projects.isEmpty {
+                await intelligenceStore.loadProjects()
+            }
         }
         .alert("Rename Category", isPresented: $isRenamePresented) {
             TextField("Category name", text: $renameText)
