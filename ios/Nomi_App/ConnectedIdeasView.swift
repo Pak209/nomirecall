@@ -37,7 +37,7 @@ struct ConnectedIdeasView: View {
                 background.ignoresSafeArea()
 
                 ScrollView(showsIndicators: false) {
-                    VStack(alignment: .leading, spacing: 26) {
+                    VStack(alignment: .leading, spacing: 28) {
                         hero
                         statsRow
                         categorySection
@@ -46,7 +46,7 @@ struct ConnectedIdeasView: View {
                         galaxyBanner
                     }
                     .padding(.horizontal, 18)
-                    .padding(.top, 10)
+                    .padding(.top, 18)
                     .padding(.bottom, 110)
                 }
             }
@@ -122,7 +122,7 @@ struct ConnectedIdeasView: View {
     private var background: some View {
         LinearGradient(
             colors: colorScheme == .dark
-                ? [Color(red: 0.05, green: 0.04, blue: 0.10), Color(red: 0.02, green: 0.02, blue: 0.05)]
+                ? [Color(red: 0.025, green: 0.025, blue: 0.055), Color(red: 0.005, green: 0.008, blue: 0.025)]
                 : [Color(red: 0.99, green: 0.97, blue: 1.00), Color(red: 0.96, green: 0.94, blue: 0.99)],
             startPoint: .top,
             endPoint: .bottom
@@ -137,7 +137,7 @@ struct ConnectedIdeasView: View {
                 Text("Connected.")
                     .foregroundStyle(Color.nomiPurple)
             }
-            .font(.system(size: 34, weight: .black, design: .rounded))
+            .font(.system(size: 38, weight: .bold, design: .rounded))
             .foregroundStyle(Color.nomiInk)
 
             Spacer()
@@ -146,14 +146,14 @@ struct ConnectedIdeasView: View {
                 Image(systemName: "magnifyingglass")
                     .font(.headline.weight(.bold))
                     .foregroundStyle(Color.nomiInk)
-                    .frame(width: 44, height: 44)
-                    .background(Color.nomiCardStrong, in: Circle())
+                    .frame(width: 48, height: 48)
+                    .background(Color.nomiPurple.opacity(colorScheme == .dark ? 0.08 : 0.05), in: Circle())
                     .overlay(Circle().stroke(Color.nomiStroke, lineWidth: 1))
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Search memories")
         }
-        .padding(.top, 8)
+        .padding(.top, 4)
     }
 
     private var statsRow: some View {
@@ -168,7 +168,7 @@ struct ConnectedIdeasView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text("Explore by category")
-                    .font(.title3.weight(.black))
+                    .font(.title3.weight(.bold))
                     .foregroundStyle(Color.nomiInk)
                 Spacer()
             }
@@ -333,10 +333,23 @@ struct CategoryExploreCard: View {
 
     @State private var isPressed = false
 
+    private var accent: Color {
+        switch NomiCategory.match(name) {
+        case .tech, .coding: Color(red: 0.44, green: 0.38, blue: 1.00)
+        case .fitness: Color(red: 0.25, green: 0.72, blue: 1.00)
+        case .trading: Color(red: 0.27, green: 0.91, blue: 0.61)
+        case .music: Color(red: 1.00, green: 0.34, blue: 0.74)
+        case .ideas: Color(red: 1.00, green: 0.68, blue: 0.31)
+        case .projects: Color(red: 0.68, green: 0.43, blue: 1.00)
+        case .travel: Color(red: 0.32, green: 0.82, blue: 0.95)
+        case .general: Color(red: 0.74, green: 0.38, blue: 1.00)
+        }
+    }
+
     var body: some View {
         Button(action: onOpen) {
             VStack(spacing: 8) {
-                NomiCategoryIconView(categoryName: name, size: 54)
+                NomiCategoryIconView(categoryName: name, size: 62, strokeColor: accent, openBottom: true)
 
                 Text(name)
                     .font(.subheadline.weight(.black))
@@ -349,14 +362,21 @@ struct CategoryExploreCard: View {
 
                 Text(share.formatted(.percent.precision(.fractionLength(0))))
                     .font(.caption.weight(.black))
-                    .foregroundStyle(Color.nomiPurple)
+                    .foregroundStyle(accent)
             }
-            .frame(width: 118)
-            .padding(.vertical, 16)
-            .background(Color.nomiCardStrong, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .frame(width: 126)
+            .padding(.vertical, 18)
+            .background(
+                LinearGradient(
+                    colors: [accent.opacity(colorScheme == .dark ? 0.10 : 0.06), Color.nomiCardStrong],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ),
+                in: RoundedRectangle(cornerRadius: 22, style: .continuous)
+            )
             .overlay(
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .stroke(isPressed ? Color.nomiPurple : Color.nomiStroke, lineWidth: isPressed ? 1.5 : 1)
+                    .stroke(isPressed ? accent : Color.nomiStroke, lineWidth: isPressed ? 1.5 : 1)
             )
             .scaleEffect(isPressed ? 0.97 : 1)
         }

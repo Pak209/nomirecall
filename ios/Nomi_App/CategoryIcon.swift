@@ -76,6 +76,8 @@ extension Color {
 /// side "arm" bumps and a gently rounded base. Drawn in a unit-relative
 /// coordinate space so it scales with its frame; stroke it, don't fill.
 struct NomiGhostShape: Shape {
+    var openBottom = false
+
     func path(in rect: CGRect) -> Path {
         let w = rect.width
         let h = rect.height
@@ -89,16 +91,18 @@ struct NomiGhostShape: Shape {
         // Dome up to the apex and down the right side.
         path.addCurve(to: pt(0.50, 0.04), control1: pt(0.20, 0.26), control2: pt(0.30, 0.04))
         path.addCurve(to: pt(0.80, 0.55), control1: pt(0.70, 0.04), control2: pt(0.80, 0.26))
-        // Right arm: bulge outward, curl back under.
+        // Right arm: bulge outward and curl back under.
         path.addCurve(to: pt(0.97, 0.66), control1: pt(0.88, 0.55), control2: pt(0.95, 0.58))
         path.addCurve(to: pt(0.80, 0.82), control1: pt(0.99, 0.76), control2: pt(0.91, 0.83))
-        // Base: soft rounded bottom back to the left arm's underside.
-        path.addCurve(to: pt(0.50, 0.92), control1: pt(0.72, 0.88), control2: pt(0.62, 0.92))
-        path.addCurve(to: pt(0.20, 0.82), control1: pt(0.38, 0.92), control2: pt(0.28, 0.88))
-        // Left arm mirroring the right.
+
+        if openBottom {
+            path.move(to: pt(0.20, 0.82))
+        } else {
+            path.addCurve(to: pt(0.50, 0.92), control1: pt(0.72, 0.88), control2: pt(0.62, 0.92))
+            path.addCurve(to: pt(0.20, 0.82), control1: pt(0.38, 0.92), control2: pt(0.28, 0.88))
+        }
         path.addCurve(to: pt(0.03, 0.66), control1: pt(0.09, 0.83), control2: pt(0.01, 0.76))
         path.addCurve(to: pt(0.20, 0.55), control1: pt(0.05, 0.58), control2: pt(0.12, 0.55))
-        path.closeSubpath()
         return path
     }
 }
@@ -191,17 +195,19 @@ struct NomiCategoryIconView: View {
 
     let category: NomiCategory
     var size: CGFloat = 44
+    var openBottom = false
     /// Override the stroke color (e.g. white inside colored canvas nodes).
     var strokeColor: Color? = nil
 
-    init(category: NomiCategory, size: CGFloat = 44, strokeColor: Color? = nil) {
+    init(category: NomiCategory, size: CGFloat = 44, strokeColor: Color? = nil, openBottom: Bool = false) {
         self.category = category
         self.size = size
         self.strokeColor = strokeColor
+        self.openBottom = openBottom
     }
 
-    init(categoryName: String, size: CGFloat = 44, strokeColor: Color? = nil) {
-        self.init(category: NomiCategory.match(categoryName), size: size, strokeColor: strokeColor)
+    init(categoryName: String, size: CGFloat = 44, strokeColor: Color? = nil, openBottom: Bool = false) {
+        self.init(category: NomiCategory.match(categoryName), size: size, strokeColor: strokeColor, openBottom: openBottom)
     }
 
     private var resolvedColor: Color {
@@ -210,13 +216,13 @@ struct NomiCategoryIconView: View {
 
     var body: some View {
         ZStack {
-            NomiGhostShape()
+            NomiGhostShape(openBottom: openBottom)
                 .stroke(resolvedColor, style: StrokeStyle(lineWidth: max(1.5, size * 0.055), lineCap: .round, lineJoin: .round))
 
             NomiCategoryGlyph(category: category, color: resolvedColor)
                 .frame(width: size * 0.34, height: size * 0.34)
                 // Glyph sits in the body's center, like the sheets.
-                .offset(y: size * 0.13)
+                .offset(y: size * (openBottom ? 0.10 : 0.13))
         }
         .frame(width: size, height: size)
         .accessibilityLabel(Text("\(category.rawValue.capitalized) category"))
