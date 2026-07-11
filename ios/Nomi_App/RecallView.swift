@@ -732,7 +732,7 @@ private struct RecallFilterSheet: View {
     }
 }
 
-private struct FlowLayout<Content: View>: View {
+struct FlowLayout<Content: View>: View {
     let items: [String]
     let content: (String) -> Content
 
