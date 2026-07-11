@@ -63,7 +63,7 @@ struct ProjectsView: View {
                     .environmentObject(intelligenceStore)
             }
             .navigationDestination(for: NomiProject.self) { project in
-                ProjectDetailView(project: project)
+                ProjectWorkspaceView(project: project)
             }
             .navigationDestination(for: NomiMemory.self) { memory in
                 MemoryDetailView(memory: memory)

@@ -73,6 +73,17 @@ final class IntelligenceStore: ObservableObject {
         }
     }
 
+    func assign(memoryId: String, to project: NomiProject) async -> Bool {
+        do {
+            try await backendService.assignMemory(memoryId: memoryId, to: project)
+            await loadProjects()
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
     func assign(memory: NomiMemory, to project: NomiProject) async -> Bool {
         do {
             try await backendService.assignMemory(memoryId: memory.id, to: project)

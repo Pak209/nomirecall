@@ -373,7 +373,7 @@ struct QuickCaptureView: View {
         alertTitle = "Could not save"
         defer { isSaving = false }
 
-        let saved = await memoryStore.create(
+        let savedMemoryId = await memoryStore.create(
             userId: userId,
             title: title,
             content: content.isEmpty ? link : content,
@@ -388,7 +388,7 @@ struct QuickCaptureView: View {
             referencedPosts: xReferencedPosts
         )
 
-        if saved {
+        if savedMemoryId != nil {
             resetDraft()
         }
     }
@@ -420,7 +420,7 @@ struct QuickCaptureView: View {
             content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : content.trimmingCharacters(in: .whitespacesAndNewlines)
         ].compactMap { $0 }.joined(separator: "\n")
 
-        let saved = await memoryStore.create(
+        let savedMemoryId = await memoryStore.create(
             userId: userId,
             title: title.trimmedFallback(preview.title ?? "TikTok video"),
             content: text.trimmedFallback(link),
@@ -433,7 +433,7 @@ struct QuickCaptureView: View {
             tiktok: metadata
         )
 
-        if saved {
+        if savedMemoryId != nil {
             resetDraft()
         }
     }
