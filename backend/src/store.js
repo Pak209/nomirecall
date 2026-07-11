@@ -4,6 +4,18 @@ const admin = require('firebase-admin');
 
 const DEFAULT_FEED_ITEMS = [];
 
+// Friend Circle subcollections. Keyed by a stable `kind` used across the store
+// API; the value is the Firestore subcollection name under users/{uid}. All
+// cross-user circle state lives here (never in shared top-level collections) so
+// blocking and privacy can be enforced entirely in backend routes.
+const CIRCLE_COLLECTIONS = {
+  friends: 'circleFriends',
+  requestsIn: 'circleRequestsIn',
+  requestsOut: 'circleRequestsOut',
+  blocked: 'circleBlocked',
+  inbox: 'circleInbox',
+};
+
 class MemoryStore {
   constructor() {
     this.mode = 'memory';
@@ -16,6 +28,8 @@ class MemoryStore {
     this.chunksByUser = new Map();
     this.memoryEdgesByUser = new Map();
     this.topicPagesByUser = new Map();
+    // userId -> { friends:Map, requestsIn:Map, requestsOut:Map, blocked:Map, inbox:Map }
+    this.circleByUser = new Map();
     this.feedItems = [...DEFAULT_FEED_ITEMS];
   }
 
@@ -26,6 +40,15 @@ class MemoryStore {
   async getUserById(userId) {
     for (const user of this.usersByEmail.values()) {
       if (user.id === userId) return user;
+    }
+    return null;
+  }
+
+  async getUserByUsername(username) {
+    const key = String(username || '').trim().toLowerCase();
+    if (!key) return null;
+    for (const user of this.usersByEmail.values()) {
+      if (String(user.username || '').trim().toLowerCase() === key) return user;
     }
     return null;
   }
@@ -79,6 +102,7 @@ class MemoryStore {
     this.topicPagesByUser.delete(userId);
     this.xBookmarkConnections.delete(userId);
     this.xBookmarkSyncStates.delete(userId);
+    this.circleByUser.delete(userId);
   }
 
   async addSource(userId, source) {
@@ -253,6 +277,38 @@ class MemoryStore {
       syncState: this.xBookmarkSyncStates.get(userId) || defaultXBookmarkSyncState(),
     }));
   }
+
+  _circleMap(userId, kind) {
+    if (!CIRCLE_COLLECTIONS[kind]) throw new Error(`Unknown circle collection: ${kind}`);
+    let bucket = this.circleByUser.get(userId);
+    if (!bucket) {
+      bucket = { friends: new Map(), requestsIn: new Map(), requestsOut: new Map(), blocked: new Map(), inbox: new Map() };
+      this.circleByUser.set(userId, bucket);
+    }
+    return bucket[kind];
+  }
+
+  async listCircleDocs(userId, kind) {
+    return Array.from(this._circleMap(userId, kind).values()).map((doc) => ({ ...doc }));
+  }
+
+  async getCircleDoc(userId, kind, docId) {
+    const doc = this._circleMap(userId, kind).get(String(docId));
+    return doc ? { ...doc } : null;
+  }
+
+  async setCircleDoc(userId, kind, docId, data) {
+    const map = this._circleMap(userId, kind);
+    const id = String(docId);
+    const existing = map.get(id) || {};
+    const next = { ...existing, ...data, id, updatedAt: new Date().toISOString() };
+    map.set(id, next);
+    return { ...next };
+  }
+
+  async deleteCircleDoc(userId, kind, docId) {
+    return this._circleMap(userId, kind).delete(String(docId));
+  }
 }
 
 class FirestoreStore {
@@ -297,6 +353,17 @@ class FirestoreStore {
     const snapshot = await this.userCollection().where('id', '==', userId).limit(1).get();
     if (snapshot.empty) return null;
     return snapshot.docs[0].data();
+  }
+
+  async getUserByUsername(username) {
+    // Usernames are persisted normalized (lowercased, @/punctuation stripped), so
+    // an exact equality query is a genuine case-insensitive exact match. Returns
+    // only the single matching user; never a list (anti-enumeration).
+    const key = String(username || '').trim().toLowerCase();
+    if (!key) return null;
+    const snapshot = await this.userCollection().where('username', '==', key).limit(1).get();
+    if (snapshot.empty) return null;
+    return { id: snapshot.docs[0].id, ...snapshot.docs[0].data() };
   }
 
   async listUsers(options = {}) {
@@ -588,6 +655,37 @@ class FirestoreStore {
       });
     }
     return candidates;
+  }
+
+  circleCollection(userId, kind) {
+    const name = CIRCLE_COLLECTIONS[kind];
+    if (!name) throw new Error(`Unknown circle collection: ${kind}`);
+    return this.userCollection().doc(userId).collection(name);
+  }
+
+  async listCircleDocs(userId, kind) {
+    const snapshot = await this.circleCollection(userId, kind).get();
+    return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+  }
+
+  async getCircleDoc(userId, kind, docId) {
+    const doc = await this.circleCollection(userId, kind).doc(String(docId)).get();
+    return doc.exists ? { id: doc.id, ...doc.data() } : null;
+  }
+
+  async setCircleDoc(userId, kind, docId, data) {
+    const ref = this.circleCollection(userId, kind).doc(String(docId));
+    await ref.set(this.withoutUndefined({
+      ...data,
+      updatedAt: new Date().toISOString(),
+    }), { merge: true });
+    const doc = await ref.get();
+    return { id: doc.id, ...doc.data() };
+  }
+
+  async deleteCircleDoc(userId, kind, docId) {
+    await this.circleCollection(userId, kind).doc(String(docId)).delete();
+    return true;
   }
 }
 

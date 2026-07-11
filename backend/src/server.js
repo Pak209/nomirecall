@@ -67,6 +67,7 @@ const {
   fallbackTikTokMetadata,
   isTikTokUrl,
 } = require('./tiktok');
+const circle = require('./circle');
 
 dotenv.config();
 
@@ -272,6 +273,27 @@ const PROJECT_MEMORY_SCHEMA = z.object({
 
 const PROJECT_SUMMARY_SCHEMA = z.object({
   forceRegenerate: z.boolean().optional().default(false),
+});
+
+const CIRCLE_SEARCH_SCHEMA = z.object({
+  q: z.string().trim().min(1, 'q is required'),
+});
+
+const CIRCLE_REQUEST_SCHEMA = z.object({
+  toUserId: z.string().min(1, 'toUserId is required'),
+});
+
+const CIRCLE_PIN_SCHEMA = z.object({
+  pinned: z.boolean(),
+});
+
+const CIRCLE_BLOCK_SCHEMA = z.object({
+  userId: z.string().min(1, 'userId is required'),
+});
+
+const CIRCLE_SHARE_SCHEMA = z.object({
+  toUserId: z.string().min(1, 'toUserId is required'),
+  memoryId: z.string().min(1, 'memoryId is required'),
 });
 
 function sourceTimestampMs(source) {
@@ -2768,6 +2790,7 @@ app.get('/api/memories', auth, async (req, res) => {
       tags: Array.isArray(source.tags) ? source.tags : [],
       concepts: Array.isArray(source.concepts) ? source.concepts : [],
       entities: Array.isArray(source.entities) ? source.entities : [],
+      sharedBy: cleanObject(source.sharedBy),
       userId: source.userId,
       body: String(source.body || ''),
       source_url: source.source_url,
@@ -3136,6 +3159,156 @@ app.post('/api/daily-briefs/:dateKey/generate', auth, requireTier('brain'), asyn
     return res.json({ brief });
   } catch (error) {
     return res.status(503).json({ error: error.message || 'Daily Brief generation is not available.' });
+  }
+});
+
+// Dependencies injected into the circle module. Built per-request so the module
+// stays decoupled from server.js internals (store, Firebase, memory helpers).
+function circleDeps() {
+  return {
+    store,
+    admin,
+    newSource,
+    cleanObject,
+    normalizeUsername,
+    firebaseProfileForUser,
+    writeNativeMemoryDocumentFromSource,
+  };
+}
+
+app.get('/api/circle/search', auth, async (req, res) => {
+  const data = parseQuery(CIRCLE_SEARCH_SCHEMA, req, res);
+  if (!data) return;
+  try {
+    const result = await circle.search(circleDeps(), req.userId, data.q);
+    return res.json(result);
+  } catch (error) {
+    return res.status(500).json({ error: error.message || 'Search failed.' });
+  }
+});
+
+app.post('/api/circle/requests', auth, async (req, res) => {
+  const data = parseBody(CIRCLE_REQUEST_SCHEMA, req, res);
+  if (!data) return;
+  try {
+    const { status, body } = await circle.sendRequest(circleDeps(), req.userId, data.toUserId);
+    return res.status(status).json(body);
+  } catch (error) {
+    return res.status(500).json({ error: error.message || 'Could not send request.' });
+  }
+});
+
+app.get('/api/circle/requests', auth, async (req, res) => {
+  try {
+    const result = await circle.listRequests(circleDeps(), req.userId);
+    return res.json(result);
+  } catch (error) {
+    return res.status(500).json({ error: error.message || 'Could not load requests.' });
+  }
+});
+
+app.post('/api/circle/requests/:fromUserId/accept', auth, async (req, res) => {
+  try {
+    const { status, body } = await circle.acceptRequest(circleDeps(), req.userId, req.params.fromUserId);
+    return res.status(status).json(body);
+  } catch (error) {
+    return res.status(500).json({ error: error.message || 'Could not accept request.' });
+  }
+});
+
+app.post('/api/circle/requests/:fromUserId/decline', auth, async (req, res) => {
+  try {
+    const { status, body } = await circle.declineRequest(circleDeps(), req.userId, req.params.fromUserId);
+    return res.status(status).json(body);
+  } catch (error) {
+    return res.status(500).json({ error: error.message || 'Could not decline request.' });
+  }
+});
+
+app.get('/api/circle/friends', auth, async (req, res) => {
+  try {
+    const result = await circle.listFriends(circleDeps(), req.userId);
+    return res.json(result);
+  } catch (error) {
+    return res.status(500).json({ error: error.message || 'Could not load friends.' });
+  }
+});
+
+app.patch('/api/circle/friends/:friendId', auth, async (req, res) => {
+  const data = parseBody(CIRCLE_PIN_SCHEMA, req, res);
+  if (!data) return;
+  try {
+    const { status, body } = await circle.setPinned(circleDeps(), req.userId, req.params.friendId, data.pinned);
+    return res.status(status).json(body);
+  } catch (error) {
+    return res.status(500).json({ error: error.message || 'Could not update friend.' });
+  }
+});
+
+app.delete('/api/circle/friends/:friendId', auth, async (req, res) => {
+  try {
+    const { status, body } = await circle.removeFriend(circleDeps(), req.userId, req.params.friendId);
+    return res.status(status).json(body);
+  } catch (error) {
+    return res.status(500).json({ error: error.message || 'Could not remove friend.' });
+  }
+});
+
+app.post('/api/circle/block', auth, async (req, res) => {
+  const data = parseBody(CIRCLE_BLOCK_SCHEMA, req, res);
+  if (!data) return;
+  try {
+    const { status, body } = await circle.block(circleDeps(), req.userId, data.userId);
+    return res.status(status).json(body);
+  } catch (error) {
+    return res.status(500).json({ error: error.message || 'Could not block user.' });
+  }
+});
+
+app.delete('/api/circle/block/:userId', auth, async (req, res) => {
+  try {
+    const { status, body } = await circle.unblock(circleDeps(), req.userId, req.params.userId);
+    return res.status(status).json(body);
+  } catch (error) {
+    return res.status(500).json({ error: error.message || 'Could not unblock user.' });
+  }
+});
+
+app.post('/api/circle/share', auth, async (req, res) => {
+  const data = parseBody(CIRCLE_SHARE_SCHEMA, req, res);
+  if (!data) return;
+  try {
+    const { status, body } = await circle.shareMemory(circleDeps(), req.userId, data.toUserId, data.memoryId);
+    return res.status(status).json(body);
+  } catch (error) {
+    return res.status(500).json({ error: error.message || 'Could not share memory.' });
+  }
+});
+
+app.get('/api/circle/inbox', auth, async (req, res) => {
+  try {
+    const result = await circle.listInbox(circleDeps(), req.userId);
+    return res.json(result);
+  } catch (error) {
+    return res.status(500).json({ error: error.message || 'Could not load inbox.' });
+  }
+});
+
+app.post('/api/circle/inbox/:shareId/save', auth, async (req, res) => {
+  try {
+    const { status, body } = await circle.saveInboxItem(circleDeps(), req.userId, req.params.shareId);
+    return res.status(status).json(body);
+  } catch (error) {
+    return res.status(500).json({ error: error.message || 'Could not save shared item.' });
+  }
+});
+
+app.post('/api/circle/inbox/:shareId/ignore', auth, async (req, res) => {
+  try {
+    const { status, body } = await circle.ignoreInboxItem(circleDeps(), req.userId, req.params.shareId);
+    return res.status(status).json(body);
+  } catch (error) {
+    return res.status(500).json({ error: error.message || 'Could not update shared item.' });
   }
 });
 
