@@ -18,6 +18,7 @@ struct MemoryDetailView: View {
     @State private var isConfirmingDelete = false
     @State private var exportedActivityItems: [URL] = []
     @State private var isShowingShareSheet = false
+    @State private var isShowingShareToCircle = false
     @State private var isShowingMarkdownPreview = false
     @State private var markdownPreview = ""
     @State private var exportMessage: String?
@@ -77,6 +78,9 @@ struct MemoryDetailView: View {
             if !exportedActivityItems.isEmpty {
                 ShareSheet(activityItems: exportedActivityItems)
             }
+        }
+        .sheet(isPresented: $isShowingShareToCircle) {
+            ShareToCircleSheet(memoryId: draft.id)
         }
         .sheet(isPresented: $isShowingMarkdownPreview) {
             NavigationStack {
@@ -163,6 +167,12 @@ struct MemoryDetailView: View {
                     Task { await toggleArchive() }
                 } label: {
                     Label(draft.isArchived ? "Unarchive" : "Archive", systemImage: draft.isArchived ? "archivebox.fill" : "archivebox")
+                }
+
+                Button {
+                    isShowingShareToCircle = true
+                } label: {
+                    Label("Share to Circle", systemImage: "person.2")
                 }
 
                 Button {
