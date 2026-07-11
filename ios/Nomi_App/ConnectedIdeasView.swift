@@ -37,7 +37,7 @@ struct ConnectedIdeasView: View {
                 background.ignoresSafeArea()
 
                 ScrollView(showsIndicators: false) {
-                    VStack(alignment: .leading, spacing: 28) {
+                    VStack(alignment: .leading, spacing: 24) {
                         hero
                         statsRow
                         categorySection
@@ -46,7 +46,7 @@ struct ConnectedIdeasView: View {
                         galaxyBanner
                     }
                     .padding(.horizontal, 18)
-                    .padding(.top, 18)
+                    .padding(.top, 12)
                     .padding(.bottom, 110)
                 }
             }
@@ -137,7 +137,7 @@ struct ConnectedIdeasView: View {
                 Text("Connected.")
                     .foregroundStyle(Color.nomiPurple)
             }
-            .font(.system(size: 38, weight: .bold, design: .rounded))
+            .font(.system(size: 32, weight: .bold, design: .rounded))
             .foregroundStyle(Color.nomiInk)
 
             Spacer()
@@ -146,7 +146,7 @@ struct ConnectedIdeasView: View {
                 Image(systemName: "magnifyingglass")
                     .font(.headline.weight(.bold))
                     .foregroundStyle(Color.nomiInk)
-                    .frame(width: 48, height: 48)
+                    .frame(width: 44, height: 44)
                     .background(Color.nomiPurple.opacity(colorScheme == .dark ? 0.08 : 0.05), in: Circle())
                     .overlay(Circle().stroke(Color.nomiStroke, lineWidth: 1))
             }
@@ -300,22 +300,27 @@ struct KnowledgeStatCard: View {
     let systemImage: String
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        HStack(spacing: 10) {
             Image(systemName: systemImage)
-                .font(.subheadline.weight(.bold))
+                .font(.headline.weight(.semibold))
                 .foregroundStyle(Color.nomiPurple)
+                .frame(width: 30, height: 30)
+                .background(Color.nomiPurple.opacity(0.10), in: Circle())
 
-            Text("\(value)")
-                .font(.system(size: 26, weight: .black, design: .rounded))
-                .foregroundStyle(Color.nomiInk)
-                .contentTransition(.numericText())
+            VStack(alignment: .leading, spacing: 1) {
+                Text("\(value)")
+                    .font(.system(size: 22, weight: .bold, design: .rounded))
+                    .foregroundStyle(Color.nomiInk)
+                    .contentTransition(.numericText())
 
-            Text(label)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(Color.nomiMuted)
+                Text(label)
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(Color.nomiMuted)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(14)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 12)
         .background(Color.nomiCardStrong, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).stroke(Color.nomiStroke, lineWidth: 1))
     }
@@ -348,24 +353,24 @@ struct CategoryExploreCard: View {
 
     var body: some View {
         Button(action: onOpen) {
-            VStack(spacing: 8) {
-                NomiCategoryIconView(categoryName: name, size: 62, strokeColor: accent, openBottom: true)
+            VStack(spacing: 6) {
+                NomiCategoryIconView(categoryName: name, size: 48, strokeColor: accent, openBottom: true)
 
                 Text(name)
-                    .font(.subheadline.weight(.black))
+                    .font(.caption.weight(.bold))
                     .foregroundStyle(Color.nomiInk)
                     .lineLimit(1)
 
                 Text("\(count) \(count == 1 ? "note" : "notes")")
-                    .font(.caption2.weight(.semibold))
+                    .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(Color.nomiMuted)
 
                 Text(share.formatted(.percent.precision(.fractionLength(0))))
-                    .font(.caption.weight(.black))
+                    .font(.caption2.weight(.bold))
                     .foregroundStyle(accent)
             }
-            .frame(width: 126)
-            .padding(.vertical, 18)
+            .frame(width: 76)
+            .padding(.vertical, 14)
             .background(
                 LinearGradient(
                     colors: [accent.opacity(colorScheme == .dark ? 0.10 : 0.06), Color.nomiCardStrong],
