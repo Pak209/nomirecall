@@ -27,6 +27,10 @@ struct ConnectedIdeasView: View {
     @State private var isShowingCapture = false
     @State private var isShowingProjects = false
     @State private var isShowingProjectEditor = false
+    @State private var isShowingCategoryEditor = false
+    @State private var renameCategoryTarget: String?
+    @State private var renameCategoryText = ""
+    @State private var isRenamingCategory = false
     /// Edge count is derived from the same graph model the galaxy uses; cached
     /// because building the graph on every body evaluation is wasteful.
     @State private var linkCount = 0
@@ -66,6 +70,37 @@ struct ConnectedIdeasView: View {
             .sheet(isPresented: $isShowingProjectEditor) {
                 ProjectEditorView(project: nil)
             }
+            .sheet(isPresented: $isShowingCategoryEditor) {
+                CategoryEditSheet(categories: categoryCounts) { name in
+                    isShowingCategoryEditor = false
+                    renameCategoryText = name
+                    renameCategoryTarget = name
+                }
+            }
+            .alert("Rename Category", isPresented: Binding(
+                get: { renameCategoryTarget != nil },
+                set: { if !$0 { renameCategoryTarget = nil } }
+            )) {
+                TextField("Category name", text: $renameCategoryText)
+                Button("Rename") {
+                    if let target = renameCategoryTarget {
+                        Task { await renameCategory(from: target, to: renameCategoryText) }
+                    }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Every memory in \(renameCategoryTarget ?? "this category") moves to the new name. Renaming onto an existing category merges them.")
+            }
+            .overlay {
+                if isRenamingCategory {
+                    ZStack {
+                        Color.black.opacity(0.35).ignoresSafeArea()
+                        ProgressView("Renaming…")
+                            .padding(22)
+                            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    }
+                }
+            }
             .task {
                 await intelligenceStore.loadProjects()
                 refreshLinkCount()
@@ -102,6 +137,23 @@ struct ConnectedIdeasView: View {
                 if $0.count == $1.count { return $0.name < $1.name }
                 return $0.count > $1.count
             }
+    }
+
+    /// Batch-moves every memory in `from` to the `to` category — categories are
+    /// strings on memories, so rename == move; renaming onto an existing
+    /// category merges the two. Same mechanic as CategoryDetailView's rename.
+    private func renameCategory(from: String, to: String) async {
+        let newName = to.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !newName.isEmpty, newName.caseInsensitiveCompare(from) != .orderedSame else { return }
+        isRenamingCategory = true
+        defer { isRenamingCategory = false }
+        let members = activeMemories.filter {
+            let name = $0.category.trimmingCharacters(in: .whitespacesAndNewlines)
+            return (name.isEmpty ? "General" : name) == from
+        }
+        for memory in members {
+            _ = await memoryStore.updateMemory(memory) { $0.category = newName }
+        }
     }
 
     private func refreshLinkCount() {
@@ -171,6 +223,12 @@ struct ConnectedIdeasView: View {
                     .font(.title3.weight(.bold))
                     .foregroundStyle(Color.nomiInk)
                 Spacer()
+                if !categoryCounts.isEmpty {
+                    Button("Edit") { isShowingCategoryEditor = true }
+                        .font(.subheadline.weight(.bold))
+                        .foregroundStyle(Color.nomiPurple)
+                        .buttonStyle(.plain)
+                }
             }
 
             if categoryCounts.isEmpty {
@@ -187,6 +245,14 @@ struct ConnectedIdeasView: View {
                                 share: activeMemories.isEmpty ? 0 : Double(entry.count) / Double(activeMemories.count)
                             ) {
                                 openedCategory = OpenedCategory(name: entry.name)
+                            }
+                            .contextMenu {
+                                Button {
+                                    renameCategoryText = entry.name
+                                    renameCategoryTarget = entry.name
+                                } label: {
+                                    Label("Rename Category", systemImage: "pencil")
+                                }
                             }
                         }
                     }
@@ -287,6 +353,140 @@ struct ConnectedIdeasView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Open Knowledge Galaxy")
+    }
+}
+
+// MARK: - Category edit sheet
+
+private struct CategoryEditSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var memoryStore: MemoryStore
+
+    let categories: [(name: String, count: Int)]
+    let onRename: (String) -> Void
+
+    @State private var applyingIds: Set<String> = []
+    @State private var isApplyingAll = false
+
+    /// Memories whose filed category disagrees with Nomi's AI-assigned one —
+    /// the "does my categorization actually make sense" audit, computed from
+    /// data the processing pipeline already produced.
+    private var mismatches: [(memory: NomiMemory, suggested: String)] {
+        memoryStore.memories
+            .filter { !$0.isArchived }
+            .compactMap { memory in
+                guard let suggested = memory.ai?.category?.trimmingCharacters(in: .whitespacesAndNewlines),
+                      !suggested.isEmpty else { return nil }
+                let filed = memory.category.trimmingCharacters(in: .whitespacesAndNewlines)
+                let filedName = filed.isEmpty ? "General" : filed
+                guard filedName.caseInsensitiveCompare(suggested) != .orderedSame else { return nil }
+                return (memory, suggested)
+            }
+    }
+
+    private func apply(_ memory: NomiMemory, suggested: String) async {
+        applyingIds.insert(memory.id)
+        defer { applyingIds.remove(memory.id) }
+        _ = await memoryStore.updateMemory(memory) { $0.category = suggested }
+    }
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                NomiBackground()
+                ScrollView(showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        if !mismatches.isEmpty {
+                            HStack {
+                                Label("Nomi's filing suggestions", systemImage: "sparkles")
+                                    .font(.footnote.weight(.black))
+                                    .foregroundStyle(Color.nomiPurple)
+                                Spacer()
+                                Button(isApplyingAll ? "Applying…" : "Apply all") {
+                                    Task {
+                                        isApplyingAll = true
+                                        for item in mismatches {
+                                            await apply(item.memory, suggested: item.suggested)
+                                        }
+                                        isApplyingAll = false
+                                    }
+                                }
+                                .font(.caption.weight(.black))
+                                .foregroundStyle(Color.nomiPurple)
+                                .buttonStyle(.plain)
+                                .disabled(isApplyingAll)
+                            }
+                            .padding(.top, 2)
+
+                            ForEach(mismatches, id: \.memory.id) { item in
+                                HStack(spacing: 10) {
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text(item.memory.title)
+                                            .font(.subheadline.weight(.bold))
+                                            .foregroundStyle(Color.nomiInk)
+                                            .lineLimit(1)
+                                        Text("Filed in \(item.memory.category.isEmpty ? "General" : item.memory.category) → Nomi suggests \(item.suggested)")
+                                            .font(.caption)
+                                            .foregroundStyle(Color.nomiMuted)
+                                    }
+                                    Spacer()
+                                    Button(applyingIds.contains(item.memory.id) ? "…" : "Apply") {
+                                        Task { await apply(item.memory, suggested: item.suggested) }
+                                    }
+                                    .font(.caption.weight(.black))
+                                    .foregroundStyle(.white)
+                                    .padding(.vertical, 6)
+                                    .padding(.horizontal, 12)
+                                    .background(Color.nomiPurple, in: Capsule())
+                                    .buttonStyle(.plain)
+                                    .disabled(applyingIds.contains(item.memory.id) || isApplyingAll)
+                                }
+                                .padding(12)
+                                .background(Color.nomiCard, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                                .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Color.nomiStroke, lineWidth: 1))
+                            }
+
+                            Divider().padding(.vertical, 6)
+                        }
+
+                        ForEach(categories, id: \.name) { entry in
+                            Button {
+                                onRename(entry.name)
+                            } label: {
+                                HStack(spacing: 12) {
+                                    NomiCategoryIconView(categoryName: entry.name, size: 34)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(entry.name)
+                                            .font(.subheadline.weight(.bold))
+                                            .foregroundStyle(Color.nomiInk)
+                                        Text("\(entry.count) \(entry.count == 1 ? "note" : "notes")")
+                                            .font(.caption2)
+                                            .foregroundStyle(Color.nomiMuted)
+                                    }
+                                    Spacer()
+                                    Image(systemName: "pencil")
+                                        .font(.subheadline.weight(.bold))
+                                        .foregroundStyle(Color.nomiPurple)
+                                }
+                                .padding(14)
+                                .background(Color.nomiCardStrong, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                                .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(Color.nomiStroke, lineWidth: 1))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(18)
+                }
+            }
+            .navigationTitle("Edit Categories")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Done") { dismiss() }
+                }
+            }
+            .presentationDragIndicator(.visible)
+        }
     }
 }
 
