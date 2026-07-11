@@ -73,7 +73,7 @@ struct MainTabsView: View {
                 handleHomeDrawerDestination(destination)
             }
         case .ideas:
-            ConnectedIdeasGraphView()
+            ConnectedIdeasView(onSearch: { selectedTab = .recall })
         case .ask:
             HomeView {
                 isShowingQuickCapture = true

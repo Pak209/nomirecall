@@ -765,7 +765,12 @@ final class XBackendService {
 
         let token = try await user.getIDToken()
         var request = URLRequest(url: url)
-        request.timeoutInterval = 18
+        // Render free-tier cold starts take 20-45s and GitHub-cron keep-alive
+        // pings fire with multi-hour gaps, so an 18s timeout guaranteed a
+        // "could not reach the backend" error whenever the app was first to
+        // arrive at a sleeping instance. 45s rides out a full cold start; the
+        // friendly waking/offline copy still covers real outages.
+        request.timeoutInterval = 45
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         return request
     }

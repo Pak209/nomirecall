@@ -24,8 +24,23 @@ struct GalaxyGraphModel {
 
     func filteredNodes(for filter: GalaxyFilter) -> [GalaxyNode] {
         switch filter {
-        case .all, .links:
-            return nodes
+        case .all:
+            // Individual memory dots (one per saved memory) and @author nodes
+            // overwhelm the overview. The default view stays at the
+            // category/concept altitude; Memory and Entities chips surface
+            // the rest on demand.
+            return nodes.filter { $0.kind != .memory && $0.kind != .author }
+        case .links:
+            // Link-flavored memories only (links, X posts, TikToks) — this
+            // chip previously returned the same set as All and did nothing.
+            return nodes.filter { node in
+                if node.kind == .hub { return true }
+                guard node.kind == .memory, let memory = node.memory else { return false }
+                return memory.displayType == "Link"
+                    || memory.displayType == "X post"
+                    || memory.type.localizedCaseInsensitiveContains("tiktok")
+                    || memory.sourceUrl != nil
+            }
         case .primary:
             return nodes.filter { $0.kind == .hub }
         case .memories:

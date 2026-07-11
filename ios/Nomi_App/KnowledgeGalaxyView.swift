@@ -25,6 +25,9 @@ struct KnowledgeGalaxyView: View {
     @State private var selectedFilter: GalaxyFilter = .all
     @State private var selectedNode: GalaxyNode?
     @State private var navigateToMemory: NomiMemory?
+    @State private var openedCategory: GalaxyNode?
+    /// User-chosen center for the Ideas-tab galaxy (empty = automatic pick).
+    @AppStorage("nomi.galaxyCenterMemoryId") private var preferredCenterMemoryId = ""
     @State private var canvasScale: CGFloat = 1
     @State private var canvasOffset: CGSize = .zero
     @State private var recenterToken = UUID()
@@ -54,6 +57,9 @@ struct KnowledgeGalaxyView: View {
                         focusedNodeID: focusedNodeID,
                         onCategorySwipe: { step in
                             focusCategory(step: step, graph: graph)
+                        },
+                        onCategoryOpen: { node in
+                            openedCategory = node
                         }
                     )
                     .id(recenterToken)
@@ -63,11 +69,23 @@ struct KnowledgeGalaxyView: View {
                     rightToolbar
 
                     if let selectedNode {
-                        GalaxyNodeDetailCard(node: selectedNode) {
-                            if let memory = selectedNode.memory {
-                                navigateToMemory = memory
-                            }
-                        }
+                        GalaxyNodeDetailCard(
+                            node: selectedNode,
+                            openMemory: {
+                                if let memory = selectedNode.memory {
+                                    navigateToMemory = memory
+                                }
+                            },
+                            openCategory: {
+                                openedCategory = selectedNode
+                            },
+                            makeCenter: selectedNode.isMemory && selectedNode.memory?.id != activeCenterMemory?.id ? {
+                                if let memory = selectedNode.memory {
+                                    preferredCenterMemoryId = memory.id
+                                    recenterToken = UUID()
+                                }
+                            } : nil
+                        )
                         .padding(.horizontal, 18)
                         .padding(.bottom, showsBackButton ? 18 : 104)
                         .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -80,6 +98,9 @@ struct KnowledgeGalaxyView: View {
             .navigationBarHidden(true)
             .navigationDestination(item: $navigateToMemory) { memory in
                 MemoryDetailView(memory: memory)
+            }
+            .navigationDestination(item: $openedCategory) { node in
+                CategoryDetailView(categoryName: node.title)
             }
             .onChange(of: selectedFilter) { _, _ in
                 selectedNode = graph?.filteredNodes(for: selectedFilter).first
@@ -100,6 +121,12 @@ struct KnowledgeGalaxyView: View {
         if let centerMemory,
            memoryStore.memories.contains(where: { $0.id == centerMemory.id }) {
             return centerMemory
+        }
+        // Honor the user's chosen center ("Set as Galaxy Center") before
+        // falling back to the automatic most-connected pick.
+        if !preferredCenterMemoryId.isEmpty,
+           let preferred = memoryStore.memories.first(where: { $0.id == preferredCenterMemoryId && !$0.isArchived }) {
+            return preferred
         }
         return memoryStore.defaultGraphMemory
     }
@@ -362,6 +389,8 @@ private struct GalaxyNodeDetailCard: View {
 
     let node: GalaxyNode
     let openMemory: () -> Void
+    var openCategory: () -> Void = {}
+    var makeCenter: (() -> Void)? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -415,6 +444,20 @@ private struct GalaxyNodeDetailCard: View {
             if node.isMemory {
                 Button(action: openMemory) {
                     Label("Open Memory", systemImage: "arrow.up.right.square")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(GalaxyMemoryButtonStyle(tint: node.kind.color))
+
+                if let makeCenter {
+                    Button(action: makeCenter) {
+                        Label("Set as Galaxy Center", systemImage: "scope")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(GalaxyMemoryButtonStyle(tint: node.kind.color))
+                }
+            } else if node.isCategory {
+                Button(action: openCategory) {
+                    Label("Explore Category", systemImage: "arrow.up.right.square")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(GalaxyMemoryButtonStyle(tint: node.kind.color))
