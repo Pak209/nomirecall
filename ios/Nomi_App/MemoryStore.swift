@@ -208,7 +208,7 @@ final class MemoryStore: ObservableObject {
         referencedPosts: [NomiReferencedPost] = [],
         tiktok: TikTokMemoryMetadata? = nil,
         processWithAI: Bool = true
-    ) async -> Bool {
+    ) async -> String? {
         do {
             let memoryId = try await memoryService.createMemory(
                 userId: userId,
@@ -232,10 +232,10 @@ final class MemoryStore: ObservableObject {
             }
             successMessage = "Memory saved."
             await load(userId: userId)
-            return true
+            return memoryId
         } catch {
             errorMessage = error.localizedDescription
-            return false
+            return nil
         }
     }
 

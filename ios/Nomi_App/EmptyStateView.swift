@@ -12,6 +12,7 @@ struct EmptyStateView: View {
 
             Text(title)
                 .font(.headline)
+                .foregroundStyle(Color.nomiInk)
 
             Text(message)
                 .font(.subheadline)
@@ -20,7 +21,7 @@ struct EmptyStateView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(22)
-        .background(.white.opacity(0.82))
+        .background(Color.nomiCardStrong)
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 }

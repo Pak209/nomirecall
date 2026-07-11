@@ -55,7 +55,7 @@ struct ConnectedIdeasView: View {
                 CategoryDetailView(categoryName: category.name)
             }
             .navigationDestination(for: NomiProject.self) { project in
-                ProjectDetailView(project: project)
+                ProjectWorkspaceView(project: project)
             }
             .sheet(isPresented: $isShowingCapture) {
                 QuickCaptureView()
