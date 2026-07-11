@@ -466,6 +466,9 @@ function nativeMemoryFromSource(source, firebaseUserId) {
     concepts: Array.isArray(source.concepts) ? source.concepts.map(String) : [],
     entities: Array.isArray(source.entities) ? source.entities.map(String) : [],
     author: Object.keys(author || {}).length ? author : undefined,
+    // Circle share attribution ("forwarded from") — kept on the native memory
+    // document so it survives in Firestore mode, not just on the source.
+    sharedBy: source.sharedBy,
     intent: source.intent || 'unknown',
     projectIds: Array.isArray(source.projectIds) ? source.projectIds.map(String) : [],
     confidenceScore: typeof source.confidenceScore === 'number' ? source.confidenceScore : undefined,
@@ -2999,6 +3002,7 @@ app.get('/api/memories/:id', auth, async (req, res) => {
       createdAt: memory.createdAt,
       category: memory.category || 'General',
       tags: Array.isArray(memory.tags) ? memory.tags : [],
+      sharedBy: cleanObject(memory.sharedBy),
       userId: memory.userId,
       body: String(memory.body || ''),
       source_url: memory.source_url,

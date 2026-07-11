@@ -308,6 +308,11 @@ async function listInbox(deps, callerId) {
 async function saveInboxItem(deps, callerId, shareId) {
   const item = await deps.store.getCircleDoc(callerId, 'inbox', shareId);
   if (!item) return { status: 404, body: { error: 'Shared item not found' } };
+  // Idempotent: saving an already-saved item (e.g. a double-tap) must not
+  // create a duplicate memory.
+  if (item.status === 'saved' && item.savedMemoryId) {
+    return { status: 200, body: { ok: true, memoryId: String(item.savedMemoryId) } };
+  }
   const snap = item.snapshot || {};
   const attr = item.attribution || {};
 

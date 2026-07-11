@@ -265,6 +265,16 @@ test('friend share lands in inbox with attribution and can be saved as a real me
   // The inbox item is now marked saved.
   const inboxAfter = await request(app).get('/api/circle/inbox').set(bob.auth);
   assert.equal(inboxAfter.body.items[0].status, 'saved');
+
+  // Saving again is idempotent: same memoryId, no duplicate memory.
+  const savedAgain = await request(app)
+    .post(`/api/circle/inbox/${shared.body.shareId}/save`)
+    .set(bob.auth);
+  assert.equal(savedAgain.status, 200);
+  assert.equal(savedAgain.body.memoryId, saved.body.memoryId);
+  const memoriesAfter = await request(app).get('/api/memories').set(bob.auth);
+  const copies = memoriesAfter.body.memories.filter((m) => m.tags.includes('shared'));
+  assert.equal(copies.length, 1, 'double-save must not duplicate the memory');
 });
 
 test('ignoring an inbox item marks it ignored', async () => {
@@ -311,6 +321,14 @@ test('blocking rejects requests + shares and hides from search; unblock restores
     .get(`/api/circle/search?q=${encodeURIComponent(alice.email)}`)
     .set(carol.auth);
   assert.equal(searchAfter.body.user.id, alice.id);
+
+  // ...and the ability to send a friend request again.
+  const rerequest = await request(app).post('/api/circle/requests').set(carol.auth).send({ toUserId: alice.id });
+  assert.equal(rerequest.status, 200);
+  assert.equal(rerequest.body.pending, true);
+  const aliceReqs = await request(app).get('/api/circle/requests').set(alice.auth);
+  assert.equal(aliceReqs.body.incoming.length, 1);
+  assert.equal(aliceReqs.body.incoming[0].id, carol.id);
 });
 
 test('blocking a friend removes the friendship on both sides', async () => {
