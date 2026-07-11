@@ -360,16 +360,95 @@ struct ConnectedIdeasView: View {
 
 private struct CategoryEditSheet: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var memoryStore: MemoryStore
 
     let categories: [(name: String, count: Int)]
     let onRename: (String) -> Void
+
+    @State private var applyingIds: Set<String> = []
+    @State private var isApplyingAll = false
+
+    /// Memories whose filed category disagrees with Nomi's AI-assigned one —
+    /// the "does my categorization actually make sense" audit, computed from
+    /// data the processing pipeline already produced.
+    private var mismatches: [(memory: NomiMemory, suggested: String)] {
+        memoryStore.memories
+            .filter { !$0.isArchived }
+            .compactMap { memory in
+                guard let suggested = memory.ai?.category?.trimmingCharacters(in: .whitespacesAndNewlines),
+                      !suggested.isEmpty else { return nil }
+                let filed = memory.category.trimmingCharacters(in: .whitespacesAndNewlines)
+                let filedName = filed.isEmpty ? "General" : filed
+                guard filedName.caseInsensitiveCompare(suggested) != .orderedSame else { return nil }
+                return (memory, suggested)
+            }
+    }
+
+    private func apply(_ memory: NomiMemory, suggested: String) async {
+        applyingIds.insert(memory.id)
+        defer { applyingIds.remove(memory.id) }
+        _ = await memoryStore.updateMemory(memory) { $0.category = suggested }
+    }
 
     var body: some View {
         NavigationStack {
             ZStack {
                 NomiBackground()
                 ScrollView(showsIndicators: false) {
-                    VStack(spacing: 10) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        if !mismatches.isEmpty {
+                            HStack {
+                                Label("Nomi's filing suggestions", systemImage: "sparkles")
+                                    .font(.footnote.weight(.black))
+                                    .foregroundStyle(Color.nomiPurple)
+                                Spacer()
+                                Button(isApplyingAll ? "Applying…" : "Apply all") {
+                                    Task {
+                                        isApplyingAll = true
+                                        for item in mismatches {
+                                            await apply(item.memory, suggested: item.suggested)
+                                        }
+                                        isApplyingAll = false
+                                    }
+                                }
+                                .font(.caption.weight(.black))
+                                .foregroundStyle(Color.nomiPurple)
+                                .buttonStyle(.plain)
+                                .disabled(isApplyingAll)
+                            }
+                            .padding(.top, 2)
+
+                            ForEach(mismatches, id: \.memory.id) { item in
+                                HStack(spacing: 10) {
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text(item.memory.title)
+                                            .font(.subheadline.weight(.bold))
+                                            .foregroundStyle(Color.nomiInk)
+                                            .lineLimit(1)
+                                        Text("Filed in \(item.memory.category.isEmpty ? "General" : item.memory.category) → Nomi suggests \(item.suggested)")
+                                            .font(.caption)
+                                            .foregroundStyle(Color.nomiMuted)
+                                    }
+                                    Spacer()
+                                    Button(applyingIds.contains(item.memory.id) ? "…" : "Apply") {
+                                        Task { await apply(item.memory, suggested: item.suggested) }
+                                    }
+                                    .font(.caption.weight(.black))
+                                    .foregroundStyle(.white)
+                                    .padding(.vertical, 6)
+                                    .padding(.horizontal, 12)
+                                    .background(Color.nomiPurple, in: Capsule())
+                                    .buttonStyle(.plain)
+                                    .disabled(applyingIds.contains(item.memory.id) || isApplyingAll)
+                                }
+                                .padding(12)
+                                .background(Color.nomiCard, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                                .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Color.nomiStroke, lineWidth: 1))
+                            }
+
+                            Divider().padding(.vertical, 6)
+                        }
+
                         ForEach(categories, id: \.name) { entry in
                             Button {
                                 onRename(entry.name)

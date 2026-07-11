@@ -199,6 +199,19 @@ struct CategoryMemoryCard: View {
         .buttonStyle(.plain)
     }
 
+    /// Every other category currently in use (normalized like the galaxy).
+    private var otherCategories: [String] {
+        let current = memory.category.trimmingCharacters(in: .whitespacesAndNewlines)
+        let currentName = current.isEmpty ? "General" : current
+        var names: Set<String> = []
+        for candidate in memoryStore.memories where !candidate.isArchived {
+            let raw = candidate.category.trimmingCharacters(in: .whitespacesAndNewlines)
+            names.insert(raw.isEmpty ? "General" : raw)
+        }
+        names.remove(currentName)
+        return names.sorted()
+    }
+
     private var availableProjects: [NomiProject] {
         let linked = Set(memory.projectIds)
         return intelligenceStore.projects.filter { !linked.contains($0.id) }
@@ -219,6 +232,17 @@ struct CategoryMemoryCard: View {
                 }
             } label: {
                 Label(memory.isFavorite ? "Remove Favorite" : "Favorite", systemImage: memory.isFavorite ? "star.slash" : "star")
+            }
+            // Refile this memory into a different category (rename semantics:
+            // categories are strings on memories, so this is a one-field patch).
+            Menu {
+                ForEach(otherCategories, id: \.self) { name in
+                    Button(name) {
+                        Task { _ = await memoryStore.updateMemory(memory) { $0.category = name } }
+                    }
+                }
+            } label: {
+                Label("Move to Category", systemImage: "folder.badge.gearshape")
             }
             // Turn ideas into project work: assign this memory to a project
             // using the same store API MemoryDetailView's Projects card uses.
