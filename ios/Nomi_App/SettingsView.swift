@@ -5,6 +5,7 @@ import FirebaseAuth
 import UIKit
 
 struct SettingsView: View {
+    @State private var isShowingReferral = false
     @Environment(\.openURL) private var openURL
     @EnvironmentObject private var appSession: AppSession
     @EnvironmentObject private var memoryStore: MemoryStore
@@ -318,6 +319,21 @@ struct SettingsView: View {
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .stroke(Color.nomiStroke, lineWidth: 1)
             )
+        }
+    }
+
+    private var referralCard: some View {
+        settingsCard(icon: "gift", iconTint: Color.nomiPurple, title: "Invite Friends") {
+            Button {
+                isShowingReferral = true
+            } label: {
+                Label("Give 7 days of Pro, get 7 days", systemImage: "gift")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(NomiPrimaryButtonStyle())
+        }
+        .sheet(isPresented: $isShowingReferral) {
+            ReferralView()
         }
     }
 
@@ -666,6 +682,8 @@ struct SettingsView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
                     subscriptionCard
+
+                    referralCard
                     legalCard
                     dangerZoneCard
                     #if DEBUG

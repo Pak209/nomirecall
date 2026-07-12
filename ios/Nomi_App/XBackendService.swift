@@ -982,3 +982,34 @@ private extension DecodingError {
         }
     }
 }
+
+
+// MARK: - Referral endpoints
+
+struct ReferralSummary: Decodable, Hashable {
+    let code: String
+    let proTrialUntil: String?
+    let grantedDays: Int?
+    let redeemed: Bool?
+}
+
+struct ReferralRedeemResult: Decodable, Hashable {
+    let ok: Bool
+    let proTrialUntil: String?
+    let referrerRewarded: Bool?
+}
+
+extension XBackendService {
+    func referralSummary() async throws -> ReferralSummary {
+        let request = try await authorizedRequest(path: "referral/me")
+        return try await send(request)
+    }
+
+    func redeemReferral(code: String) async throws -> ReferralRedeemResult {
+        var request = try await authorizedRequest(path: "referral/redeem")
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["code": code])
+        return try await send(request)
+    }
+}
