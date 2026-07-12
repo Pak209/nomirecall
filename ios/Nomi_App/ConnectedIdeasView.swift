@@ -554,7 +554,7 @@ struct CategoryExploreCard: View {
     var body: some View {
         Button(action: onOpen) {
             VStack(spacing: 6) {
-                NomiCategoryIconView(categoryName: name, size: 48, strokeColor: accent, openBottom: true)
+                NomiIdeasCategoryIcon(categoryName: name, size: 48, fallbackColor: accent)
 
                 Text(name)
                     .font(.caption.weight(.bold))
