@@ -547,6 +547,9 @@ struct CategoryExploreCard: View {
         case .ideas: Color(red: 1.00, green: 0.68, blue: 0.31)
         case .projects: Color(red: 0.68, green: 0.43, blue: 1.00)
         case .travel: Color(red: 0.32, green: 0.82, blue: 0.95)
+        case .personal: Color(red: 1.00, green: 0.55, blue: 0.55)
+        case .business: Color(red: 0.98, green: 0.75, blue: 0.30)
+        case .agents: Color(red: 0.45, green: 0.85, blue: 0.85)
         case .general: Color(red: 0.74, green: 0.38, blue: 1.00)
         }
     }

@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 // MARK: - Category model
 
@@ -15,6 +16,9 @@ enum NomiCategory: String, CaseIterable, Identifiable {
     case coding
     case projects
     case travel
+    case personal
+    case business
+    case agents
     case general
 
     var id: String { rawValue }
@@ -34,6 +38,9 @@ enum NomiCategory: String, CaseIterable, Identifiable {
             (.ideas, ["idea", "inspiration", "insight", "thought", "brainstorm"]),
             (.projects, ["project", "task", "todo", "plan", "checklist"]),
             (.travel, ["travel", "trip", "flight", "vacation", "destination"]),
+            (.business, ["business", "work", "career", "job", "startup ops", "marketing"]),
+            (.agents, ["agent", "bot", "automation", "crew"]),
+            (.personal, ["personal", "life", "family", "journal"]),
         ]
         for (category, keywords) in keywordMap where keywords.contains(where: { value.contains($0) }) {
             return category
@@ -53,8 +60,22 @@ enum NomiCategory: String, CaseIterable, Identifiable {
         case .coding: "laptopcomputer"
         case .projects: "checklist"
         case .travel: "airplane"
+        case .personal: "person"
+        case .business: "briefcase"
+        case .agents: "cpu"
         case .general: "sparkles"
         }
+    }
+
+    /// Rendered icon asset (dark variant shipped as the universal image for
+    /// both modes). All canonical categories have one; unmatched free-form
+    /// categories fall back to the vector ghost.
+    var assetName: String {
+        "Category" + rawValue.capitalized
+    }
+
+    var hasRenderedIcon: Bool {
+        UIImage(named: assetName) != nil
     }
 }
 
@@ -219,6 +240,18 @@ struct NomiCategoryIconView: View {
     }
 
     var body: some View {
+        if category.hasRenderedIcon {
+            Image(category.assetName)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: size, height: size)
+                .accessibilityLabel(Text("\(category.rawValue.capitalized) category"))
+        } else {
+            vectorFallback
+        }
+    }
+
+    private var vectorFallback: some View {
         ZStack {
             NomiGhostShape(openBottom: openBottom)
                 .stroke(resolvedColor, style: StrokeStyle(lineWidth: max(1.5, size * 0.055), lineCap: .round, lineJoin: .round))
@@ -248,17 +281,7 @@ struct NomiIdeasCategoryIcon: View {
     private var matched: NomiCategory { NomiCategory.match(categoryName) }
 
     private var sheetAssetName: String? {
-        switch matched {
-        case .tech: "CategoryTech"
-        case .fitness: "CategoryFitness"
-        case .trading: "CategoryTrading"
-        case .music: "CategoryMusic"
-        case .ideas: "CategoryIdeas"
-        case .coding: "CategoryCoding"
-        case .projects: "CategoryProjects"
-        case .travel: "CategoryTravel"
-        case .general: nil
-        }
+        matched.hasRenderedIcon ? matched.assetName : nil
     }
 
     private var fallbackSymbol: String {
