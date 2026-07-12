@@ -8,6 +8,15 @@ function utcDateKey(date = new Date()) {
   return date.toISOString().slice(0, 10);
 }
 
+// Accepts an ISO string or a Date; returns true only if it parses to a moment
+// strictly in the future. Used to lift a free user to the `pro` AI tier while a
+// referral Pro trial is active, without touching any paid-tier fields.
+function isFutureDate(value, now = Date.now()) {
+  if (!value) return false;
+  const ms = value instanceof Date ? value.getTime() : Date.parse(String(value));
+  return Number.isFinite(ms) && ms > now;
+}
+
 function getUserAIUsageTier(user = {}) {
   if (user.isAdmin === true || user.role === 'admin' || user.tier === 'admin' || user.tier === 'dev' || user.aiTier === 'admin' || user.aiTier === 'dev') return 'admin';
   if (user.isEarlyAccess === true || user.earlyAccessEnabled === true || user.tier === 'early_access' || user.aiTier === 'early_access') return 'early_access';
@@ -15,6 +24,9 @@ function getUserAIUsageTier(user = {}) {
   if (user.subscriptionStatus === 'early_access') return 'early_access';
   if (user.tier === 'pro' || user.aiTier === 'pro' || (Array.isArray(user.entitlements) && user.entitlements.includes('pro')) || user.subscriptionStatus === 'pro') return 'pro';
   if (user.tier === 'brain' || user.aiTier === 'brain' || (Array.isArray(user.entitlements) && user.entitlements.includes('brain')) || user.subscriptionStatus === 'brain') return 'brain';
+  // Referral Pro trial: only lifts users who have no paid tier above (checked
+  // last so every paid tier keeps precedence). proTrialUntil is an ISO string.
+  if (isFutureDate(user.proTrialUntil)) return 'pro';
   return 'free';
 }
 
@@ -214,6 +226,7 @@ module.exports = {
   getTodayUsage: getAIProcessingDailyUsage,
   getUserAiTier: getUserAIUsageTier,
   getUserAIUsageTier,
+  isFutureDate,
   incrementAiUsage: recordAIProcessingUsage,
   limitReachedPayload,
   recordAIProcessingUsage,
