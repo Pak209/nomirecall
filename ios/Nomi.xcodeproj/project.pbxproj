@@ -9,8 +9,9 @@
 /* Begin PBXBuildFile section */
 		02DE75098B0A170AC631B8AF /* NomiSharePayload.swift in Sources */ = {isa = PBXBuildFile; fileRef = F60EF6FFD302C6A5751B09F7 /* NomiSharePayload.swift */; };
 		04EA7BE19AFE7CF963793653 /* PurchaseStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03B1BA0E5198465E668F1619 /* PurchaseStore.swift */; };
-		99EC485AC5E547BC8A8B78A6 /* FriendCircleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04AF0D7CEABD4BB5A363B4C6 /* FriendCircleView.swift */; };
-		7EACC297430E494CAE8A9D37 /* CircleStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51029B60CBD2467CA7329B19 /* CircleStore.swift */; };
+		6C806CEFB2794E67A08A1391 /* FriendCircleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE965E0472E94AF3A0CE3A7B /* FriendCircleView.swift */; };
+		03197E6CB66C4B7BBA6B44E7 /* CircleStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03E19E39179743C19674005A /* CircleStore.swift */; };
+		3C828340D4A08E219F51573D /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 88893632D66EA77AC1FE3B30 /* PrivacyInfo.xcprivacy */; };
 		0EFD22C711B84839B46B0052 /* ProjectWorkspaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0D8C385437741F88AF3B0CC /* ProjectWorkspaceView.swift */; };
 		09FB3CF85FAE766CD86516D6 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A1FA9C2AB1FF7A7A453A296D /* Assets.xcassets */; };
 		0A0A0BD4D0ECEBF7503A1789 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 3835DFB317F094FD68CFC186 /* FirebaseFirestore */; };
@@ -111,8 +112,9 @@
 		025E759FE95060F50E8FAF8D /* AppSession.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppSession.swift; sourceTree = "<group>"; };
 		039CBC479F6EC025CD4D92CC /* Nomi_App.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = Nomi_App.entitlements; sourceTree = "<group>"; };
 		03B1BA0E5198465E668F1619 /* PurchaseStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PurchaseStore.swift; sourceTree = "<group>"; };
-		04AF0D7CEABD4BB5A363B4C6 /* FriendCircleView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FriendCircleView.swift; sourceTree = "<group>"; };
-		51029B60CBD2467CA7329B19 /* CircleStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CircleStore.swift; sourceTree = "<group>"; };
+		FE965E0472E94AF3A0CE3A7B /* FriendCircleView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FriendCircleView.swift; sourceTree = "<group>"; };
+		03E19E39179743C19674005A /* CircleStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CircleStore.swift; sourceTree = "<group>"; };
+		88893632D66EA77AC1FE3B30 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; name = PrivacyInfo.xcprivacy; path = ../Nomi/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		D0D8C385437741F88AF3B0CC /* ProjectWorkspaceView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ProjectWorkspaceView.swift; sourceTree = "<group>"; };
 		0409D49EAF065C6BE22C7F52 /* NomiShareInbox.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NomiShareInbox.swift; sourceTree = "<group>"; };
 		096A1417BA627518BB111844 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; name = PrivacyInfo.xcprivacy; path = ../Nomi/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
@@ -287,8 +289,8 @@
 				180296D0082142DE909B030B /* CategoryDetailView.swift */,
 				D53EE0B957CA43B3A1C214C2 /* ConnectedIdeasView.swift */,
 				D0D8C385437741F88AF3B0CC /* ProjectWorkspaceView.swift */,
-				51029B60CBD2467CA7329B19 /* CircleStore.swift */,
-				04AF0D7CEABD4BB5A363B4C6 /* FriendCircleView.swift */,
+				03E19E39179743C19674005A /* CircleStore.swift */,
+				FE965E0472E94AF3A0CE3A7B /* FriendCircleView.swift */,
 				03B1BA0E5198465E668F1619 /* PurchaseStore.swift */,
 				ED762E379793815EC13BD3F5 /* DiscoverView.swift */,
 				F81FF0E663F233BB1A4DFB0A /* NomiPaywallView.swift */,
@@ -298,6 +300,7 @@
 				F60EF6FFD302C6A5751B09F7 /* NomiSharePayload.swift */,
 				0409D49EAF065C6BE22C7F52 /* NomiShareInbox.swift */,
 				039CBC479F6EC025CD4D92CC /* Nomi_App.entitlements */,
+				88893632D66EA77AC1FE3B30 /* PrivacyInfo.xcprivacy */,
 				096A1417BA627518BB111844 /* PrivacyInfo.xcprivacy */,
 			);
 			path = Nomi_App;
@@ -516,6 +519,7 @@
 			files = (
 				09FB3CF85FAE766CD86516D6 /* Assets.xcassets in Resources */,
 				940CB849208C2626A1A7BFE6 /* GoogleService-Info.plist in Resources */,
+				3C828340D4A08E219F51573D /* PrivacyInfo.xcprivacy in Resources */,
 				768A9C08D706FA6882553C94 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -738,8 +742,8 @@
 				C21A1E49D69F4EB8A275216D /* CategoryDetailView.swift in Sources */,
 				FAD239FCA2224FBD903D6126 /* ConnectedIdeasView.swift in Sources */,
 				0EFD22C711B84839B46B0052 /* ProjectWorkspaceView.swift in Sources */,
-				7EACC297430E494CAE8A9D37 /* CircleStore.swift in Sources */,
-				99EC485AC5E547BC8A8B78A6 /* FriendCircleView.swift in Sources */,
+				03197E6CB66C4B7BBA6B44E7 /* CircleStore.swift in Sources */,
+				6C806CEFB2794E67A08A1391 /* FriendCircleView.swift in Sources */,
 				04EA7BE19AFE7CF963793653 /* PurchaseStore.swift in Sources */,
 				62A09443F7F40E99A24E3CFA /* DiscoverView.swift in Sources */,
 				C72621B6F3F3FD0ACCF6955F /* NomiPaywallView.swift in Sources */,

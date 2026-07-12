@@ -35,6 +35,16 @@ install! 'cocoapods',
 prepare_react_native_project!
 
 target 'Nomi' do
+  # Firebase's Swift pods require module maps when CocoaPods links them as
+  # static libraries. Keep this targeted so React Native's overlapping
+  # ReactCommon module maps are not regenerated globally.
+  pod 'FirebaseCore', :modular_headers => true
+  pod 'FirebaseCoreInternal', :modular_headers => true
+  pod 'FirebaseAuth', :modular_headers => true
+  pod 'FirebaseAppCheckInterop', :modular_headers => true
+  pod 'GoogleUtilities', :modular_headers => true
+  pod 'RecaptchaInterop', :modular_headers => true
+
   use_expo_modules!
   config = use_native_modules!
 
