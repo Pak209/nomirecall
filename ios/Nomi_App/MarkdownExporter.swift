@@ -334,6 +334,10 @@ enum MarkdownExporter {
             }
         }
 
+        // Organic share loop: exports are Nomi's most-traveled artifact.
+        lines.append("")
+        lines.append("---")
+        lines.append("*Saved with [Nomi](\(NomiShareLinks.marketingURL)) — your second brain that remembers.*")
         return lines.joined(separator: "\n")
     }
 

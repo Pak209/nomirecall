@@ -40,3 +40,10 @@ enum BackendConfig {
     static var allowsLocalDebugTools: Bool { false }
     #endif
 }
+
+
+enum NomiShareLinks {
+    /// Destination for outbound share footers. Swap to the TestFlight public
+    /// link (then the App Store URL) once those exist — one place to change.
+    static let marketingURL = "https://nomirecall.onrender.com"
+}
