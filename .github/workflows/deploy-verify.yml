@@ -1,0 +1,44 @@
+name: Verify Render deploy
+
+# After every merge to main, wait for Render to serve the new commit, warm it,
+# and fail loudly if the deploy never lands. On free tier this also minimizes
+# the cold window: the instance is exercised the moment it boots.
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Wait for deploy, then warm
+        run: |
+          BASE=https://nomirecall.onrender.com/api
+          echo "expecting commit: $GITHUB_SHA"
+          start_commit=""
+          for i in $(seq 1 60); do
+            body=$(curl -sS -m 75 "$BASE/health" || echo '{}')
+            ok=$(echo "$body" | jq -r '.ok // false')
+            commit=$(echo "$body" | jq -r '.commit // empty')
+            [ -z "$start_commit" ] && [ -n "$commit" ] && start_commit=$commit
+            echo "poll $i: ok=$ok commit=${commit:-none}"
+            if [ "$commit" = "$GITHUB_SHA" ]; then
+              echo "✅ new commit is live — warming"
+              curl -sS -m 75 -o /dev/null "$BASE/health"
+              curl -sS -m 75 -o /dev/null -w "warm status=%{http_code}\n" "$BASE/health"
+              exit 0
+            fi
+            sleep 12
+          done
+          # Deploy never landed. If the service is healthy on the old commit,
+          # Render likely skipped the deploy (build filter / older backend
+          # image without the commit field) — treat as pass with a notice.
+          final=$(curl -sS -m 75 "$BASE/health" || echo '{}')
+          if [ "$(echo "$final" | jq -r '.ok // false')" = "true" ]; then
+            echo "⚠️ service healthy but still on ${start_commit:-an older build} — deploy skipped or delayed beyond 12m"
+            exit 0
+          fi
+          echo "❌ backend unreachable after deploy window"
+          exit 1

@@ -1882,7 +1882,13 @@ async function upsertFirebaseUser(decoded, interests = []) {
 }
 
 app.get('/api/health', (_req, res) => {
-  res.json({ ok: true, service: 'second-brain-backend', persistence: store.mode });
+  res.json({
+    ok: true,
+    service: 'second-brain-backend',
+    persistence: store.mode,
+    // Render injects the deployed commit; lets CI verify a deploy finished.
+    commit: process.env.RENDER_GIT_COMMIT || null,
+  });
 });
 
 app.post('/api/auth/email', async (req, res) => {
