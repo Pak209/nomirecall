@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		02DE75098B0A170AC631B8AF /* NomiSharePayload.swift in Sources */ = {isa = PBXBuildFile; fileRef = F60EF6FFD302C6A5751B09F7 /* NomiSharePayload.swift */; };
 		04EA7BE19AFE7CF963793653 /* PurchaseStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03B1BA0E5198465E668F1619 /* PurchaseStore.swift */; };
+		2255EC5F92C94C26BD79E263 /* LinkPreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D31354330E0141439972F727 /* LinkPreviewView.swift */; };
 		23D50ACF9BDA47D089572C48 /* ReferralView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3581B15585114AB589FE7259 /* ReferralView.swift */; };
 		6C806CEFB2794E67A08A1391 /* FriendCircleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE965E0472E94AF3A0CE3A7B /* FriendCircleView.swift */; };
 		03197E6CB66C4B7BBA6B44E7 /* CircleStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03E19E39179743C19674005A /* CircleStore.swift */; };
@@ -113,6 +114,7 @@
 		025E759FE95060F50E8FAF8D /* AppSession.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppSession.swift; sourceTree = "<group>"; };
 		039CBC479F6EC025CD4D92CC /* Nomi_App.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = Nomi_App.entitlements; sourceTree = "<group>"; };
 		03B1BA0E5198465E668F1619 /* PurchaseStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PurchaseStore.swift; sourceTree = "<group>"; };
+		D31354330E0141439972F727 /* LinkPreviewView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LinkPreviewView.swift; sourceTree = "<group>"; };
 		3581B15585114AB589FE7259 /* ReferralView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ReferralView.swift; sourceTree = "<group>"; };
 		FE965E0472E94AF3A0CE3A7B /* FriendCircleView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FriendCircleView.swift; sourceTree = "<group>"; };
 		03E19E39179743C19674005A /* CircleStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CircleStore.swift; sourceTree = "<group>"; };
@@ -294,6 +296,7 @@
 				03E19E39179743C19674005A /* CircleStore.swift */,
 				FE965E0472E94AF3A0CE3A7B /* FriendCircleView.swift */,
 				3581B15585114AB589FE7259 /* ReferralView.swift */,
+				D31354330E0141439972F727 /* LinkPreviewView.swift */,
 				03B1BA0E5198465E668F1619 /* PurchaseStore.swift */,
 				ED762E379793815EC13BD3F5 /* DiscoverView.swift */,
 				F81FF0E663F233BB1A4DFB0A /* NomiPaywallView.swift */,
@@ -748,6 +751,7 @@
 				03197E6CB66C4B7BBA6B44E7 /* CircleStore.swift in Sources */,
 				6C806CEFB2794E67A08A1391 /* FriendCircleView.swift in Sources */,
 				23D50ACF9BDA47D089572C48 /* ReferralView.swift in Sources */,
+				2255EC5F92C94C26BD79E263 /* LinkPreviewView.swift in Sources */,
 				04EA7BE19AFE7CF963793653 /* PurchaseStore.swift in Sources */,
 				62A09443F7F40E99A24E3CFA /* DiscoverView.swift in Sources */,
 				C72621B6F3F3FD0ACCF6955F /* NomiPaywallView.swift in Sources */,

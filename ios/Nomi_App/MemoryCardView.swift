@@ -49,13 +49,17 @@ struct MemoryCardView: View {
                     .lineLimit(postTextSize.feedPreviewLineLimit)
             }
 
-            if !memory.media.isEmpty || !memory.links.isEmpty || !memory.referencedPosts.isEmpty {
+            if let link = memory.previewLink {
+                LinkPreviewCard(url: link.url, storedTitle: link.title, storedThumbnail: link.thumbnail)
+            }
+
+            if !memory.media.isEmpty || memory.links.count > 1 || !memory.referencedPosts.isEmpty {
                 HStack(spacing: 12) {
                     if !memory.media.isEmpty {
                         Label("\(memory.media.count)", systemImage: "photo.on.rectangle")
                     }
-                    if !memory.links.isEmpty {
-                        Label("\(memory.links.count)", systemImage: "link")
+                    if memory.links.count > 1 {
+                        Label("+\(memory.links.count - 1)", systemImage: "link")
                     }
                     if !memory.referencedPosts.isEmpty {
                         Label("\(memory.referencedPosts.count)", systemImage: "arrow.triangle.branch")

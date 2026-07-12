@@ -269,6 +269,10 @@ struct MemoryDetailView: View {
                 .textSelection(.enabled)
                 .fixedSize(horizontal: false, vertical: true)
 
+            if let link = draft.previewLink {
+                LinkPreviewCard(url: link.url, storedTitle: link.title, storedThumbnail: link.thumbnail)
+            }
+
             if originalText.count > 220 {
                 Button(isOriginalExpanded ? "Show less" : "Read more") {
                     withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
