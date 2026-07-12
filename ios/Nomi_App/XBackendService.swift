@@ -782,7 +782,16 @@ final class XBackendService {
         do {
             (data, response) = try await urlSession.data(for: request)
         } catch let error as URLError {
-            throw BackendServiceError.network(Self.friendlyNetworkMessage(for: error))
+            // Deploy/cold-start blips: one silent retry for idempotent GETs on
+            // connection-class failures before surfacing the friendly error.
+            let retriable: Set<URLError.Code> = [.timedOut, .cannotConnectToHost, .networkConnectionLost, .cannotFindHost, .dnsLookupFailed]
+            let method = (request.httpMethod ?? "GET").uppercased()
+            if method == "GET", retriable.contains(error.code),
+               let retried = try? await { try? await Task.sleep(for: .seconds(2.5)); return try await urlSession.data(for: request) }() {
+                (data, response) = retried
+            } else {
+                throw BackendServiceError.network(Self.friendlyNetworkMessage(for: error))
+            }
         } catch {
             throw BackendServiceError.network("Nomi could not reach the backend. It may be waking up or your connection may be offline.")
         }

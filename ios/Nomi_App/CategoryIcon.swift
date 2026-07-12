@@ -74,8 +74,17 @@ enum NomiCategory: String, CaseIterable, Identifiable {
         "Category" + rawValue.capitalized
     }
 
+    /// Only categories with individual-2-style art ship an imageset. The
+    /// remaining categories (general/business/agents/personal) render the
+    /// glyph tile until matching art exists — never the retired nose-shaped
+    /// generation.
     var hasRenderedIcon: Bool {
-        UIImage(named: assetName) != nil
+        switch self {
+        case .tech, .fitness, .trading, .music, .ideas, .coding, .projects, .travel:
+            UIImage(named: assetName) != nil
+        default:
+            false
+        }
     }
 }
 
@@ -253,6 +262,17 @@ struct NomiCategoryIconView: View {
 
     private var vectorFallback: some View {
         ZStack {
+            Circle()
+                .fill(resolvedColor.opacity(0.13))
+            NomiCategoryGlyph(category: category, color: resolvedColor, weight: .bold)
+                .frame(width: size * 0.5, height: size * 0.5)
+        }
+        .frame(width: size, height: size)
+        .accessibilityLabel(Text("\(category.rawValue.capitalized) category"))
+    }
+
+    private var retiredGhostFallback: some View {
+        ZStack {
             NomiGhostShape(openBottom: openBottom)
                 .stroke(resolvedColor, style: StrokeStyle(lineWidth: max(1.5, size * 0.055), lineCap: .round, lineJoin: .round))
 
@@ -310,15 +330,14 @@ struct NomiIdeasCategoryIcon: View {
                 .accessibilityLabel(Text("\(categoryName) category"))
         } else {
             ZStack {
-                NomiGhostShape(openBottom: true)
-                    .stroke(fallbackColor, style: StrokeStyle(lineWidth: max(1.5, size * 0.055), lineCap: .round, lineJoin: .round))
+                Circle()
+                    .fill(fallbackColor.opacity(0.13))
                 Image(systemName: fallbackSymbol)
                     .resizable()
                     .scaledToFit()
-                    .fontWeight(.semibold)
+                    .fontWeight(.bold)
                     .foregroundStyle(fallbackColor)
-                    .frame(width: size * 0.31, height: size * 0.31)
-                    .offset(y: size * 0.10)
+                    .frame(width: size * 0.46, height: size * 0.46)
             }
             .frame(width: size, height: size)
             .accessibilityLabel(Text("\(categoryName) category"))
