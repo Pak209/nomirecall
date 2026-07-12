@@ -15,6 +15,7 @@ struct ReferralView: View {
     @State private var isRedeeming = false
     @State private var redeemSuccessUntil: String?
     @State private var errorMessage: String?
+    @State private var loadError: String?
 
     private let backendService = XBackendService()
 
@@ -47,6 +48,28 @@ struct ReferralView: View {
                             if summary.redeemed != true {
                                 redeemCard
                             }
+                        } else {
+                            // Load failed (cold backend, offline): say so and
+                            // offer retry instead of a silently empty screen.
+                            VStack(spacing: 12) {
+                                Text(loadError ?? "Couldn\u{2019}t load your invite code. The backend may be waking up.")
+                                    .font(.subheadline)
+                                    .foregroundStyle(Color.nomiMuted)
+                                    .multilineTextAlignment(.center)
+                                Button {
+                                    Task { await load() }
+                                } label: {
+                                    Label("Try again", systemImage: "arrow.clockwise")
+                                        .font(.subheadline.weight(.bold))
+                                        .padding(.vertical, 10)
+                                        .padding(.horizontal, 18)
+                                        .background(Color.nomiPurple.opacity(0.14), in: Capsule())
+                                        .foregroundStyle(Color.nomiPurple)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 30)
                         }
                     }
                     .padding(20)
@@ -180,7 +203,12 @@ struct ReferralView: View {
     private func load() async {
         isLoading = true
         defer { isLoading = false }
-        summary = try? await backendService.referralSummary()
+        do {
+            summary = try await backendService.referralSummary()
+            loadError = nil
+        } catch {
+            loadError = error.localizedDescription
+        }
     }
 
     private func redeem() async {
