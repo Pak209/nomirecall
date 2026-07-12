@@ -96,7 +96,11 @@ struct NomiGhostShape: Shape {
         path.addCurve(to: pt(0.80, 0.82), control1: pt(0.99, 0.76), control2: pt(0.91, 0.83))
 
         if openBottom {
-            path.move(to: pt(0.20, 0.82))
+            // Curl inward on both sides before opening the base. Without
+            // these tails, the arm bumps read like a nose at card sizes.
+            path.addCurve(to: pt(0.66, 0.92), control1: pt(0.78, 0.89), control2: pt(0.72, 0.92))
+            path.move(to: pt(0.34, 0.92))
+            path.addCurve(to: pt(0.20, 0.82), control1: pt(0.28, 0.92), control2: pt(0.22, 0.89))
         } else {
             path.addCurve(to: pt(0.50, 0.92), control1: pt(0.72, 0.88), control2: pt(0.62, 0.92))
             path.addCurve(to: pt(0.20, 0.82), control1: pt(0.38, 0.92), control2: pt(0.28, 0.88))
@@ -226,6 +230,76 @@ struct NomiCategoryIconView: View {
         }
         .frame(width: size, height: size)
         .accessibilityLabel(Text("\(category.rawValue.capitalized) category"))
+    }
+}
+
+// MARK: - Ideas dashboard artwork
+
+/// Uses the original category-sheet artwork on the Ideas dashboard. Unknown
+/// user-created categories keep the same ghost silhouette but receive a
+/// stable, category-specific symbol instead of all looking like General.
+struct NomiIdeasCategoryIcon: View {
+    @Environment(\.colorScheme) private var colorScheme
+
+    let categoryName: String
+    var size: CGFloat = 48
+    var fallbackColor: Color
+
+    private var matched: NomiCategory { NomiCategory.match(categoryName) }
+
+    private var sheetAssetName: String? {
+        switch matched {
+        case .tech: "CategoryTech"
+        case .fitness: "CategoryFitness"
+        case .trading: "CategoryTrading"
+        case .music: "CategoryMusic"
+        case .ideas: "CategoryIdeas"
+        case .coding: "CategoryCoding"
+        case .projects: "CategoryProjects"
+        case .travel: "CategoryTravel"
+        case .general: nil
+        }
+    }
+
+    private var fallbackSymbol: String {
+        let value = categoryName.lowercased()
+        if value.contains("business") || value.contains("work") { return "briefcase" }
+        if value.contains("agent") || value.contains("bot") { return "cpu" }
+        if value.contains("personal") || value.contains("life") { return "person" }
+        if value.contains("food") || value.contains("recipe") { return "fork.knife" }
+        if value.contains("book") || value.contains("learn") { return "book.closed" }
+        if value.contains("home") { return "house" }
+        if value.contains("general") { return "square.grid.2x2" }
+
+        let symbols = ["bookmark", "star", "flag", "folder", "tag", "heart"]
+        let checksum = categoryName.unicodeScalars.reduce(0) { ($0 &* 31) &+ Int($1.value) }
+        return symbols[abs(checksum) % symbols.count]
+    }
+
+    var body: some View {
+        if let sheetAssetName {
+            Image(sheetAssetName)
+                .resizable()
+                .interpolation(.high)
+                .antialiased(true)
+                .scaledToFit()
+                .frame(width: size, height: size)
+                .accessibilityLabel(Text("\(categoryName) category"))
+        } else {
+            ZStack {
+                NomiGhostShape(openBottom: true)
+                    .stroke(fallbackColor, style: StrokeStyle(lineWidth: max(1.5, size * 0.055), lineCap: .round, lineJoin: .round))
+                Image(systemName: fallbackSymbol)
+                    .resizable()
+                    .scaledToFit()
+                    .fontWeight(.semibold)
+                    .foregroundStyle(fallbackColor)
+                    .frame(width: size * 0.31, height: size * 0.31)
+                    .offset(y: size * 0.10)
+            }
+            .frame(width: size, height: size)
+            .accessibilityLabel(Text("\(categoryName) category"))
+        }
     }
 }
 
