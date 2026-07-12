@@ -5,6 +5,8 @@ struct FriendCircleView: View {
     @StateObject private var store = CircleStore()
     @Environment(\.dismiss) private var dismiss
 
+    @AppStorage("nomi.circleIntroSeen") private var circleIntroSeen = false
+    @State private var isShowingIntro = false
     @State private var isShowingAddFriend = false
     @State private var removalTarget: CircleFriend?
     @State private var blockTarget: CircleFriend?
@@ -50,14 +52,25 @@ struct FriendCircleView: View {
                 }
 
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        isShowingAddFriend = true
-                    } label: {
-                        Image(systemName: "plus")
-                            .font(.headline.weight(.bold))
-                            .foregroundStyle(Color.nomiPink)
+                    HStack(spacing: 2) {
+                        Button {
+                            isShowingIntro = true
+                        } label: {
+                            Image(systemName: "questionmark.circle")
+                                .font(.headline.weight(.bold))
+                                .foregroundStyle(Color.nomiMuted)
+                        }
+                        .accessibilityLabel("How Circle works")
+
+                        Button {
+                            isShowingAddFriend = true
+                        } label: {
+                            Image(systemName: "plus")
+                                .font(.headline.weight(.bold))
+                                .foregroundStyle(Color.nomiPink)
+                        }
+                        .accessibilityLabel("Add friend")
                     }
-                    .accessibilityLabel("Add friend")
                 }
             }
             .sheet(isPresented: $isShowingAddFriend) {
@@ -96,6 +109,15 @@ struct FriendCircleView: View {
             }
             .task { await store.loadAll() }
             .refreshable { await store.loadAll() }
+            .onAppear {
+                if !circleIntroSeen { isShowingIntro = true }
+            }
+            .sheet(isPresented: $isShowingIntro) {
+                CircleIntroSheet {
+                    circleIntroSeen = true
+                    isShowingIntro = false
+                }
+            }
         }
     }
 
@@ -782,5 +804,102 @@ struct ShareToCircleSheet: View {
             get: { store.errorMessage != nil },
             set: { if !$0 { store.errorMessage = nil } }
         )
+    }
+}
+
+
+// MARK: - First-run intro
+
+/// One-time explainer shown on first open (reopenable via the ? button).
+/// Pure education — no mock data, no fake controls.
+private struct CircleIntroSheet: View {
+    let onDone: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                NomiBackground()
+
+                ScrollView(showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 18) {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Welcome to your Circle")
+                                .font(.system(size: 28, weight: .black, design: .rounded))
+                                .foregroundStyle(Color.nomiInk)
+                            Text("My brain stays private. My Circle helps it grow.")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(Color.nomiPurple)
+                        }
+                        .padding(.top, 8)
+
+                        introCard(
+                            icon: "person.badge.plus",
+                            title: "Add people you trust",
+                            body: "Find friends by their exact username or email — there's no public directory and no follower counts. Friendship is mutual: they approve, you're connected."
+                        )
+
+                        introCard(
+                            icon: "square.and.arrow.up",
+                            title: "Share what matters",
+                            body: "Share any memory from its ⋯ menu. Friends receive a copy with your name on it and choose to save it into their own Nomi or pass. Nothing is ever shared automatically."
+                        )
+
+                        introCard(
+                            icon: "folder.badge.person.crop",
+                            title: "Build projects together",
+                            body: "Invite friends into a project workspace to brainstorm, answer each other's open questions, and turn shared ideas into decisions and tasks — without exposing anything outside that project.",
+                            badge: "Coming Soon"
+                        )
+
+                        Button(action: onDone) {
+                            Text("Got it")
+                                .font(.headline.weight(.bold))
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 14)
+                                .background(Color.nomiPurple, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                                .foregroundStyle(.white)
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.top, 6)
+                    }
+                    .padding(20)
+                }
+            }
+            .presentationDragIndicator(.visible)
+        }
+    }
+
+    private func introCard(icon: String, title: String, body text: String, badge: String? = nil) -> some View {
+        HStack(alignment: .top, spacing: 14) {
+            Image(systemName: icon)
+                .font(.title3.weight(.bold))
+                .foregroundStyle(Color.nomiPurple)
+                .frame(width: 40, height: 40)
+                .background(Color.nomiPurple.opacity(0.12), in: Circle())
+
+            VStack(alignment: .leading, spacing: 5) {
+                HStack(spacing: 8) {
+                    Text(title)
+                        .font(.headline.weight(.black))
+                        .foregroundStyle(Color.nomiInk)
+                    if let badge {
+                        Text(badge)
+                            .font(.caption2.weight(.black))
+                            .foregroundStyle(Color.nomiOrange)
+                            .padding(.vertical, 3)
+                            .padding(.horizontal, 7)
+                            .background(Color.nomiOrange.opacity(0.14), in: Capsule())
+                    }
+                }
+                Text(text)
+                    .font(.subheadline)
+                    .foregroundStyle(Color.nomiMuted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(15)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.nomiCardStrong, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).stroke(Color.nomiStroke, lineWidth: 1))
     }
 }
