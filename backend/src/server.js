@@ -68,6 +68,7 @@ const {
   isTikTokUrl,
 } = require('./tiktok');
 const circle = require('./circle');
+const referral = require('./referral');
 
 dotenv.config();
 
@@ -294,6 +295,10 @@ const CIRCLE_BLOCK_SCHEMA = z.object({
 const CIRCLE_SHARE_SCHEMA = z.object({
   toUserId: z.string().min(1, 'toUserId is required'),
   memoryId: z.string().min(1, 'memoryId is required'),
+});
+
+const REFERRAL_REDEEM_SCHEMA = z.object({
+  code: z.string().min(1, 'A referral code is required.'),
 });
 
 function sourceTimestampMs(source) {
@@ -1591,6 +1596,8 @@ function publicUser(user) {
     displayName: user.displayName || user.email,
     photoURL: user.photoURL || null,
     tier: user.tier || 'free',
+    proTrialUntil: user.proTrialUntil || null,
+    referralCode: user.referralCode || null,
     interests: user.interests || [],
     onboardingCompleted: !!user.onboardingCompleted,
   };
@@ -3313,6 +3320,32 @@ app.post('/api/circle/inbox/:shareId/ignore', auth, async (req, res) => {
     return res.status(status).json(body);
   } catch (error) {
     return res.status(500).json({ error: error.message || 'Could not update shared item.' });
+  }
+});
+
+// Dependencies injected into the referral module. Built per-request so the module
+// stays decoupled from server.js internals (mirrors circleDeps()).
+function referralDeps() {
+  return { store };
+}
+
+app.get('/api/referral/me', auth, async (req, res) => {
+  try {
+    const { status, body } = await referral.getReferralSummary(referralDeps(), req.userId);
+    return res.status(status).json(body);
+  } catch (error) {
+    return res.status(500).json({ error: error.message || 'Could not load referral.' });
+  }
+});
+
+app.post('/api/referral/redeem', auth, async (req, res) => {
+  const data = parseBody(REFERRAL_REDEEM_SCHEMA, req, res);
+  if (!data) return;
+  try {
+    const { status, body } = await referral.redeem(referralDeps(), req.userId, data.code);
+    return res.status(status).json(body);
+  } catch (error) {
+    return res.status(500).json({ error: error.message || 'Could not redeem referral code.' });
   }
 });
 

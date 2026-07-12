@@ -53,6 +53,18 @@ class MemoryStore {
     return null;
   }
 
+  async findUserByReferralCode(code) {
+    // Exact match. Referral codes are persisted exactly as generated (from an
+    // unambiguous uppercase alphabet); the caller normalizes redeem input to the
+    // same shape, so an exact equality check mirrors the Firestore where('==').
+    const key = String(code || '').trim();
+    if (!key) return null;
+    for (const user of this.usersByEmail.values()) {
+      if (String(user.referralCode || '') === key) return user;
+    }
+    return null;
+  }
+
   async listUsers(options = {}) {
     return Array.from(this.usersByEmail.values()).slice(0, Number(options.limit || 500));
   }
@@ -362,6 +374,16 @@ class FirestoreStore {
     const key = String(username || '').trim().toLowerCase();
     if (!key) return null;
     const snapshot = await this.userCollection().where('username', '==', key).limit(1).get();
+    if (snapshot.empty) return null;
+    return { id: snapshot.docs[0].id, ...snapshot.docs[0].data() };
+  }
+
+  async findUserByReferralCode(code) {
+    // Referral codes are stored exactly as generated; the caller normalizes
+    // redeem input to the same casing, so this is a genuine exact match.
+    const key = String(code || '').trim();
+    if (!key) return null;
+    const snapshot = await this.userCollection().where('referralCode', '==', key).limit(1).get();
     if (snapshot.empty) return null;
     return { id: snapshot.docs[0].id, ...snapshot.docs[0].data() };
   }
