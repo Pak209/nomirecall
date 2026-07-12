@@ -817,6 +817,106 @@ final class XBackendService {
     }
 }
 
+// MARK: - Friend Circle
+
+extension XBackendService {
+    func circleSearch(query: String) async throws -> CircleProfile? {
+        var components = URLComponents(url: baseURL.appendingPathComponent("circle/search"), resolvingAgainstBaseURL: false)
+        components?.queryItems = [URLQueryItem(name: "q", value: query)]
+        guard let url = components?.url else { throw BackendServiceError.invalidResponse }
+
+        var request = try await authorizedRequest(url: url)
+        request.httpMethod = "GET"
+        let response: CircleSearchResponse = try await send(request)
+        return response.user
+    }
+
+    func circleRequests() async throws -> CircleRequestsResponse {
+        var request = try await authorizedRequest(path: "circle/requests")
+        request.httpMethod = "GET"
+        return try await send(request)
+    }
+
+    @discardableResult
+    func sendCircleRequest(toUserId: String) async throws -> CircleRequestActionResponse {
+        var request = try await authorizedRequest(path: "circle/requests")
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(["toUserId": toUserId])
+        return try await send(request)
+    }
+
+    func acceptCircleRequest(fromUserId: String) async throws {
+        var request = try await authorizedRequest(path: "circle/requests/\(fromUserId)/accept")
+        request.httpMethod = "POST"
+        let _: CircleActionResponse = try await send(request)
+    }
+
+    func declineCircleRequest(fromUserId: String) async throws {
+        var request = try await authorizedRequest(path: "circle/requests/\(fromUserId)/decline")
+        request.httpMethod = "POST"
+        let _: CircleActionResponse = try await send(request)
+    }
+
+    func circleFriends() async throws -> [CircleFriend] {
+        var request = try await authorizedRequest(path: "circle/friends")
+        request.httpMethod = "GET"
+        let response: CircleFriendsResponse = try await send(request)
+        return response.friends
+    }
+
+    func setCircleFriendPinned(friendId: String, pinned: Bool) async throws {
+        var request = try await authorizedRequest(path: "circle/friends/\(friendId)")
+        request.httpMethod = "PATCH"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(["pinned": pinned])
+        let _: CircleActionResponse = try await send(request)
+    }
+
+    func removeCircleFriend(friendId: String) async throws {
+        var request = try await authorizedRequest(path: "circle/friends/\(friendId)")
+        request.httpMethod = "DELETE"
+        let _: CircleActionResponse = try await send(request)
+    }
+
+    func blockCircleUser(userId: String) async throws {
+        var request = try await authorizedRequest(path: "circle/block")
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(["userId": userId])
+        let _: CircleActionResponse = try await send(request)
+    }
+
+    @discardableResult
+    func shareToCircle(toUserId: String, memoryId: String) async throws -> CircleShareResponse {
+        var request = try await authorizedRequest(path: "circle/share")
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(["toUserId": toUserId, "memoryId": memoryId])
+        return try await send(request)
+    }
+
+    func circleInbox() async throws -> [CircleInboxItem] {
+        var request = try await authorizedRequest(path: "circle/inbox")
+        request.httpMethod = "GET"
+        let response: CircleInboxResponse = try await send(request)
+        return response.items
+    }
+
+    @discardableResult
+    func saveCircleShare(shareId: String) async throws -> CircleSaveResponse {
+        var request = try await authorizedRequest(path: "circle/inbox/\(shareId)/save")
+        request.httpMethod = "POST"
+        return try await send(request)
+    }
+
+    func ignoreCircleShare(shareId: String) async throws {
+        var request = try await authorizedRequest(path: "circle/inbox/\(shareId)/ignore")
+        request.httpMethod = "POST"
+        let _: CircleActionResponse = try await send(request)
+    }
+}
+
 private struct BackendErrorResponse: Decodable {
     let error: String
 }
