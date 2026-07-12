@@ -815,6 +815,13 @@ final class XBackendService {
     }
 
     private static func friendlyNetworkMessage(for error: URLError) -> String {
+        let host = BackendConfig.apiBaseURL.host ?? "the backend"
+        if host == "localhost" || host == "127.0.0.1" {
+            // The single most confusing failure mode during development: the
+            // Xcode scheme's NOMI_BACKEND_API_BASE_URL override points at a
+            // local backend that isn't running. Say so explicitly.
+            return "This build is pointed at a local dev backend (localhost) that isn't running. Disable the NOMI_BACKEND_API_BASE_URL override in the Xcode scheme, or start the local backend."
+        }
         switch error.code {
         case .timedOut:
             return "Nomi is waking up the backend. Please try again in a few seconds."
