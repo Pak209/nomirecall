@@ -45,5 +45,5 @@ enum BackendConfig {
 enum NomiShareLinks {
     /// Destination for outbound share footers. Swap to the TestFlight public
     /// link (then the App Store URL) once those exist — one place to change.
-    static let marketingURL = "https://nomirecall.onrender.com"
+    static let marketingURL = "https://testflight.apple.com/join/KVUNpuJ1"
 }
