@@ -1,3 +1,4 @@
+import AuthenticationServices
 import Foundation
 import FirebaseAuth
 import FirebaseCore
@@ -84,6 +85,31 @@ final class AuthService {
             return authResult.user
         } catch let error as AuthServiceError {
             throw error
+        } catch {
+            throw AuthErrorFormatter.userFacingError(from: error)
+        }
+    }
+
+    @MainActor
+    func signInWithApple(authorization: ASAuthorization, rawNonce: String) async throws -> User {
+        guard FirebaseAppReady.isConfigured else { throw AuthServiceError.firebaseNotConfigured }
+        guard let appleIDCredential = authorization.credential as? ASAuthorizationAppleIDCredential,
+              let identityTokenData = appleIDCredential.identityToken,
+              let identityToken = String(data: identityTokenData, encoding: .utf8) else {
+            throw AppleSignInError.missingIdentityToken
+        }
+
+        // fullName is only delivered on the first authorization for this Apple
+        // ID; Firebase persists it as the user's displayName when present.
+        let credential = OAuthProvider.appleCredential(
+            withIDToken: identityToken,
+            rawNonce: rawNonce,
+            fullName: appleIDCredential.fullName
+        )
+
+        do {
+            let authResult = try await Auth.auth().signIn(with: credential)
+            return authResult.user
         } catch {
             throw AuthErrorFormatter.userFacingError(from: error)
         }
@@ -269,8 +295,15 @@ final class AccountDeletionService {
 
         let userId = user.uid
 
-        guard !needsFreshSignIn(user) else {
-            throw AccountDeletionError.requiresRecentLogin
+        if isAppleUser(user) {
+            // Apple requires revoking Sign in with Apple tokens when the
+            // account is deleted (guideline 5.1.1(v)); the fresh authorization
+            // also satisfies Firebase's recent-login requirement.
+            try await reauthenticateAppleUserAndRevokeToken(user)
+        } else {
+            guard !needsFreshSignIn(user) else {
+                throw AccountDeletionError.requiresRecentLogin
+            }
         }
 
         try await deleteStorageFiles(userId: userId)
@@ -368,6 +401,36 @@ final class AccountDeletionService {
         }
     }
 
+    private func isAppleUser(_ user: User) -> Bool {
+        user.providerData.contains { $0.providerID == "apple.com" }
+    }
+
+    @MainActor
+    private func reauthenticateAppleUserAndRevokeToken(_ user: User) async throws {
+        let rawNonce = AppleNonce.randomNonceString()
+        let flow = AppleAuthorizationFlow()
+        let appleCredential = try await flow.requestCredential(hashedNonce: AppleNonce.sha256(rawNonce))
+
+        guard let identityTokenData = appleCredential.identityToken,
+              let identityToken = String(data: identityTokenData, encoding: .utf8) else {
+            throw AppleSignInError.missingIdentityToken
+        }
+
+        let credential = OAuthProvider.appleCredential(
+            withIDToken: identityToken,
+            rawNonce: rawNonce,
+            fullName: nil
+        )
+        try await user.reauthenticate(with: credential)
+
+        if let codeData = appleCredential.authorizationCode,
+           let authorizationCode = String(data: codeData, encoding: .utf8) {
+            // Best-effort: a transient revocation failure must not strand the
+            // user's data deletion, which is the part they can see.
+            try? await Auth.auth().revokeToken(withAuthorizationCode: authorizationCode)
+        }
+    }
+
     private func isRecentLoginRequired(_ error: Error) -> Bool {
         let nsError = error as NSError
         return AuthErrorCode(_bridgedNSError: nsError)?.code == .requiresRecentLogin
@@ -437,7 +500,7 @@ enum AuthErrorFormatter {
         case AuthErrorCode.networkError.rawValue:
             return DisplayableAuthError("Nomi could not reach Firebase. Check your connection and try again.")
         case AuthErrorCode.operationNotAllowed.rawValue:
-            return DisplayableAuthError("Email/password sign-in is not enabled in Firebase Authentication.")
+            return DisplayableAuthError("This sign-in method is not enabled in Firebase Authentication yet.")
         case AuthErrorCode.appNotAuthorized.rawValue:
             return DisplayableAuthError("This app is not authorized for Firebase Auth. Check the iOS bundle ID and API key restrictions in Google Cloud.")
         case AuthErrorCode.invalidAPIKey.rawValue:
