@@ -1,3 +1,4 @@
+import AuthenticationServices
 import SwiftUI
 
 struct AuthStackView: View {
@@ -15,8 +16,14 @@ struct AuthStackView: View {
     @State private var biometricDisplayName = "Face ID"
     @State private var isWorking = false
     @State private var isGoogleWorking = false
+    @State private var isAppleWorking = false
     @State private var isBiometricWorking = false
+    @State private var currentAppleNonce = ""
     @State private var errorMessage: String?
+
+    private var isAnyAuthWorking: Bool {
+        isWorking || isGoogleWorking || isAppleWorking || isBiometricWorking
+    }
 
     private let authService = AuthService()
     private let userProfileService = UserProfileService()
@@ -100,7 +107,7 @@ struct AuthStackView: View {
                                     .frame(maxWidth: .infinity)
                                 }
                                 .buttonStyle(NomiSecondaryButtonStyle())
-                                .disabled(isWorking || isGoogleWorking || isBiometricWorking)
+                                .disabled(isAnyAuthWorking)
                             }
                         }
                     }
@@ -120,7 +127,7 @@ struct AuthStackView: View {
                         .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(NomiPrimaryButtonStyle())
-                    .disabled(isWorking || isGoogleWorking || isBiometricWorking || email.isEmpty || password.count < 6)
+                    .disabled(isAnyAuthWorking || email.isEmpty || password.count < 6)
 
                     HStack(spacing: 12) {
                         Rectangle()
@@ -135,6 +142,27 @@ struct AuthStackView: View {
                             .fill(.secondary.opacity(0.24))
                             .frame(height: 1)
                     }
+
+                    SignInWithAppleButton(.continue) { request in
+                        let nonce = AppleNonce.randomNonceString()
+                        currentAppleNonce = nonce
+                        request.requestedScopes = [.fullName, .email]
+                        request.nonce = AppleNonce.sha256(nonce)
+                    } onCompletion: { result in
+                        handleAppleSignIn(result)
+                    }
+                    .signInWithAppleButtonStyle(.black)
+                    .frame(height: 44)
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .overlay {
+                        if isAppleWorking {
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .fill(.black.opacity(0.55))
+                            ProgressView()
+                                .tint(.white)
+                        }
+                    }
+                    .disabled(isAnyAuthWorking)
 
                     Button {
                         continueWithGoogle()
@@ -160,7 +188,7 @@ struct AuthStackView: View {
                         .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(NomiSecondaryButtonStyle())
-                    .disabled(isWorking || isGoogleWorking || isBiometricWorking)
+                    .disabled(isAnyAuthWorking)
 
                     if let errorMessage {
                         Text(errorMessage)
@@ -221,6 +249,32 @@ struct AuthStackView: View {
 
             password = ""
             isBiometricWorking = false
+        }
+    }
+
+    private func handleAppleSignIn(_ result: Result<ASAuthorization, Error>) {
+        switch result {
+        case .failure(let error):
+            // A dismissed Apple sheet is a normal outcome, not an error state.
+            if !AppleSignInError.isCancellation(error) {
+                errorMessage = error.localizedDescription
+            }
+        case .success(let authorization):
+            isAppleWorking = true
+            errorMessage = nil
+            let nonce = currentAppleNonce
+
+            Task {
+                do {
+                    _ = try await authService.signInWithApple(authorization: authorization, rawNonce: nonce)
+                } catch {
+                    if !AppleSignInError.isCancellation(error) {
+                        errorMessage = error.localizedDescription
+                    }
+                }
+
+                isAppleWorking = false
+            }
         }
     }
 

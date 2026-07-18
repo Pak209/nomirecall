@@ -158,3 +158,32 @@ Confirm App Privacy labels in App Store Connect match actual collection, storage
 - [ ] Final RevenueCat entitlement/offering/product IDs
 - [ ] Final privacy labels
 - [ ] Final screenshot set using non-sensitive sample data from the review demo flow
+
+## Sign in with Apple (added for the Guideline 4.8 rejection, 2026-07-18)
+
+The 1.0 (25) submission was rejected under Guideline 4.8 (Design — Login
+Services) because the app offered Google Sign-In without an equivalent
+privacy-preserving option. Fix shipped on branch `fix/sign-in-with-apple`:
+
+- Official `SignInWithAppleButton` (`.continue` style) on the auth screen,
+  placed above "Continue with Google" at the same width/height.
+- Firebase Apple provider via `OAuthProvider.appleCredential(withIDToken:rawNonce:fullName:)`
+  with a SHA-256-hashed cryptographic nonce (`AppleSignInService.swift`).
+- Apple-provided full name is persisted as displayName on first login
+  (Firebase handles this when `fullName` is passed with the credential).
+- Hide My Email relay addresses flow through unchanged — no account merging
+  is attempted on email or name matches.
+- Account deletion for Apple-authenticated users re-authenticates with a
+  fresh Apple authorization and calls `Auth.revokeToken(withAuthorizationCode:)`
+  per Guideline 5.1.1(v), then deletes data exactly as before.
+- Entitlement `com.apple.developer.applesignin` added to Nomi_App.entitlements.
+
+Console prerequisites before the resubmission build:
+
+1. **Firebase Console** → Authentication → Sign-in method → **Apple → Enable**.
+   (iOS-only apps need no Services ID, key, or secret — leave those blank.)
+2. **Apple Developer / Xcode**: the App ID `com.dkimoto.nomi.recall` needs the
+   "Sign In with Apple" capability. With automatic signing, Xcode registers it
+   on the next archive; no manual portal step is usually needed.
+3. Archive build 1.0 (26), upload, attach to the version, and reply to App
+   Review identifying the added login option.
