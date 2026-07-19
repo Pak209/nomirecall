@@ -14,6 +14,8 @@ struct AuthStackView: View {
     @State private var rememberMe = false
     @State private var hasRememberedCredentials = false
     @State private var biometricDisplayName = "Face ID"
+    @Environment(\.colorScheme) private var colorScheme
+
     @State private var isWorking = false
     @State private var isGoogleWorking = false
     @State private var isAppleWorking = false
@@ -151,7 +153,7 @@ struct AuthStackView: View {
                     } onCompletion: { result in
                         handleAppleSignIn(result)
                     }
-                    .signInWithAppleButtonStyle(.black)
+                    .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
                     .frame(height: 44)
                     .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                     .overlay {
@@ -256,7 +258,15 @@ struct AuthStackView: View {
         switch result {
         case .failure(let error):
             // A dismissed Apple sheet is a normal outcome, not an error state.
-            if !AppleSignInError.isCancellation(error) {
+            if AppleSignInError.isCancellation(error) {
+                return
+            }
+
+            // Raw ASAuthorizationError descriptions read like debugger output
+            // ("The operation couldn't be completed…"); show something human.
+            if error is ASAuthorizationError {
+                errorMessage = "Apple sign-in didn't finish. Please try again."
+            } else {
                 errorMessage = error.localizedDescription
             }
         case .success(let authorization):
